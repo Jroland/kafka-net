@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Text;
 
-namespace kafka_net.Common
+namespace Kafka.Common
 {
     public static class Extensions
     {

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using kafka_net.Common;
+using Kafka.Common;
 
 namespace Kafka.Client
 {
@@ -22,6 +22,9 @@ namespace Kafka.Client
             _readTimeoutMS = readTimeoutMS;
         }
 
+        /// <summary>
+        /// Uri connection to kafka server.
+        /// </summary>
         public Uri KafkaUri
         {
             get { return _kafkaUri; }
