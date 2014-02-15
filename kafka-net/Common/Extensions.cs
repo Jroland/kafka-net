@@ -6,8 +6,28 @@ namespace Kafka.Common
 {
     public static class Extensions
     {
+        public static byte[] ToIntSizedBytes(this string value)
+        {
+            if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
+
+            return value.Length.ToBytes()
+                        .Concat(value.ToBytes())
+                        .ToArray();
+        }
+
+        public static byte[] ToInt16SizedBytes(this string value)
+        {
+            if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
+
+            return ((Int16)value.Length).ToBytes()
+                        .Concat(value.ToBytes())
+                        .ToArray();
+        }
+
         public static byte[] ToBytes(this string value)
         {
+            if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
+            
             return Encoding.UTF8.GetBytes(value).Reverse().ToArray();
         }
 
@@ -45,8 +65,7 @@ namespace Kafka.Common
         {
             return BitConverter.GetBytes(value).Reverse().ToArray();
         }
-
-
+        
         public static Int32 ToInt32(this byte[] value)
         {
             return BitConverter.ToInt32(value, 0);
