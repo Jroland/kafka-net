@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Kafka.Common;
+using Kafka.Model;
 using kafka_net.Common;
 
 namespace Kafka

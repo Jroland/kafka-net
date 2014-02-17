@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Kafka.Common;
 
-namespace Kafka
+namespace Kafka.Model
 {
     public class Topic
     {

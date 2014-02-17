@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Kafka;
+using Kafka.Model;
 using NUnit.Framework;
 using kafka_net.Common;
 

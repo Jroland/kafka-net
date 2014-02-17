@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
-using Kafka.Common;
 
-namespace Kafka
+
+namespace Kafka.Model
 {
     /// <summary>
     /// Payload represents a collection of messages to be posted to a specified Topic on specified Partition.
