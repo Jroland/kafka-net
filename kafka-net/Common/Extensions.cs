@@ -69,7 +69,7 @@ namespace Kafka.Common
         
         public static Int32 ToInt32(this byte[] value)
         {
-            return BitConverter.ToInt32(value, 0);
+            return BitConverter.ToInt32(value.Reverse().ToArray(), 0);
         }
     }
 }

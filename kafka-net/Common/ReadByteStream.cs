@@ -25,6 +25,21 @@ namespace Kafka.Common
             return ReadBytes(1).First();
         }
 
+        public int ReadInt()
+        {
+            return BitConverter.ToInt32(ReadBytes(4), 0);
+        }
+
+        public long ReadLong()
+        {
+            return BitConverter.ToInt64(ReadBytes(8), 0);
+        }
+
+        public Int16 ReadInt16()
+        {
+            return BitConverter.ToInt16(ReadBytes(2), 0);
+        }
+
         public byte[] ReadBytes(int size)
         {
             return ReadBytesFromStream(size).Reverse().ToArray();
@@ -35,9 +50,16 @@ namespace Kafka.Common
             return Encoding.UTF8.GetString(ReadBytesFromStream(size));
         }
 
+        public string ReadInt16String()
+        {
+            var size = ReadInt16();
+            if (size == -1) return null;
+            return ReadString(size);
+        }
+
         public string ReadIntString()
         {
-            var size = BitConverter.ToInt32(ReadBytes(4), 0);
+            var size = ReadInt();
             if (size == -1) return null;
             return ReadString(size);
         }

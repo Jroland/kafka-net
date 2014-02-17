@@ -26,19 +26,19 @@ namespace Kafka
         public string Value { get; set; }
     }
 
-    public class ProduceRequest
+    public interface IKafkaRequest
     {
-        /// <summary>
-        /// Descriptive name of the source of the messages sent to kafka
-        /// </summary>
-        public string ClientId = "Kafka-Net";
+        string ClientId { get; set; }
+        int CorrelationId { get; set; }
+        ProtocolEncoding EncodingKey { get; }
+    }
 
-        public int CorrelationId { get; set; }
+    public class ProduceRequest : BaseRequest, IKafkaRequest
+    { 
         /// <summary>
         /// Indicates the type of kafka encoding this request is
         /// </summary>
         public ProtocolEncoding EncodingKey { get { return ProtocolEncoding.Produce; } }
-
         /// <summary>
         /// Time kafka will wait for requested ack level before returning.
         /// </summary>
@@ -51,5 +51,50 @@ namespace Kafka
         /// Collection of payloads to post to kafka
         /// </summary>
         public List<Payload> Payload = new List<Payload>();
+    }
+
+    public class FetchRequest : BaseRequest, IKafkaRequest
+    {
+        /// <summary>
+        /// Indicates the type of kafka encoding this request is
+        /// </summary>
+        public ProtocolEncoding EncodingKey { get { return ProtocolEncoding.Fetch; } }
+    }
+
+    public class MetadataRequest : BaseRequest, IKafkaRequest
+    {
+        /// <summary>
+        /// Indicates the type of kafka encoding this request is
+        /// </summary>
+        public ProtocolEncoding EncodingKey { get { return ProtocolEncoding.MetaData; } }
+
+        /// <summary>
+        /// The list of topics to get metadata for.
+        /// </summary>
+        public List<string> Topics { get; set; }
+    }
+
+    public class MetadataResponse
+    {
+        public MetadataResponse()
+        {
+            Brokers = new List<Broker>();
+            Topics = new List<Topic>();
+        }
+
+        public List<Broker> Brokers { get; set; }
+        public List<Topic> Topics { get; set; }
+    }
+
+    public abstract class BaseRequest
+    {
+        private string _clientId = "Kafka-Net";
+
+        /// <summary>
+        /// Descriptive name of the source of the messages sent to kafka
+        /// </summary>
+        public string ClientId { get { return _clientId; } set { _clientId = value; } }
+
+        public int CorrelationId { get; set; }
     }
 }

@@ -16,7 +16,7 @@ namespace kafka_tests
         public void EnsureHeaderShouldPackCorrectByteLengths()
         {
             var protocol = new Protocol();
-            var result = protocol.EncodeHeader("test", 123456789, ProtocolEncoding.Fetch);
+            var result = protocol.EncodeHeader(new FetchRequest {ClientId = "test", CorrelationId = 123456789});
 
             Assert.That(result.Length, Is.EqualTo(14));
             Assert.That(result, Is.EqualTo(new byte[] { 0, 1, 0, 0, 7, 91, 205, 21, 0, 4, 116, 101, 115, 116 }));

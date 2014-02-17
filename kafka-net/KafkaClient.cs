@@ -22,5 +22,11 @@ namespace Kafka
         {
             _conn.SendAsync(_protocol.EncodeProduceRequest(request)).Wait();
         }
+
+        public async Task<MetadataResponse> SendAsync(MetadataRequest request)
+        {
+            var response = await _conn.SendReceiveAsync(_protocol.EncodeMetadataRequest(request));
+            return _protocol.DecodeMetadataResponse(response);
+        }
     }
 }

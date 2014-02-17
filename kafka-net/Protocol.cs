@@ -24,14 +24,20 @@ namespace Kafka
 
         private readonly static Crc32 Crc32 = new Crc32();
 
-        public byte[] EncodeHeader(string clientId, int correlationId, ProtocolEncoding requestKey)
+        /// <summary>
+        /// Encode the common head for kafka request.
+        /// </summary>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        /// <remarks>Format: (hhihs) </remarks>
+        public byte[] EncodeHeader(IKafkaRequest request)
         {
             var message = new WriteByteStream();
 
-            message.Pack(((Int16)requestKey).ToBytes(),
+            message.Pack(((Int16)request.EncodingKey).ToBytes(),
                           ApiVersion.ToBytes(),
-                          correlationId.ToBytes(),
-                          clientId.ToInt16SizedBytes());
+                          request.CorrelationId.ToBytes(),
+                          request.ClientId.ToInt16SizedBytes());
 
             return message.Payload();
         }
@@ -105,7 +111,7 @@ namespace Kafka
 
             var topicGroups = request.Payload.GroupBy(x => x.Topic).ToList();
 
-            message.Pack(EncodeHeader(request.ClientId, request.CorrelationId, request.EncodingKey)); //header
+            message.Pack(EncodeHeader(request)); //header
             message.Pack(request.Acks.ToBytes(), request.TimeoutMS.ToBytes(), topicGroups.Count.ToBytes()); //metadata
 
             foreach (var topicGroup in topicGroups)
@@ -124,6 +130,41 @@ namespace Kafka
             message.Prepend(message.Length().ToBytes());
 
             return message.Payload();
+        }
+
+        public byte[] EncodeMetadataRequest(MetadataRequest request)
+        {
+            var message = new WriteByteStream();
+
+            if (request.Topics == null) request.Topics = new List<string>();
+
+            message.Pack(EncodeHeader(request)); //header
+            message.Pack(request.Topics.Count.ToBytes());
+            message.Pack(request.Topics.Select(x => x.ToInt16SizedBytes()).ToArray());
+            message.Prepend(message.Length().ToBytes());
+
+            return message.Payload();
+        }
+
+        public MetadataResponse DecodeMetadataResponse(byte[] data)
+        {
+            var stream = new ReadByteStream(data);
+            var response = new MetadataResponse();
+            var correlationId = stream.ReadInt();
+
+            var brokerCount = stream.ReadInt();
+            for (var i = 0; i < brokerCount; i++)
+            {
+                response.Brokers.Add(Broker.FromStream(stream));
+            }
+
+            var topicCount = stream.ReadInt();
+            for (var i = 0; i < topicCount; i++)
+            {
+                response.Topics.Add(Topic.FromStream(stream));
+            }
+
+            return response;
         }
     }
 }

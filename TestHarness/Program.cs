@@ -15,6 +15,18 @@ namespace TestHarness
 
             var client = new KafkaClient(new Uri("http://CSDKAFKA01:9092"));
 
+            var request = new MetadataRequest
+                {
+                    CorrelationId = 1,
+                    Topics = new List<string>(new[] {"TestHarness"})
+                };
+
+            var result = client.SendAsync(request).Result;
+
+        }
+
+        private static void SendMessageTest(KafkaClient client)
+        {
             var request = new ProduceRequest
                 {
                     ClientId = "kafka-python",

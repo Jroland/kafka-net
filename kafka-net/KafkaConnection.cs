@@ -37,38 +37,33 @@ namespace Kafka
         /// <returns>Task handle to send operation.</returns>
         public async Task SendAsync(byte[] payload)
         {
-            var conn = await GetClient();
-            using (var stream = conn.GetStream())
-            {
-                await stream.WriteAsync(payload, 0, payload.Length);
-            }
+            var stream = await GetStream();
+            await stream.WriteAsync(payload, 0, payload.Length);
         }
 
         /// <summary>
         /// Read a response from kafka server
         /// </summary>
         /// <returns>Task handle with byte[] of response data from kafka.</returns>
-        public async Task<byte[]> ReadAsync()
+        public async Task<byte[]> SendReceiveAsync(byte[] payload)
         {
+            var stream = await GetStream();
+
+            await stream.WriteAsync(payload, 0, payload.Length);
+
             //get message size from header
-            var header = await ReadAsync(4);
+            var header = await ReadAsync(4, stream);
 
             var size = header.ToInt32();
 
-            return await ReadAsync(size);
+            return await ReadAsync(size, stream);
         }
 
-        private async Task<byte[]> ReadAsync(int size)
+        private async Task<byte[]> ReadAsync(int size, NetworkStream stream)
         {
-            var conn = await GetClient();
-            using (var stream = conn.GetStream())
-            {
-                stream.ReadTimeout = _readTimeoutMS;
-
-                var buffer = new byte[size];
-                await stream.ReadAsync(buffer, 0, size);
-                return buffer;
-            }
+            var buffer = new byte[size];
+            await stream.ReadAsync(buffer, 0, size);
+            return buffer;
         }
 
         private async Task<TcpClient> GetClient()
@@ -80,9 +75,18 @@ namespace Kafka
             return _client;
         }
 
+        private async Task<NetworkStream> GetStream()
+        {
+            var client = await GetClient();
+            var stream = client.GetStream();
+            stream.ReadTimeout = _readTimeoutMS;
+            return stream;
+        }
+
         public void Dispose()
         {
             using (_client)
+            using (_client.GetStream())
             {
 
             }
