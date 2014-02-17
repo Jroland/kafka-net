@@ -31,8 +31,7 @@ namespace Kafka
             message.Pack(((Int16)requestKey).ToBytes(),
                           ApiVersion.ToBytes(),
                           correlationId.ToBytes(),
-                          ((Int16)clientId.Length).ToBytes(),
-                          clientId.ToBytes());
+                          clientId.ToInt16SizedBytes());
 
             return message.Payload();
         }

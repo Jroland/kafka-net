@@ -19,7 +19,7 @@ namespace kafka_tests
             var result = protocol.EncodeHeader("test", 123456789, ProtocolEncoding.Fetch);
 
             Assert.That(result.Length, Is.EqualTo(14));
-            Assert.That(result, Is.EqualTo(new byte[] { 0, 1, 0, 0, 7, 91, 205, 21, 0, 4, 116, 115, 101, 116 }));
+            Assert.That(result, Is.EqualTo(new byte[] { 0, 1, 0, 0, 7, 91, 205, 21, 0, 4, 116, 101, 115, 116 }));
         }
 
         [Test]

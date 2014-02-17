@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Text;
 using Kafka.Common;
 
@@ -45,7 +46,7 @@ namespace Kafka
         /// <summary>
         /// Level of ack required by kafka.  0 immediate, 1 written to leader, 2+ replicas synced, -1 all replicas
         /// </summary>
-        public int Acks = 0;
+        public Int16 Acks = 1;
         /// <summary>
         /// Collection of payloads to post to kafka
         /// </summary>

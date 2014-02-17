@@ -4,8 +4,21 @@ using System.Linq;
 
 namespace Kafka.Common
 {
+    public enum Endianness
+    {
+        BigEndian,
+        LittleEndian
+    }
+
     public class WriteByteStream
     {
+        private readonly Endianness _endian;
+
+        public WriteByteStream(Endianness endian = Endianness.BigEndian)
+        {
+            _endian = endian;
+        }
+
         private readonly List<byte[]> _message = new List<byte[]>();
 
         public int Length()
