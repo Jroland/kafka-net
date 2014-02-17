@@ -21,8 +21,7 @@ namespace Kafka
     public class Protocol
     {
         private const Int16 ApiVersion = 0;
-
-        private readonly static Crc32 Crc32 = new Crc32();
+        private static readonly Crc32 Crc32 = new Crc32();
 
         /// <summary>
         /// Encode the common head for kafka request.

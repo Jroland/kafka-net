@@ -12,13 +12,12 @@ namespace TestHarness
     {
         static void Main(string[] args)
         {
-
+            
             var client = new KafkaClient(new Uri("http://CSDKAFKA01:9092"));
 
             var request = new MetadataRequest
                 {
-                    CorrelationId = 1,
-                    Topics = new List<string>(new[] {"TestHarness"})
+                    CorrelationId = 1
                 };
 
             var result = client.SendAsync(request).Result;
