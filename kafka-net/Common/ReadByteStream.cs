@@ -19,6 +19,7 @@ namespace Kafka.Common
 
         public byte[] Payload { get { return _payload; } }
         public long Position { get { return _stream.Position; } set { _stream.Position = 0; } }
+        public bool HasData { get { return _stream.Position < _stream.Length; } }
 
         public byte ReadByte()
         {
@@ -62,6 +63,18 @@ namespace Kafka.Common
             var size = ReadInt();
             if (size == -1) return null;
             return ReadString(size);
+        }
+
+        public byte[] ReadInt16PrefixedBytes()
+        {
+            var size = ReadInt16();
+            return ReadBytesFromStream(size);
+        }
+
+        public byte[] ReadIntPrefixedBytes()
+        {
+            var size = ReadInt();
+            return ReadBytesFromStream(size);
         }
 
         public byte[] ReadToEnd()

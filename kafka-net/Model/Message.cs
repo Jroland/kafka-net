@@ -19,8 +19,9 @@ namespace Kafka.Model
     /// </summary>
     public class Message
     {
+        public long Offset { get; set; }
         public byte MagicNumber { get; set; }
-        public byte Attributes { get; set; }
+        public byte Attribute { get; set; }
         public string Key { get; set; }
         public string Value { get; set; }
     }
@@ -58,6 +59,35 @@ namespace Kafka.Model
         /// Indicates the type of kafka encoding this request is
         /// </summary>
         public ProtocolEncoding EncodingKey { get { return ProtocolEncoding.Fetch; } }
+
+        public int MaxWaitTime = 100;
+        public int MinBytes = 4096;
+        public List<Fetch> Fetches { get; set; }
+    }
+
+    public class Fetch
+    {
+        public Fetch()
+        {
+            MaxBytes = 4096;
+        }
+
+        public string Topic { get; set; }
+
+        public int PartitionId { get; set; }
+
+        public long Offset { get; set; }
+
+        public int MaxBytes { get; set; }
+    }
+
+    public class FetchResponse
+    {
+        public string Topic { get; set; }
+        public int PartitionId { get; set; }
+        public Int16 Error { get; set; }
+        public long HighWaterMark { get; set; }
+        public List<Message> Messages { get; set; }
     }
 
     public class MetadataRequest : BaseRequest, IKafkaRequest

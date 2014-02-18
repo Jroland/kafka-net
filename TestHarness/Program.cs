@@ -16,13 +16,32 @@ namespace TestHarness
             
             var client = new KafkaClient(new Uri("http://CSDKAFKA01:9092"));
 
-            var request = new MetadataRequest
+            var request = new FetchRequest
                 {
-                    CorrelationId = 1
+                    CorrelationId = 1,
+                    Fetches = new List<Fetch>(new[]
+                        {
+                            new Fetch
+                                {
+                                    Topic = "TestHarness",
+                                    PartitionId = 0,
+                                    Offset = 0
+                                }
+                        })
                 };
 
             var result = client.SendAsync(request).Result;
 
+        }
+
+        private static void SendMetadataRequest(KafkaClient client)
+        {
+            var request = new MetadataRequest
+            {
+                CorrelationId = 1
+            };
+
+            var result = client.SendAsync(request).Result;
         }
 
         private static void SendMessageTest(KafkaClient client)

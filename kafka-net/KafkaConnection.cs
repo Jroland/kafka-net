@@ -5,11 +5,15 @@ using Kafka.Common;
 
 namespace Kafka
 {
+    /// <summary>
+    /// TODO not currently thread safe
+    /// </summary>
     public class KafkaConnection : IDisposable
     {
         private readonly Uri _kafkaUri;
         private readonly int _readTimeoutMS;
         private readonly TcpClient _client = new TcpClient();
+        private bool _disposed;
 
         /// <summary>
         /// Initializes a new instance of the KafkaConnection class.
@@ -88,7 +92,7 @@ namespace Kafka
             using (_client)
             using (_client.GetStream())
             {
-
+                _disposed = true;
             }
         }
     }

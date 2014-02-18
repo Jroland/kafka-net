@@ -35,8 +35,8 @@ namespace kafka_tests
             };
 
             var encoded = protocol.EncodeMessage(testMessage);
-            encoded[0] = 0;
-            var result = protocol.DecodeMessage(encoded);
+            encoded[0] += 1;
+            var result = protocol.DecodeMessage(0, encoded).First();
         }
 
         [Test]
@@ -54,7 +54,7 @@ namespace kafka_tests
                 };
 
             var encoded = protocol.EncodeMessage(testMessage);
-            var result = protocol.DecodeMessage(encoded);
+            var result = protocol.DecodeMessage(0, encoded).First();
 
             Assert.That(testMessage.Key, Is.EqualTo(result.Key));
             Assert.That(testMessage.Value, Is.EqualTo(result.Value));

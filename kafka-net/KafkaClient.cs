@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Kafka.Model;
 
@@ -24,6 +26,12 @@ namespace Kafka
         {
             var response = await _conn.SendReceiveAsync(_protocol.EncodeMetadataRequest(request));
             return _protocol.DecodeMetadataResponse(response);
+        }
+
+        public async Task<List<FetchResponse>> SendAsync(FetchRequest request)
+        {
+            var response = await _conn.SendReceiveAsync(_protocol.EncodeFetchRequest(request));
+            return _protocol.DecodeFetchResponse(response).ToList();
         }
     }
 }
