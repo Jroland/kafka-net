@@ -9,18 +9,29 @@ using kafka_net.Common;
 
 namespace Kafka
 {
-    public enum ProtocolEncoding
+    public enum ApiKeyRequestType
     {
         Produce = 0,
         Fetch = 1,
         Offset = 2,
         MetaData = 3,
-        OffsetCommit = 8,
-        OffsetFetch = 9
+        LeaderAndIsr = 4,
+        StopReplica = 5,
+        OffsetCommit = 6,
+        OffsetFetch = 7
     }
 
+    /// <summary>
+    /// Kafka Protocol implementation:
+    /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
+    /// </summary>
     public class Protocol
     {
+        /// <summary>
+        /// From Documentation: 
+        /// The replica id indicates the node id of the replica initiating this request. Normal client consumers should always specify this as -1 as they have no node id. 
+        /// Other brokers set this to be their own node id. The value -2 is accepted to allow a non-broker to issue fetch requests as if it were a replica broker for debugging purposes.
+        /// </summary>
         private const int ReplicaId = -1;
         private const Int16 ApiVersion = 0;
         private static readonly Crc32 Crc32 = new Crc32();
@@ -35,7 +46,7 @@ namespace Kafka
         {
             var message = new WriteByteStream();
 
-            message.Pack(((Int16)request.EncodingKey).ToBytes(),
+            message.Pack(((Int16)request.ApiKey).ToBytes(),
                           ApiVersion.ToBytes(),
                           request.CorrelationId.ToBytes(),
                           request.ClientId.ToInt16SizedBytes());
@@ -150,6 +161,33 @@ namespace Kafka
             return message.Payload();
         }
 
+        public IEnumerable<ProduceResponse> DecodeProduceResponse(byte[] data)
+        {
+            var stream = new ReadByteStream(data);
+
+            var correlationId = stream.ReadInt();
+
+            var topicCount = stream.ReadInt();
+            for (int i = 0; i < topicCount; i++)
+            {
+                var topic = stream.ReadInt16String();
+
+                var partitionCount = stream.ReadInt();
+                for (int j = 0; j < partitionCount; j++)
+                {
+                    var response = new ProduceResponse()
+                    {
+                        Topic = topic,
+                        PartitionId = stream.ReadInt(),
+                        Error = stream.ReadInt16(),
+                        Offset = stream.ReadLong()
+                    };
+
+                    yield return response;
+                }
+            }
+        }
+
         /// <summary>
         /// Encode a request for metadata about topic and broker information.
         /// </summary>
@@ -247,6 +285,123 @@ namespace Kafka
                             HighWaterMark = stream.ReadLong()
                         };
                     response.Messages = DecodeMessageSet(stream.ReadIntPrefixedBytes()).ToList();
+                    yield return response;
+                }
+            }
+        }
+
+        public byte[] EncodeOffsetRequest(OffsetRequest request)
+        {
+            var message = new WriteByteStream();
+            if (request.Offsets == null) request.Offsets = new List<Offset>();
+
+            message.Pack(EncodeHeader(request));
+
+            var topicGroups = request.Offsets.GroupBy(x => x.Topic).ToList();
+            message.Pack(ReplicaId.ToBytes(), topicGroups.Count.ToBytes());
+
+            foreach (var topicGroup in topicGroups)
+            {
+                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                message.Pack(topicGroup.Key.ToInt16SizedBytes(), partitions.Count.ToBytes());
+
+                foreach (var partition in partitions)
+                {
+                    foreach (var offset in partition)
+                    {
+                        message.Pack(partition.Key.ToBytes(), offset.Time.ToBytes(), offset.MaxOffsets.ToBytes());
+                    }
+                }
+            }
+
+            message.Prepend(message.Length().ToBytes());
+
+            return message.Payload();
+        }
+
+        public IEnumerable<OffsetResponse> DecodeOffsetResponse(byte[] data)
+        {
+            var stream = new ReadByteStream(data);
+
+            var correlationId = stream.ReadInt();
+
+            var topicCount = stream.ReadInt();
+            for (int i = 0; i < topicCount; i++)
+            {
+                var topic = stream.ReadInt16String();
+
+                var partitionCount = stream.ReadInt();
+                for (int j = 0; j < partitionCount; j++)
+                {
+                    var response = new OffsetResponse()
+                    {
+                        Topic = topic,
+                        PartitionId = stream.ReadInt(),
+                        Error = stream.ReadInt16(),
+                        Offsets = new List<long>()
+                    };
+                    var offsetCount = stream.ReadInt();
+                    for (int k = 0; k < offsetCount; k++)
+                    {
+                        response.Offsets.Add(stream.ReadLong());
+                    }
+
+                    yield return response;
+                }
+            }
+        }
+
+        public byte[] EncodeOffsetCommitRequest(OffsetCommitRequest request)
+        {
+            var message = new WriteByteStream();
+            if (request.OffsetCommits == null) request.OffsetCommits = new List<OffsetCommit>();
+
+            message.Pack(EncodeHeader(request));
+            message.Pack(request.ConsumerGroup.ToInt16SizedBytes());
+
+            var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
+            message.Pack(topicGroups.Count.ToBytes());
+
+            foreach (var topicGroup in topicGroups)
+            {
+                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                message.Pack(topicGroup.Key.ToInt16SizedBytes(), partitions.Count.ToBytes());
+
+                foreach (var partition in partitions)
+                {
+                    foreach (var commit in partition)
+                    {
+                        message.Pack(partition.Key.ToBytes(), commit.Offset.ToBytes(), commit.Metadata.ToInt16SizedBytes());
+                    }
+                }
+            }
+
+            message.Prepend(message.Length().ToBytes());
+
+            return message.Payload();
+        }
+
+        public IEnumerable<OffsetCommitResponse> DecodeOffsetCommitResponse(byte[] data)
+        {
+            var stream = new ReadByteStream(data);
+
+            var correlationId = stream.ReadInt();
+
+            var topicCount = stream.ReadInt();
+            for (int i = 0; i < topicCount; i++)
+            {
+                var topic = stream.ReadInt16String();
+
+                var partitionCount = stream.ReadInt();
+                for (int j = 0; j < partitionCount; j++)
+                {
+                    var response = new OffsetCommitResponse()
+                    {
+                        Topic = topic,
+                        PartitionId = stream.ReadInt(),
+                        Error = stream.ReadInt16()
+                    };
+                   
                     yield return response;
                 }
             }

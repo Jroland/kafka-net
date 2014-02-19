@@ -19,10 +19,22 @@ namespace Kafka.Model
     /// </summary>
     public class Message
     {
+        /// <summary>
+        /// The offset of the message within the kafka log.
+        /// </summary>
         public long Offset { get; set; }
         public byte MagicNumber { get; set; }
+        /// <summary>
+        /// Attribute value outside message body used for added codec/compression info.
+        /// </summary>
         public byte Attribute { get; set; }
+        /// <summary>
+        /// Key value used for routing message to partitions.
+        /// </summary>
         public string Key { get; set; }
+        /// <summary>
+        /// The message body contents.  Can contain compress message set.
+        /// </summary>
         public string Value { get; set; }
     }
 
@@ -30,15 +42,15 @@ namespace Kafka.Model
     {
         string ClientId { get; set; }
         int CorrelationId { get; set; }
-        ProtocolEncoding EncodingKey { get; }
+        ApiKeyRequestType ApiKey { get; }
     }
 
     public class ProduceRequest : BaseRequest, IKafkaRequest
-    { 
+    {
         /// <summary>
         /// Indicates the type of kafka encoding this request is
         /// </summary>
-        public ProtocolEncoding EncodingKey { get { return ProtocolEncoding.Produce; } }
+        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Produce; } }
         /// <summary>
         /// Time kafka will wait for requested ack level before returning.
         /// </summary>
@@ -53,12 +65,29 @@ namespace Kafka.Model
         public List<Payload> Payload = new List<Payload>();
     }
 
+    public class ProduceResponse
+    {
+        /// <summary>
+        /// The topic the offset came from.
+        /// </summary>
+        public string Topic { get; set; }
+        /// <summary>
+        /// The partition the offset came from.
+        /// </summary>
+        public int PartitionId { get; set; }
+        /// <summary>
+        /// The offset number to commit as completed.
+        /// </summary>
+        public Int16 Error { get; set; }
+        public long Offset { get; set; }
+    }
+
     public class FetchRequest : BaseRequest, IKafkaRequest
     {
         /// <summary>
         /// Indicates the type of kafka encoding this request is
         /// </summary>
-        public ProtocolEncoding EncodingKey { get { return ProtocolEncoding.Fetch; } }
+        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Fetch; } }
 
         public int MaxWaitTime = 100;
         public int MinBytes = 4096;
@@ -90,12 +119,78 @@ namespace Kafka.Model
         public List<Message> Messages { get; set; }
     }
 
+    public class OffsetCommitRequest : BaseRequest, IKafkaRequest
+    {
+        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetCommit; } }
+        public string ConsumerGroup { get; set; }
+        public List<OffsetCommit> OffsetCommits { get; set; }
+    }
+
+    public class OffsetCommit
+    {
+        /// <summary>
+        /// The topic the offset came from.
+        /// </summary>
+        public string Topic { get; set; }
+        /// <summary>
+        /// The partition the offset came from.
+        /// </summary>
+        public int PartitionId { get; set; }
+        /// <summary>
+        /// The offset number to commit as completed.
+        /// </summary>
+        public long Offset { get; set; }
+        /// <summary>
+        /// Descriptive metadata about this commit.
+        /// </summary>
+        public string Metadata { get; set; }
+    }
+
+    public class OffsetCommitResponse
+    {
+        public string Topic { get; set; }
+        public int PartitionId { get; set; }
+        public Int16 Error { get; set; }
+    }
+
+    public class OffsetRequest : BaseRequest, IKafkaRequest
+    {
+        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Offset; } }
+        public List<Offset> Offsets { get; set; }
+    }
+
+    public class Offset
+    {
+        public Offset()
+        {
+            Time = -1;
+            MaxOffsets = 1;
+        }
+        public string Topic { get; set; }
+        public int PartitionId { get; set; }
+        /// <summary>
+        /// Used to ask for all messages before a certain time (ms). There are two special values. 
+        /// Specify -1 to receive the latest offsets and -2 to receive the earliest available offset. 
+        /// Note that because offsets are pulled in descending order, asking for the earliest offset will always return you a single element.
+        /// </summary>
+        public long Time { get; set; }
+        public int MaxOffsets { get; set; }
+    }
+
+    public class OffsetResponse
+    {
+        public string Topic { get; set; }
+        public int PartitionId { get; set; }
+        public Int16 Error { get; set; }
+        public List<long> Offsets { get; set; }
+    }
+
     public class MetadataRequest : BaseRequest, IKafkaRequest
     {
         /// <summary>
         /// Indicates the type of kafka encoding this request is
         /// </summary>
-        public ProtocolEncoding EncodingKey { get { return ProtocolEncoding.MetaData; } }
+        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.MetaData; } }
 
         /// <summary>
         /// The list of topics to get metadata for.

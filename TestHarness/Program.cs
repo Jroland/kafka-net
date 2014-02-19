@@ -1,9 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 using Kafka;
 using Kafka.Model;
 
@@ -15,11 +11,54 @@ namespace TestHarness
         {
             
             var client = new KafkaClient(new Uri("http://CSDKAFKA01:9092"));
+            SendMessageTest(client);
+        }
 
+        private static void SendOffsetCommitRequest(KafkaClient client)
+        {
+            var request = new OffsetCommitRequest()
+            {
+                CorrelationId = 1,
+                ConsumerGroup = "TestHarnessGroup",
+                OffsetCommits = new List<OffsetCommit>(new[]{
+                    new OffsetCommit{
+                        Topic = "TestHarness",
+                        PartitionId = 0,
+                        Offset = 6,
+                        Metadata = "Test metadata"
+                    }
+                })
+            };
+
+            var result = client.SendAsync(request).Result;
+        }
+
+        private static void SendOffsetRequest(KafkaClient client)
+        {
+            var request = new OffsetRequest
+            {
+                CorrelationId = 1,
+                Offsets = new List<Offset>(new[]
+                        {
+                            new Offset
+                                {
+                                    Topic = "TestHarness",
+                                    PartitionId = 0,
+                                    MaxOffsets = 1,
+                                    Time = -1
+                                }
+                        })
+            };
+
+            var result = client.SendAsync(request).Result;
+        }
+
+        private static void SendFetchRequest(KafkaClient client)
+        {
             var request = new FetchRequest
-                {
-                    CorrelationId = 1,
-                    Fetches = new List<Fetch>(new[]
+            {
+                CorrelationId = 1,
+                Fetches = new List<Fetch>(new[]
                         {
                             new Fetch
                                 {
@@ -28,10 +67,9 @@ namespace TestHarness
                                     Offset = 0
                                 }
                         })
-                };
+            };
 
             var result = client.SendAsync(request).Result;
-
         }
 
         private static void SendMetadataRequest(KafkaClient client)
@@ -60,7 +98,7 @@ namespace TestHarness
                         })
                 };
 
-            client.Send(request);
+            var result = client.SendAsync(request).Result;
         }
     }
 }
