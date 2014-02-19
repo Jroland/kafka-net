@@ -1,6 +1,6 @@
-﻿using Kafka.Common;
+﻿using KafkaNet.Common;
 
-namespace Kafka.Model
+namespace KafkaNet.Model
 {
     public class Broker
     {

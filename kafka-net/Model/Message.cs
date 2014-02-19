@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 
 
-namespace Kafka.Model
+namespace KafkaNet.Model
 {
     /// <summary>
     /// Payload represents a collection of messages to be posted to a specified Topic on specified Partition.

@@ -7,7 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Security.Cryptography;
 
-namespace Kafka.Common
+namespace KafkaNet.Common
 {
     /// <summary>
     /// Implements a 32-bit CRC hash algorithm compatible with Zip etc.

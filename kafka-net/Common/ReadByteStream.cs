@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace Kafka.Common
+namespace KafkaNet.Common
 {
     public class ReadByteStream
     {

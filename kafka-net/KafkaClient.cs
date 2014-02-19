@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Kafka.Model;
+using KafkaNet.Model;
 
-namespace Kafka
+namespace KafkaNet
 {
     public class KafkaClient
     {

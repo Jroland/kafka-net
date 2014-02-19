@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Net.Sockets;
 using System.Threading.Tasks;
-using Kafka.Common;
+using KafkaNet.Common;
 
-namespace Kafka
+namespace KafkaNet
 {
     /// <summary>
     /// TODO not currently thread safe

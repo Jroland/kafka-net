@@ -8,9 +8,9 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyTitle("kafka-net")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("TP")]
+[assembly: AssemblyCompany("James Roland")]
 [assembly: AssemblyProduct("kafka-net")]
-[assembly: AssemblyCopyright("Copyright © TP 2014")]
+[assembly: AssemblyCopyright("Copyright © James Roland 2014")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

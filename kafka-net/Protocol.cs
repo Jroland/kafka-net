@@ -1,13 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Kafka.Common;
-using Kafka.Model;
-using kafka_net.Common;
+using KafkaNet.Common;
+using KafkaNet.Model;
 
-namespace Kafka
+
+namespace KafkaNet
 {
     public enum ApiKeyRequestType
     {

@@ -1,12 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Kafka;
-using Kafka.Model;
+﻿using System.Linq;
+using KafkaNet;
+using KafkaNet.Common;
+using KafkaNet.Model;
 using NUnit.Framework;
-using kafka_net.Common;
+
 
 namespace kafka_tests
 {

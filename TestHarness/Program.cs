@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using Kafka;
-using Kafka.Model;
+using KafkaNet;
+using KafkaNet.Model;
 
 namespace TestHarness
 {
