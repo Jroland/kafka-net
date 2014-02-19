@@ -20,7 +20,7 @@ namespace Kafka
         /// </summary>
         /// <param name="serverAddress"></param>
         /// <param name="readTimeoutMS">The timeout for read operations</param>
-        public KafkaConnection(Uri serverAddress, int readTimeoutMS = 30000)
+        public KafkaConnection(Uri serverAddress, int readTimeoutMS = 5000)
         {
             _kafkaUri = serverAddress;
             _readTimeoutMS = readTimeoutMS;
