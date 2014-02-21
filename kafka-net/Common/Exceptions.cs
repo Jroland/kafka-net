@@ -6,4 +6,9 @@ namespace KafkaNet.Common
     {
         public FailCrcCheckException(string message) : base(message) { }
     }
+
+    public class ResponseTimeoutException : Exception
+    {
+        public ResponseTimeoutException(string message) : base(message) { }
+    } 
 }

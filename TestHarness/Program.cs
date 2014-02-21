@@ -11,7 +11,7 @@ namespace TestHarness
         {
             
             var client = new KafkaClient(new Uri("http://CSDKAFKA01:9092"));
-            SendMessageTest(client);
+            SendMetadataRequest(client);
         }
 
         private static void SendOffsetCommitRequest(KafkaClient client)
@@ -74,10 +74,10 @@ namespace TestHarness
 
         private static void SendMetadataRequest(KafkaClient client)
         {
-            var request = new MetadataRequest
-            {
-                CorrelationId = 1
-            };
+            var request = new MetadataRequest()
+                {
+                    Topics = new List<string>(new[] {"UnitTest"})
+                };
 
             var result = client.SendAsync(request).Result;
         }

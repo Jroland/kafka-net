@@ -19,6 +19,26 @@ namespace KafkaNet
         OffsetFetch = 7
     }
 
+    public enum ErrorResponseCode
+    {
+        NoError = 0,
+        Unknown = -1, 
+        OffsetOutOfRange =1,
+        InvalidMessage = 2,
+        UnknownTopicOrPartition = 3,
+        InvalidMessageSize = 4,
+        LeaderNotAvailable = 5,
+        NotLeaderForPartition = 6,
+        RequestTimedOut = 7,
+        BrokerNotAvailable = 8,
+        ReplicaNotAvailable = 9,
+        MessageSizeTooLarge = 10,
+        StaleControllerEpochCode = 11,
+        OffsetMetadataTooLargeCode = 12
+    }
+
+
+
     /// <summary>
     /// Kafka Protocol implementation:
     /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol

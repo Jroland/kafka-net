@@ -42,6 +42,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="KafkaRouter.cs" />
     <Compile Include="Model\Broker.cs" />
     <Compile Include="Common\ReadByteStream.cs" />
     <Compile Include="Common\Crc32.cs" />

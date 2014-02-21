@@ -5,23 +5,36 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Model;
+using KafkaNet.Common;
+
 
 namespace KafkaNet
 {
-    public class KafkaClient
+    /// <summary>
+    /// TODO: need to put in place a way to record and log errors.
+    /// </summary>
+    public class KafkaClient : IDisposable
     {
+        private const int DefaultResonseTimeout = 5000;
         private readonly KafkaConnection _conn;
         private readonly Protocol _protocol;
         private readonly ConcurrentDictionary<int, AsyncRequest> _requestIndex = new ConcurrentDictionary<int, AsyncRequest>();
-
-        private int _correlationId;
         
+        private readonly Timer _indexTimeoutTimer;
+        private readonly int _responseTimeoutMS;
 
-        public KafkaClient(Uri connection)
+        private int _correlationIdSeed;
+        
+        public KafkaClient(Uri connection, int resopnseTimeoutMS = DefaultResonseTimeout)
         {
             _conn = new KafkaConnection(connection);
+            _conn.OnResponseReceived += OnResponseReceived;
             _protocol = new Protocol();
+            _indexTimeoutTimer = new Timer(ResponseTimeoutCallback, null, TimeSpan.FromMilliseconds(resopnseTimeoutMS), TimeSpan.FromMilliseconds(100));
+            _responseTimeoutMS = resopnseTimeoutMS;
         }
+
+        public int ResponseTimeoutMS { get { return _responseTimeoutMS; } }
 
         public Task<List<ProduceResponse>> SendAsync(ProduceRequest request)
         {
@@ -84,7 +97,7 @@ namespace KafkaNet
         {
             var tcs = new TaskCompletionSource<T>();
 
-            var asynRequest = new AsyncRequest(request.CorrelationId, request.ApiKey);
+            var asynRequest = new AsyncRequest(request.CorrelationId);
             asynRequest.TaskSource.Task.ContinueWith(data =>
             {
                 try
@@ -104,28 +117,75 @@ namespace KafkaNet
             return tcs.Task;
         }
 
+        private void OnResponseReceived(byte[] payload)
+        {
+            try
+            {
+                var correlationId = payload.Take(4).ToArray().ToInt32();
+                AsyncRequest asyncRequest;
+                if (_requestIndex.TryRemove(correlationId, out asyncRequest))
+                {
+                    asyncRequest.TaskSource.SetResult(payload);
+                }
+                else
+                {
+                    //TODO received a message but failed to find it in the index
+                }
+            }
+            catch (Exception ex)
+            {
+                //TODO record unexpected failure
+            }
+        }
+
         private int NextCorrelationId()
         {
-            var id = Interlocked.Increment(ref _correlationId);
+            var id = Interlocked.Increment(ref _correlationIdSeed);
             if (id > int.MaxValue - 100) //somewhere close to max reset.
             {
-                Interlocked.Add(ref _correlationId, -1 * id);
+                Interlocked.Add(ref _correlationIdSeed, -1 * id);
             }
             return id;
+        }
+
+        /// <summary>
+        /// Iterates the waiting response index for any requests that should be timed out and marks as exception.
+        /// </summary>
+        private void ResponseTimeoutCallback(object state)
+        {
+            var timeouts = _requestIndex.Values.Where(x => x.CreatedOn < DateTime.UtcNow.AddMinutes(-1)).ToList();
+
+            foreach (var timeout in timeouts)
+            {
+                AsyncRequest request;
+                if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
+                {
+                    request.TaskSource.SetException(new ResponseTimeoutException(
+                        string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            using(_indexTimeoutTimer)
+            using (_conn)
+            {
+
+            }
         }
     }
 
     class AsyncRequest
     {
-        public AsyncRequest(int correlationId, ApiKeyRequestType apiKey)
+        public AsyncRequest(int correlationId)
         {
-            DecodeKey = apiKey;
+            CorrelationId = correlationId;
             CreatedOn = DateTime.UtcNow;
             TaskSource = new TaskCompletionSource<byte[]>();
         }
 
         public int CorrelationId { get; set; }
-        public ApiKeyRequestType DecodeKey { get; set; }
         public TaskCompletionSource<byte[]> TaskSource { get; set; }
         public DateTime CreatedOn { get; set; }
     }

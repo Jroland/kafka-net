@@ -48,7 +48,7 @@ namespace KafkaNet.Model
     public class ProduceRequest : BaseRequest, IKafkaRequest
     {
         /// <summary>
-        /// Indicates the type of kafka encoding this request is
+        /// Indicates the type of kafka encoding this request is.
         /// </summary>
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Produce; } }
         /// <summary>

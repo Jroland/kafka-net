@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="Integration\IntegrationAssets.cs" />
     <Compile Include="Integration\KafkaClientTests.cs" />
+    <Compile Include="RequestFactory.cs" />
     <Compile Include="Unit\ProtocolTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

@@ -1,4 +1,5 @@
-﻿using KafkaNet.Common;
+﻿using System;
+using KafkaNet.Common;
 
 namespace KafkaNet.Model
 {
@@ -7,6 +8,7 @@ namespace KafkaNet.Model
         public int BrokerId { get; set; }
         public string Host { get; set; }
         public int Port { get; set; }
+        public Uri Address { get { return new Uri(string.Format("http://{0}:{1}", Host, Port));} }
 
         public static Broker FromStream(ReadByteStream stream)
         {

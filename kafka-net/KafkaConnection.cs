@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -8,15 +7,19 @@ using KafkaNet.Common;
 namespace KafkaNet
 {
     /// <summary>
-    /// TODO not currently thread safe
+    /// KafkaConnection represents the lowest level TCP stream connection to a Kafka broker. 
+    /// The Send and Receive are separated into two disconnected paths and must be combine outside
+    /// this class by the correlation ID contained within the returned message.
+    /// 
+    /// The SendAsync function will return a Task and complete once the data has been sent to the outbound stream.
+    /// The Read response is handled by a single thread polling the stream for data and firing an OnResponseReceived
+    /// event when a response is received.
     /// </summary>
     public class KafkaConnection : IDisposable
     {
         public delegate void ResponseReceived(byte[] payload);
-        public event ResponseReceived OnReponseReceived;
+        public event ResponseReceived OnResponseReceived;
 
-        private readonly BlockingCollection<byte[]> _readQueue = new BlockingCollection<byte[]>(100);
-        private readonly ConcurrentDictionary<int, TaskCompletionSource<byte[]>> _requestIndex = new ConcurrentDictionary<int, TaskCompletionSource<byte[]>>();
         private readonly object _threadLock = new object();
         private readonly Uri _kafkaUri;
         private readonly int _readTimeoutMS;
@@ -36,7 +39,7 @@ namespace KafkaNet
         }
 
         /// <summary>
-        /// Indicates thread is polling the stream for data to read.
+        /// Indicates a thread is polling the stream for data to read.
         /// </summary>
         public bool ReadPolling
         {
@@ -52,7 +55,7 @@ namespace KafkaNet
         }
 
         /// <summary>
-        /// Send payload to the kafka server
+        /// Send payload to the kafka server and complete task once payload is sent.
         /// </summary>
         /// <param name="payload">kafka protocol formatted byte[] payload</param>
         /// <returns>Task handle to send operation.</returns>
@@ -67,9 +70,11 @@ namespace KafkaNet
             stream.Read(buffer, 0, size);
             return buffer;
         }
-        
+
         private void StartReadPoller()
         {
+            //This thread will poll the receive stream for data, parce a message out
+            //and trigger an event with the message payload
             Task.Factory.StartNew(() =>
                 {
                     while (_interrupt == false)
@@ -82,15 +87,15 @@ namespace KafkaNet
                             var stream = GetStream();
                             while (_interrupt == false)
                             {
-                                if (stream.DataAvailable)
+                                while (stream.DataAvailable)
                                 {
                                     //get message size
                                     var size = Read(4, stream).ToInt32();
 
-                                    //load message place on return queue
-                                    if (OnReponseReceived != null)
-                                        OnReponseReceived(Read(size, stream));
+                                    //load message and fire event with payload
+                                    if (OnResponseReceived != null) OnResponseReceived(Read(size, stream));
                                 }
+                                Thread.Sleep(100);
                             }
                         }
                         catch (Exception ex)
