@@ -200,6 +200,7 @@ namespace KafkaNet.Model
 
     public class MetadataResponse
     {
+        public int CorrelationId { get; set; }
         public MetadataResponse()
         {
             Brokers = new List<Broker>();
@@ -213,12 +214,17 @@ namespace KafkaNet.Model
     public abstract class BaseRequest
     {
         private string _clientId = "Kafka-Net";
+        private int _correlationId = 1;
 
         /// <summary>
         /// Descriptive name of the source of the messages sent to kafka
         /// </summary>
         public string ClientId { get { return _clientId; } set { _clientId = value; } }
 
-        public int CorrelationId { get; set; }
+        /// <summary>
+        /// Value supplied will be passed back in the response by the server unmodified. 
+        /// It is useful for matching request and response between the client and server. 
+        /// </summary>
+        public int CorrelationId { get { return _correlationId; } set { _correlationId = value; } }
     }
 }

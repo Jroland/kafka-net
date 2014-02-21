@@ -215,7 +215,7 @@ namespace KafkaNet
         {
             var stream = new ReadByteStream(data);
             var response = new MetadataResponse();
-            var correlationId = stream.ReadInt();
+            response.CorrelationId = stream.ReadInt();
 
             var brokerCount = stream.ReadInt();
             for (var i = 0; i < brokerCount; i++)

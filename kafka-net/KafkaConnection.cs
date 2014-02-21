@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
 
@@ -10,10 +12,17 @@ namespace KafkaNet
     /// </summary>
     public class KafkaConnection : IDisposable
     {
+        public delegate void ResponseReceived(byte[] payload);
+        public event ResponseReceived OnReponseReceived;
+
+        private readonly BlockingCollection<byte[]> _readQueue = new BlockingCollection<byte[]>(100);
+        private readonly ConcurrentDictionary<int, TaskCompletionSource<byte[]>> _requestIndex = new ConcurrentDictionary<int, TaskCompletionSource<byte[]>>();
+        private readonly object _threadLock = new object();
         private readonly Uri _kafkaUri;
         private readonly int _readTimeoutMS;
-        private readonly TcpClient _client = new TcpClient();
-        private bool _disposed;
+        private TcpClient _client;
+        private bool _interrupt;
+        private int _readerActive;
 
         /// <summary>
         /// Initializes a new instance of the KafkaConnection class.
@@ -24,6 +33,14 @@ namespace KafkaNet
         {
             _kafkaUri = serverAddress;
             _readTimeoutMS = readTimeoutMS;
+        }
+
+        /// <summary>
+        /// Indicates thread is polling the stream for data to read.
+        /// </summary>
+        public bool ReadPolling
+        {
+            get { return _readerActive >= 1; }
         }
 
         /// <summary>
@@ -39,49 +56,76 @@ namespace KafkaNet
         /// </summary>
         /// <param name="payload">kafka protocol formatted byte[] payload</param>
         /// <returns>Task handle to send operation.</returns>
-        public async Task SendAsync(byte[] payload)
+        public Task SendAsync(byte[] payload)
         {
-            var stream = await GetStream();
-            await stream.WriteAsync(payload, 0, payload.Length);
+            return GetStream().WriteAsync(payload, 0, payload.Length);
         }
-
-        /// <summary>
-        /// Read a response from kafka server
-        /// </summary>
-        /// <returns>Task handle with byte[] of response data from kafka.</returns>
-        public async Task<byte[]> SendReceiveAsync(byte[] payload)
-        {
-            var stream = await GetStream();
-
-            await stream.WriteAsync(payload, 0, payload.Length);
-
-            //get message size from header
-            var header = await ReadAsync(4, stream);
-
-            var size = header.ToInt32();
-
-            return await ReadAsync(size, stream);
-        }
-
-        private async Task<byte[]> ReadAsync(int size, NetworkStream stream)
+        
+        private byte[] Read(int size, NetworkStream stream)
         {
             var buffer = new byte[size];
-            await stream.ReadAsync(buffer, 0, size);
+            stream.Read(buffer, 0, size);
             return buffer;
         }
-
-        private async Task<TcpClient> GetClient()
+        
+        private void StartReadPoller()
         {
-            if (_client.Connected == false)
+            Task.Factory.StartNew(() =>
+                {
+                    while (_interrupt == false)
+                    {
+                        try
+                        {
+                            //only allow one reader to execute
+                            if (Interlocked.Increment(ref _readerActive) > 1) return;
+
+                            var stream = GetStream();
+                            while (_interrupt == false)
+                            {
+                                if (stream.DataAvailable)
+                                {
+                                    //get message size
+                                    var size = Read(4, stream).ToInt32();
+
+                                    //load message place on return queue
+                                    if (OnReponseReceived != null)
+                                        OnReponseReceived(Read(size, stream));
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            //record exception and continue to scan for data
+                        }
+                        finally
+                        {
+                            Interlocked.Decrement(ref _readerActive);
+                        }
+                    }
+                });
+        }
+
+        private TcpClient GetClient()
+        {
+            if (_client == null || _client.Connected == false || ReadPolling == false)
             {
-                await _client.ConnectAsync(_kafkaUri.Host, _kafkaUri.Port);
+                lock (_threadLock)
+                {
+                    if (_client == null || _client.Connected == false)
+                    {
+                        _client = new TcpClient();
+                        _client.Connect(_kafkaUri.Host, _kafkaUri.Port);
+                    }
+
+                    if (ReadPolling == false) StartReadPoller();
+                }
             }
             return _client;
         }
 
-        private async Task<NetworkStream> GetStream()
+        private NetworkStream GetStream()
         {
-            var client = await GetClient();
+            var client = GetClient();
             var stream = client.GetStream();
             stream.ReadTimeout = _readTimeoutMS;
             return stream;
@@ -92,7 +136,7 @@ namespace KafkaNet
             using (_client)
             using (_client.GetStream())
             {
-                _disposed = true;
+                _interrupt = true;
             }
         }
     }
