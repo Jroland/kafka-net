@@ -97,7 +97,17 @@ namespace kafka_tests.Unit
             var list = new List<Partition>(_twoPartitions);
             list[1].PartitionId = 999;
             
-            selector.Select("test", "1", _twoPartitions);
+            selector.Select("test", "1", list);
         }
+
+        [Test]
+        [ExpectedException(typeof(ApplicationException))]
+        public void SelectorShouldThrowExceptionWhenPartitionsAreEmpty()
+        {
+            var selector = new DefaultPartitionSelector();
+            var list = new List<Partition>();
+            selector.Select("test", "1", list);
+        }
+
     }
 }

@@ -20,7 +20,7 @@ namespace KafkaNet
             {
                 return _roundRobinTracker.AddOrUpdate(topic, x => partitions.First(), (s, i) =>
                     {
-                        var index = partitions.FindIndex(0, p => p == i);
+                        var index = partitions.FindIndex(0, p => p.Equals(i));
                         if (index == -1) return partitions.First();
                         if (++index >= partitions.Count) return partitions.First();
                         return partitions[index];
