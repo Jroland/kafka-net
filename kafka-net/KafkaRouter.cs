@@ -1,24 +1,26 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using KafkaNet.Model;
+using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
     public class KafkaRouter
     {
-        private readonly IPartitionSelector _partitionSelector;
+        public delegate void ResponseReceived(byte[] payload);
+        public event ResponseReceived OnResponseReceived;
+
+        private readonly KafkaClientOptions _kafkaOptions;
         private readonly ConcurrentDictionary<int, KafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, KafkaConnection>();
         private readonly ConcurrentDictionary<string, Topic> _topicIndex = new ConcurrentDictionary<string, Topic>();
         private readonly List<KafkaConnection> _defaultConnections = new List<KafkaConnection>();
 
-        public KafkaRouter(IEnumerable<Uri> kafkaServers, IPartitionSelector partitionSelector)
+        public KafkaRouter(KafkaClientOptions kafkaOptions)
         {
-            _partitionSelector = partitionSelector;
+            _kafkaOptions = kafkaOptions;
 
-            //TODO add query parcing to get readtimeout string
-            foreach (var uri in kafkaServers.Distinct())
+            foreach (var uri in kafkaOptions.KafkaServerUri.Distinct())
             {
                 _defaultConnections.Add(new KafkaConnection(uri));
             }
@@ -26,7 +28,7 @@ namespace KafkaNet
 
         public List<KafkaConnection> DefaultBrokers { get { return _defaultConnections; } }
 
-        public KafkaConnection GetConnection(string topic, int partitionId)
+        public KafkaConnection GetBrokerConnection(string topic, int partitionId)
         {
             Topic metaTopic;
             if (_topicIndex.TryGetValue(topic, out metaTopic))
@@ -41,12 +43,12 @@ namespace KafkaNet
             return null;
         }
 
-        public KafkaConnection SelectConnection(string topic, string key = null)
+        public KafkaConnection SelectBrokerConnection(string topic, string key = null)
         {
             Topic metaTopic;
             if (_topicIndex.TryGetValue(topic, out metaTopic))
             {
-                var partition = _partitionSelector.Select(topic, key, metaTopic.Partitions);
+                var partition = _kafkaOptions.PartitionSelector.Select(topic, key, metaTopic.Partitions);
                 KafkaConnection conn;
                 if (_brokerConnectionIndex.TryGetValue(partition.LeaderId, out conn)) return conn;
             }
