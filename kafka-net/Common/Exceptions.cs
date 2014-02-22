@@ -10,5 +10,10 @@ namespace KafkaNet.Common
     public class ResponseTimeoutException : Exception
     {
         public ResponseTimeoutException(string message) : base(message) { }
-    } 
+    }
+
+    public class InvalidPartitionIdSelectedException : Exception
+    {
+        public InvalidPartitionIdSelectedException(string message) : base(message) { }
+    }
 }

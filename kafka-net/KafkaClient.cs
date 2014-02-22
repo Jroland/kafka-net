@@ -176,7 +176,7 @@ namespace KafkaNet
         }
     }
 
-    class AsyncRequest
+    partial class AsyncRequest
     {
         public AsyncRequest(int correlationId)
         {

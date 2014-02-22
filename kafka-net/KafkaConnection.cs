@@ -22,7 +22,6 @@ namespace KafkaNet
 
         private readonly object _threadLock = new object();
         private readonly Uri _kafkaUri;
-        private readonly int _readTimeoutMS;
         private TcpClient _client;
         private bool _interrupt;
         private int _readerActive;
@@ -31,11 +30,9 @@ namespace KafkaNet
         /// Initializes a new instance of the KafkaConnection class.
         /// </summary>
         /// <param name="serverAddress"></param>
-        /// <param name="readTimeoutMS">The timeout for read operations</param>
-        public KafkaConnection(Uri serverAddress, int readTimeoutMS = 5000)
+        public KafkaConnection(Uri serverAddress)
         {
             _kafkaUri = serverAddress;
-            _readTimeoutMS = readTimeoutMS;
         }
 
         /// <summary>
@@ -63,7 +60,7 @@ namespace KafkaNet
         {
             return GetStream().WriteAsync(payload, 0, payload.Length);
         }
-        
+
         private byte[] Read(int size, NetworkStream stream)
         {
             var buffer = new byte[size];
@@ -131,9 +128,7 @@ namespace KafkaNet
         private NetworkStream GetStream()
         {
             var client = GetClient();
-            var stream = client.GetStream();
-            stream.ReadTimeout = _readTimeoutMS;
-            return stream;
+            return client.GetStream();
         }
 
         public void Dispose()

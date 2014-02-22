@@ -76,6 +76,24 @@ namespace KafkaNet.Model
 
             return partition;
         }
+
+        protected bool Equals(Partition other)
+        {
+            return PartitionId == other.PartitionId;
+        }
+
+        public override int GetHashCode()
+        {
+            return PartitionId;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj)) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != this.GetType()) return false;
+            return Equals((Partition) obj);
+        }
     }
 
 }
