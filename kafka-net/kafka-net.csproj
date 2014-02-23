@@ -44,7 +44,7 @@
   <ItemGroup>
     <Compile Include="DefaultPartitionSelector.cs" />
     <Compile Include="Interfaces\IPartitionSelector.cs" />
-    <Compile Include="KafkaRouter.cs" />
+    <Compile Include="BrokerRouter.cs" />
     <Compile Include="Model\Broker.cs" />
     <Compile Include="Common\ReadByteStream.cs" />
     <Compile Include="Common\Crc32.cs" />

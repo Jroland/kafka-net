@@ -25,6 +25,20 @@ namespace KafkaNet.Protocol
         /// </summary>
         public List<Payload> Payload = new List<Payload>();
 
+        /// <summary>
+        /// Copy of this ProduceRequest with an empty Payload collection.
+        /// </summary>
+        /// <returns>A ProduceRequest without empty Payload collection.</returns>
+        public ProduceRequest Copy()
+        {
+            return new ProduceRequest
+                {
+                    TimeoutMS = this.TimeoutMS,
+                    Acks = this.Acks,
+                    Payload = new List<Payload>()
+                };
+        }
+
         public byte[] Encode()
         {
             return EncodeProduceRequest(this);

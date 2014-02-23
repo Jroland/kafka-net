@@ -16,4 +16,9 @@ namespace KafkaNet.Common
     {
         public InvalidPartitionIdSelectedException(string message) : base(message) { }
     }
+
+    public class ServerUnreachableException : Exception
+    {
+        public ServerUnreachableException(string message) : base(message) { }
+    }
 }
