@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace KafkaNet.Model
 {
@@ -11,9 +12,9 @@ namespace KafkaNet.Model
         public IPartitionSelector PartitionSelector { get; set; }
         public int ResponseTimeoutMs { get; set; }
 
-        public void KafkaConnection(List<Uri> kafkaServerUri)
+        public KafkaClientOptions(params Uri[] kafkaServerUri)
         {
-            KafkaServerUri = kafkaServerUri;
+            KafkaServerUri = kafkaServerUri.ToList();
             PartitionSelector = new DefaultPartitionSelector();
             ResponseTimeoutMs = DefaultResonseTimeout;
         }

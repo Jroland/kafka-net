@@ -43,6 +43,7 @@ namespace KafkaNet
 
         public Task<MetadataResponse> GetTopicMetadataASync(params string[] topics)
         {
+            //TODO get topics from cache, refresh the ones we dont have in cache
             return CycleDefaultBrokersForTopicMetadataAsync(topics);
         }
         
@@ -66,7 +67,7 @@ namespace KafkaNet
 
             return null;
         }
-
+        
         private async Task<MetadataResponse> CycleDefaultBrokersForTopicMetadataAsync(params string[] topics)
         {
             var request = new MetadataRequest { Topics = topics.ToList() };

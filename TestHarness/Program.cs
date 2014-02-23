@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using KafkaNet;
 using KafkaNet.Model;
+using KafkaNet.Protocol;
 
 namespace TestHarness
 {
@@ -9,7 +10,11 @@ namespace TestHarness
     {
         static void Main(string[] args)
         {
-            
+
+            var client = new KafkaClient(new KafkaClientOptions(new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092")));
+
+            var topic = client.GetTopicAsync("TestHarness").Result;
+            var response = client.SendMessageAsync("TestHarness", new[] { new Message { Value = "TestMe" } }).Result;
             //var client = new KafkaClient(new Uri("http://CSDKAFKA01:9092"));
             //SendMetadataRequest(client);
         }

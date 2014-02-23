@@ -26,7 +26,7 @@ namespace KafkaNet
             _router = new BrokerRouter(kafkaOptions);
         }
 
-        public async Task<List<ProduceResponse>> SendMessageAsync(string topic, List<Message> messages, Int16 acks = 1, int timeoutMS = 1000)
+        public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1, int timeoutMS = 1000)
         {
             var routeGroup = new ConcurrentDictionary<BrokerRoute, List<Message>>();
 
