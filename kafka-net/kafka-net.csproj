@@ -42,29 +42,31 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Consumer.cs" />
     <Compile Include="DefaultPartitionSelector.cs" />
+    <Compile Include="Interfaces\IKafkaLog.cs" />
     <Compile Include="Interfaces\IPartitionSelector.cs" />
     <Compile Include="BrokerRouter.cs" />
     <Compile Include="Model\Broker.cs" />
     <Compile Include="Common\ReadByteStream.cs" />
     <Compile Include="Common\Crc32.cs" />
-    <Compile Include="Common\Exceptions.cs" />
     <Compile Include="Common\WriteByteStream.cs" />
-    <Compile Include="KafkaClient.cs" />
+    <Compile Include="Producer.cs" />
     <Compile Include="KafkaConnection.cs" />
     <Compile Include="Common\Extensions.cs" />
-    <Compile Include="Model\KafkaClientOptions.cs" />
+    <Compile Include="Model\KafkaOptions.cs" />
+    <Compile Include="Protocol.cs" />
     <Compile Include="Protocol\BaseRequest.cs" />
     <Compile Include="Interfaces\IKafkaRequest.cs" />
     <Compile Include="Protocol\FetchRequest.cs" />
     <Compile Include="Protocol\Message.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Protocol.cs" />
     <Compile Include="Model\Topic.cs" />
     <Compile Include="Protocol\MetadataRequest.cs" />
     <Compile Include="Protocol\OffsetCommitRequest.cs" />
     <Compile Include="Protocol\OffsetRequest.cs" />
     <Compile Include="Protocol\ProduceRequest.cs" />
+    <Compile Include="DefaultTraceLog.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

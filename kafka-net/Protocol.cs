@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using KafkaNet.Common;
-using KafkaNet.Model;
-
 
 namespace KafkaNet
 {
@@ -22,8 +17,8 @@ namespace KafkaNet
     public enum ErrorResponseCode
     {
         NoError = 0,
-        Unknown = -1, 
-        OffsetOutOfRange =1,
+        Unknown = -1,
+        OffsetOutOfRange = 1,
         InvalidMessage = 2,
         UnknownTopicOrPartition = 3,
         InvalidMessageSize = 4,
@@ -36,22 +31,24 @@ namespace KafkaNet
         StaleControllerEpochCode = 11,
         OffsetMetadataTooLargeCode = 12
     }
-    
-    /// <summary>
-    /// Kafka Protocol implementation:
-    /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
-    /// </summary>
-    public static class Protocol1
+
+    public class FailCrcCheckException : Exception
     {
-        
+        public FailCrcCheckException(string message) : base(message) { }
+    }
 
-        
+    public class ResponseTimeoutException : Exception
+    {
+        public ResponseTimeoutException(string message) : base(message) { }
+    }
 
-       
-       
+    public class InvalidPartitionException : Exception
+    {
+        public InvalidPartitionException(string message) : base(message) { }
+    }
 
-       
-
-        
+    public class ServerUnreachableException : Exception
+    {
+        public ServerUnreachableException(string message) : base(message) { }
     }
 }

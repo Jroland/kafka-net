@@ -4,6 +4,9 @@ using System.Text;
 
 namespace KafkaNet.Common
 {
+    /// <summary>
+    /// Provides Big Endian conversion extensions to required types for the Kafka protocol.
+    /// </summary>
     public static class Extensions
     {
         public static byte[] ToIntSizedBytes(this string value)

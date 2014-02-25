@@ -6,6 +6,14 @@ using System.Text;
 
 namespace KafkaNet.Common
 {
+    /// <summary>
+    /// This class wraps a collection of bytes and provides a set of helper functions for reading
+    /// Big Endian to Little Endian types off the collection of bytes[]
+    /// </summary>
+    /// <remarks>
+    /// TODO Currently this class is hard coded to Big to Little endian.  
+    /// We should technically check for the system endianness and convert accordingly.
+    /// </remarks>
     public class ReadByteStream
     {
         private readonly byte[] _payload;

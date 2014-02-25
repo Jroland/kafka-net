@@ -2,10 +2,8 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using KafkaNet;
-using KafkaNet.Common;
 using KafkaNet.Model;
 using NUnit.Framework;
 
@@ -14,12 +12,16 @@ namespace kafka_tests.Unit
     [TestFixture]
     public class DefaultPartitionSelectorTests
     {
-        private List<Partition> _twoPartitions;
+        private Topic _topicA;
+        private Topic _topicB;
 
         [SetUp]
         public void Setup()
         {
-            _twoPartitions = new List<Partition>(new[]
+            _topicA = new Topic
+            {
+                Name = "a",
+                Partitions = new List<Partition>(new[]
                 {
                     new Partition
                         {
@@ -31,7 +33,26 @@ namespace kafka_tests.Unit
                             LeaderId = 1,
                             PartitionId = 1
                         }
-                });
+                })
+            };
+
+            _topicB = new Topic
+            {
+                Name = "b",
+                Partitions = new List<Partition>(new[]
+                {
+                    new Partition
+                        {
+                            LeaderId = 0,
+                            PartitionId = 0
+                        },
+                    new Partition
+                        {
+                            LeaderId = 1,
+                            PartitionId = 1
+                        }
+                })
+            };
         }
 
         [Test]
@@ -39,9 +60,9 @@ namespace kafka_tests.Unit
         {
             var selector = new DefaultPartitionSelector();
 
-            var first = selector.Select("test", null, _twoPartitions);
-            var second = selector.Select("test", null, _twoPartitions);
-            var third = selector.Select("test", null, _twoPartitions);
+            var first = selector.Select(_topicA, null);
+            var second = selector.Select(_topicA, null);
+            var third = selector.Select(_topicA, null);
 
             Assert.That(first.PartitionId, Is.EqualTo(0));
             Assert.That(second.PartitionId, Is.EqualTo(1));
@@ -54,7 +75,7 @@ namespace kafka_tests.Unit
             var selector = new DefaultPartitionSelector();
             var bag = new ConcurrentBag<Partition>();
 
-            Parallel.For(0, 100, x => bag.Add(selector.Select("test", null, _twoPartitions)));
+            Parallel.For(0, 100, x => bag.Add(selector.Select(_topicA, null)));
 
             Assert.That(bag.Count(x => x.PartitionId == 0), Is.EqualTo(50));
             Assert.That(bag.Count(x => x.PartitionId == 1), Is.EqualTo(50));
@@ -65,10 +86,10 @@ namespace kafka_tests.Unit
         {
             var selector = new DefaultPartitionSelector();
 
-            var a1 = selector.Select("a", null, _twoPartitions);
-            var b1 = selector.Select("b", null, _twoPartitions);
-            var a2 = selector.Select("a", null, _twoPartitions);
-            var b2 = selector.Select("b", null, _twoPartitions);
+            var a1 = selector.Select(_topicA, null);
+            var b1 = selector.Select(_topicB, null);
+            var a2 = selector.Select(_topicA, null);
+            var b2 = selector.Select(_topicB, null);
 
             Assert.That(a1.PartitionId, Is.EqualTo(0));
             Assert.That(a2.PartitionId, Is.EqualTo(1));
@@ -82,22 +103,28 @@ namespace kafka_tests.Unit
         {
             var selector = new DefaultPartitionSelector();
 
-            var first = selector.Select("test", "0", _twoPartitions);
-            var second = selector.Select("test", "1", _twoPartitions);
+            var first = selector.Select(_topicA, "0");
+            var second = selector.Select(_topicA, "1");
 
             Assert.That(first.PartitionId, Is.EqualTo(0));
             Assert.That(second.PartitionId, Is.EqualTo(1));
         }
 
         [Test]
-        [ExpectedException(typeof(InvalidPartitionIdSelectedException))]
+        [ExpectedException(typeof(InvalidPartitionException))]
         public void KeyHashShouldThrowExceptionWhenChoosesAPartitionIdThatDoesNotExist()
         {
             var selector = new DefaultPartitionSelector();
-            var list = new List<Partition>(_twoPartitions);
+            var list = new List<Partition>(_topicA.Partitions);
             list[1].PartitionId = 999;
-            
-            selector.Select("test", "1", list);
+            var topic = new Topic
+                {
+                    Name = "badPartition",
+                    Partitions = list
+                };
+
+
+            selector.Select(topic, "1");
         }
 
         [Test]
@@ -105,8 +132,12 @@ namespace kafka_tests.Unit
         public void SelectorShouldThrowExceptionWhenPartitionsAreEmpty()
         {
             var selector = new DefaultPartitionSelector();
-            var list = new List<Partition>();
-            selector.Select("test", "1", list);
+            var topic = new Topic
+            {
+                Name = "emptyPartition",
+                Partitions = new List<Partition>()
+            };
+            selector.Select(topic, "1");
         }
 
     }

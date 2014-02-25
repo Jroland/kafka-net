@@ -4,19 +4,21 @@ using System.Linq;
 
 namespace KafkaNet.Model
 {
-    public class KafkaClientOptions
+    public class KafkaOptions
     {
-        private const int DefaultResonseTimeout = 5000;
+        private const int DefaultResponseTimeout = 5000;
 
         public List<Uri> KafkaServerUri { get; set; }
         public IPartitionSelector PartitionSelector { get; set; }
         public int ResponseTimeoutMs { get; set; }
+        public IKafkaLog Log { get; set; }
 
-        public KafkaClientOptions(params Uri[] kafkaServerUri)
+        public KafkaOptions(params Uri[] kafkaServerUri)
         {
             KafkaServerUri = kafkaServerUri.ToList();
             PartitionSelector = new DefaultPartitionSelector();
-            ResponseTimeoutMs = DefaultResonseTimeout;
+            ResponseTimeoutMs = DefaultResponseTimeout;
+            Log = new DefaultTraceLog();
         }
     }
 }

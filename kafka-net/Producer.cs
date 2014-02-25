@@ -2,25 +2,22 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Model;
-using KafkaNet.Common;
 using KafkaNet.Protocol;
 
 
 namespace KafkaNet
 {
     /// <summary>
-    /// TODO: need to put in place a way to record and log errors.
+    /// Provides a simplified high level API for producing messages on a topic.
     /// </summary>
-    public class KafkaClient : IDisposable
+    public class Producer : IDisposable
     {
-        private readonly KafkaClientOptions _kafkaOptions;
+        private readonly KafkaOptions _kafkaOptions;
         private readonly BrokerRouter _router;
 
-        public KafkaClient(KafkaClientOptions kafkaOptions)
+        public Producer(KafkaOptions kafkaOptions)
         {
             _kafkaOptions = kafkaOptions;
             _router = new BrokerRouter(kafkaOptions);
@@ -62,46 +59,11 @@ namespace KafkaNet
 
         public async Task<Topic> GetTopicAsync(string topic)
         {
-            var response = await _router.GetTopicMetadataASync(topic);
+            var response = await _router.GetTopicMetadataAsync(topic);
             
-            return response.Topics.First();
+            return response.First();
         }
 
-        
-        //public Task<MetadataResponse> SendAsync(MetadataRequest request)
-        //{
-        //    request.CorrelationId = NextCorrelationId();
-
-        //    var responseCallback = RegisterAsyncResponse(request, _protocol.DecodeMetadataResponse);
-        //    _conn.SendAsync(_protocol.EncodeMetadataRequest(request));
-        //    return responseCallback;
-        //}
-
-        //public Task<List<FetchResponse>> SendAsync(FetchRequest request)
-        //{
-        //    request.CorrelationId = NextCorrelationId();
-
-        //    var responseCallback = RegisterAsyncResponse(request, x => _protocol.DecodeFetchResponse(x).ToList());
-        //    _conn.SendAsync(_protocol.EncodeFetchRequest(request));
-        //    return responseCallback;
-        //}
-
-        //public Task<List<OffsetResponse>> SendAsync(OffsetRequest request)
-        //{
-        //    request.CorrelationId = NextCorrelationId();
-
-        //    var responseCallback = RegisterAsyncResponse(request, x => _protocol.DecodeOffsetResponse(x).ToList());
-        //    _conn.SendAsync(_protocol.EncodeOffsetRequest(request));
-        //    return responseCallback;
-        //}
-
-        //public Task<List<OffsetCommitResponse>> SendAsync(OffsetCommitRequest request)
-        //{
-        //    throw new NotSupportedException("Not currently supported in kafka version 0.8.  https://issues.apache.org/jira/browse/KAFKA-993");
-        //    //var response = await _conn.SendReceiveAsync(_protocol.EncodeOffsetCommitRequest(request));
-        //    //return _protocol.DecodeOffsetCommitResponse(response).ToList();
-        //}
-        
         public void Dispose()
         {
             using (_router)

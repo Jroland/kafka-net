@@ -4,6 +4,11 @@ using System.Linq;
 
 namespace KafkaNet.Common
 {
+    /// <summary>
+    /// This class provides methods to collect, merge and manage bytes together.  
+    /// There is no built in awareness of endianess in this class.  All bytes are 
+    /// store in the order given.
+    /// </summary>
     public class WriteByteStream
     {
         private readonly List<byte[]> _message = new List<byte[]>();

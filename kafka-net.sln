@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "kafka-tests", "kafka-tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestHarness", "TestHarness\TestHarness.csproj", "{53E0B3CE-6C41-4C8A-8B66-9BD03667B1E0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "kafka-net-client", "kafka-net-client\kafka-net-client.csproj", "{FF7E1490-7453-47B0-A12E-64FED927825A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,6 +27,10 @@ Global
 		{53E0B3CE-6C41-4C8A-8B66-9BD03667B1E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{53E0B3CE-6C41-4C8A-8B66-9BD03667B1E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{53E0B3CE-6C41-4C8A-8B66-9BD03667B1E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FF7E1490-7453-47B0-A12E-64FED927825A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FF7E1490-7453-47B0-A12E-64FED927825A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FF7E1490-7453-47B0-A12E-64FED927825A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FF7E1490-7453-47B0-A12E-64FED927825A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

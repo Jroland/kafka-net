@@ -11,15 +11,43 @@ namespace TestHarness
         static void Main(string[] args)
         {
 
-            var client = new KafkaClient(new KafkaClientOptions(new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092")));
+            var client = new Producer(new KafkaOptions(new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092")));
 
-            var topic = client.GetTopicAsync("TestHarness").Result;
-            var response = client.SendMessageAsync("TestHarness", new[] { new Message { Value = "TestMe" } }).Result;
-            //var client = new KafkaClient(new Uri("http://CSDKAFKA01:9092"));
+            var conn = new KafkaConnection(new Uri("http://CSDKAFKA01:9092"), 5000, new DefaultTraceLog());
+             var request = new OffsetRequest
+            {
+                CorrelationId = 1,
+                Offsets = new List<Offset>(new[]
+                        {
+                            new Offset
+                                {
+                                    Topic = "TestHarness",
+                                    PartitionId = 0,
+                                    MaxOffsets = 1,
+                                    Time = -1
+                                },
+                                 new Offset
+                                {
+                                    Topic = "TestHarness",
+                                    PartitionId = 1,
+                                    MaxOffsets = 1,
+                                    Time = -1
+                                }
+                        })
+            };
+            var response = conn.SendAsync(request).Result;
+
+            //var topic = client.GetTopicAsync("TestHarness").Result;
+
+
+            //var response = client.SendMessageAsync("TestHarness", new[] { new Message { Value = "TestMe" } }).Result;
+
+
+            //var client = new Producer(new Uri("http://CSDKAFKA01:9092"));
             //SendMetadataRequest(client);
         }
 
-        //private static void SendOffsetCommitRequest(KafkaClient client)
+        //private static void SendOffsetCommitRequest(Producer client)
         //{
         //    var request = new OffsetCommitRequest()
         //    {
@@ -38,7 +66,7 @@ namespace TestHarness
         //    var result = client.SendAsync(request).Result;
         //}
 
-        //private static void SendOffsetRequest(KafkaClient client)
+        //private static void SendOffsetRequest(Producer client)
         //{
         //    var request = new OffsetRequest
         //    {
@@ -58,7 +86,7 @@ namespace TestHarness
         //    var result = client.SendAsync(request).Result;
         //}
 
-        //private static void SendFetchRequest(KafkaClient client)
+        //private static void SendFetchRequest(Producer client)
         //{
         //    var request = new FetchRequest
         //    {
@@ -77,7 +105,7 @@ namespace TestHarness
         //    var result = client.SendAsync(request).Result;
         //}
 
-        //private static void SendMetadataRequest(KafkaClient client)
+        //private static void SendMetadataRequest(Producer client)
         //{
         //    var request = new MetadataRequest()
         //        {
@@ -87,7 +115,7 @@ namespace TestHarness
         //    var result = client.SendAsync(request).Result;
         //}
 
-        //private static void SendMessageTest(KafkaClient client)
+        //private static void SendMessageTest(Producer client)
         //{
         //    var request = new ProduceRequest
         //        {

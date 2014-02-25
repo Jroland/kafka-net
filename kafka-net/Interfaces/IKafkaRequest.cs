@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace KafkaNet.Protocol
+namespace KafkaNet
 {
     public interface IKafkaRequest<out T>
     {

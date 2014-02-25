@@ -43,10 +43,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Integration\KafkaClientTests.cs" />
+    <Compile Include="Integration\KafkaConnectionTests.cs" />
     <Compile Include="RequestFactory.cs" />
     <Compile Include="Unit\DefaultPartitionSelectorTests.cs" />
-    <Compile Include="Unit\ProtocolTests.cs" />
+    <Compile Include="Unit\ProtocolBaseRequestTests.cs" />
+    <Compile Include="Unit\ProtocolMessageTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>

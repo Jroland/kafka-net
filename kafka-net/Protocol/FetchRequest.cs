@@ -7,12 +7,21 @@ namespace KafkaNet.Protocol
 {
     public class FetchRequest : BaseRequest, IKafkaRequest<FetchResponse>
     {
+        internal const int DefaultMinBlockingByteBufferSize = 4096;
+        private const int DefaultMaxBlockingWaitTime = 1000;
+
         /// <summary>
         /// Indicates the type of kafka encoding this request is
         /// </summary>
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Fetch; } }
-        public int MaxWaitTime = 100;
-        public int MinBytes = 4096;
+        /// <summary>
+        /// The maximum amount of time to block for the MinBytes to be available before returning.
+        /// </summary>
+        public int MaxWaitTime = DefaultMaxBlockingWaitTime;
+        /// <summary>
+        /// Defines how many bytes should be available before returning data. A value of 0 indicate a no blocking command.
+        /// </summary>
+        public int MinBytes = DefaultMinBlockingByteBufferSize;
         public List<Fetch> Fetches { get; set; }
 
         public byte[] Encode()
@@ -75,6 +84,7 @@ namespace KafkaNet.Protocol
                         Error = stream.ReadInt16(),
                         HighWaterMark = stream.ReadLong()
                     };
+                    //note: dont use initializer here as it breaks stream position.
                     response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes()).ToList();
                     yield return response;
                 }
@@ -86,7 +96,7 @@ namespace KafkaNet.Protocol
     {
         public Fetch()
         {
-            MaxBytes = 4096;
+            MaxBytes = FetchRequest.DefaultMinBlockingByteBufferSize * 8;
         }
 
         public string Topic { get; set; }

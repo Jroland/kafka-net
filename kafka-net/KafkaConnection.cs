@@ -6,7 +6,6 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
@@ -25,6 +24,7 @@ namespace KafkaNet
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
         private readonly Timer _responseTimeoutTimer;
         private readonly int _responseTimeoutMS;
+        private readonly IKafkaLog _log;
         private readonly Uri _kafkaUri;
         private TcpClient _client;
         private bool _interrupt;
@@ -34,10 +34,12 @@ namespace KafkaNet
         /// <summary>
         /// Initializes a new instance of the KafkaConnection class.
         /// </summary>
-        /// <param name="serverAddress"></param>
-        /// <param name="responseTimeoutMs"></param>
-        public KafkaConnection(Uri serverAddress, int responseTimeoutMs)
+        /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
+        /// <param name="serverAddress">The Uri address to this kafka server.</param>
+        /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received from kafka.</param>
+        public KafkaConnection(Uri serverAddress, int responseTimeoutMs, IKafkaLog log)
         {
+            _log = log;
             _kafkaUri = serverAddress;
             _responseTimeoutMS = responseTimeoutMs;
             _responseTimeoutTimer = new Timer(ResponseTimeoutCallback, null, TimeSpan.FromMilliseconds(_responseTimeoutMS), TimeSpan.FromMilliseconds(100));
@@ -104,6 +106,26 @@ namespace KafkaNet
             return tcs.Task;
         }
 
+        #region Equals Override...
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj)) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != this.GetType()) return false;
+            return Equals((KafkaConnection)obj);
+        }
+
+        protected bool Equals(KafkaConnection other)
+        {
+            return Equals(_kafkaUri, other._kafkaUri);
+        }
+
+        public override int GetHashCode()
+        {
+            return (_kafkaUri != null ? _kafkaUri.GetHashCode() : 0);
+        } 
+        #endregion
+
         private byte[] Read(int size, NetworkStream stream)
         {
             var buffer = new byte[size];
@@ -165,7 +187,9 @@ namespace KafkaNet
                         }
                         catch (Exception ex)
                         {
-                            //record exception and continue to scan for data
+                            //TODO being in sync with the byte order on read is important.  What happens if this exception causes us to be out of sync?
+                            //record exception and continue to scan for data.
+                            _log.ErrorFormat("Exception occured in polling read thread.  Exception={0}", ex);
                         }
                         finally
                         {
@@ -185,7 +209,7 @@ namespace KafkaNet
             }
             else
             {
-                //TODO received a message but failed to find it in the index
+                _log.WarnFormat("Message response received with correlationId={0}, but did not exist in the request queue.", correlationId);
             }
         }
 
