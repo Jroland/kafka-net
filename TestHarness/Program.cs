@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
@@ -10,41 +12,27 @@ namespace TestHarness
     {
         static void Main(string[] args)
         {
+            var options = new KafkaOptions(new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092"));
+            var router = new BrokerRouter(options);
+            var client = new Producer(options);
 
-            var client = new Producer(new KafkaOptions(new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092")));
+            Task.Factory.StartNew(() =>
+                {
+                    var consumer = new Consumer(new ConsumerOptions {Topic = "TestHarness", Router = router});
+                    foreach (var data in consumer.Consume())
+                    {
+                        Console.WriteLine("Response:{0}", data.Value);
+                    }
+                });
 
-            var conn = new KafkaConnection(new Uri("http://CSDKAFKA01:9092"), 5000, new DefaultTraceLog());
-             var request = new OffsetRequest
+
+            while (true)
             {
-                CorrelationId = 1,
-                Offsets = new List<Offset>(new[]
-                        {
-                            new Offset
-                                {
-                                    Topic = "TestHarness",
-                                    PartitionId = 0,
-                                    MaxOffsets = 1,
-                                    Time = -1
-                                },
-                                 new Offset
-                                {
-                                    Topic = "TestHarness",
-                                    PartitionId = 1,
-                                    MaxOffsets = 1,
-                                    Time = -1
-                                }
-                        })
-            };
-            var response = conn.SendAsync(request).Result;
-
-            //var topic = client.GetTopicAsync("TestHarness").Result;
-
-
-            //var response = client.SendMessageAsync("TestHarness", new[] { new Message { Value = "TestMe" } }).Result;
-
-
-            //var client = new Producer(new Uri("http://CSDKAFKA01:9092"));
-            //SendMetadataRequest(client);
+                var message = Console.ReadLine();
+                if (message == "quit") break;
+                client.SendMessageAsync("TestHarness", new[] {new Message {Value = message}});
+            }
+            
         }
 
         //private static void SendOffsetCommitRequest(Producer client)

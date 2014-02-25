@@ -1,0 +1,269 @@
+﻿using System;
+using System.Timers;
+
+namespace KafkaNet.Common
+{
+    public enum ScheduleTimerStatus
+    {
+        /// <summary>
+        ///     Timer is stopped.
+        /// </summary>
+        Stopped,
+
+        /// <summary>
+        ///     Timer is running.
+        /// </summary>
+        Running
+    }
+
+    public interface IScheduledTimer : IDisposable
+    {
+        /// <summary>
+        ///     Current running status of the timer.
+        /// </summary>
+        ScheduleTimerStatus Status { get; }
+
+        /// <summary>
+        /// Indicates if the timer is running.
+        /// </summary>
+        bool Enabled { get; }
+
+        /// <summary>
+        ///     Set the time to start a replication.
+        /// </summary>
+        /// <param name="start">Start date and time for the replication timer.</param>
+        /// <returns>Instance of SolrTimer for fluent configuration.</returns>
+        /// <remarks>If no interval is set, the replication will only happen once.</remarks>
+        IScheduledTimer StartingAt(DateTime start);
+
+        /// <summary>
+        ///     Set the interval to send a replication command to a Solr server.
+        /// </summary>
+        /// <param name="interval">Interval this command is to be called.</param>
+        /// <returns>Instance of SolrTimer for fluent configuration.</returns>
+        /// <remarks>If no start time is set, the interval starts when the timer is started.</remarks>
+        IScheduledTimer Every(TimeSpan interval);
+
+        /// <summary>
+        ///     Action to perform when the timer expires.
+        /// </summary>
+        IScheduledTimer Do(Action action);
+
+        /// <summary>
+        /// Sets the timer to execute and restart the timer without waiting for the Do method to finish.
+        /// </summary>
+        /// <returns></returns>
+        IScheduledTimer DontWait();
+
+        /// <summary>
+        ///     Starts the timer
+        /// </summary>
+        IScheduledTimer Begin();
+
+        /// <summary>
+        ///     Stop the timer.
+        /// </summary>
+        IScheduledTimer End();
+    }
+
+    /// <summary>
+    ///     Timer class to handle replication and optimization remotely.
+    /// </summary>
+    public class ScheduledTimer : IScheduledTimer
+    {
+        private bool _disposed;
+        private readonly Timer _timer;
+        private TimeSpan? _interval;
+        private DateTime? _timerStart;
+        private Action _action;
+        private bool _dontWait;
+
+        /// <summary>
+        ///     Current running status of the timer.
+        /// </summary>
+        public ScheduleTimerStatus Status { get; private set; }
+
+        /// <summary>
+        ///     Constructor.
+        /// </summary>
+        public ScheduledTimer()
+        {
+            _interval = null;
+            _timerStart = null;
+
+            _timer = new Timer();
+            _timer.Elapsed += ReplicationStartupTimerElapsed;
+            _timer.AutoReset = true;
+
+            Status = ScheduleTimerStatus.Stopped;
+        }
+
+        private void WaitActionWrapper()
+        {
+            if (_action == null) return;
+
+            try
+            {
+                _timer.Enabled = false;
+                _action();
+            }
+            finally
+            {
+                if (_disposed == false)
+                    _timer.Enabled = true;
+            }
+        }
+
+        private void ReplicationTimerElapsed(object sender, ElapsedEventArgs e)
+        {
+            if (_action == null) return;
+
+            if (_dontWait)
+                _action();
+            else
+                WaitActionWrapper();
+        }
+
+        private void ReplicationStartupTimerElapsed(object sender, ElapsedEventArgs e)
+        {
+            if (_interval.HasValue)
+            {
+                _timer.Stop();
+
+                _timer.Elapsed -= ReplicationStartupTimerElapsed;
+                _timer.Elapsed += ReplicationTimerElapsed;
+
+                _timer.Interval = ProcessIntervalAndEnsureItIsGreaterThan0(_interval.Value);
+
+                _timer.Start();
+            }
+            else
+            {
+                End();
+            }
+
+            ReplicationTimerElapsed(sender, e);
+        }
+
+        /// <summary>
+        /// Indicates if the timer is running.
+        /// </summary>
+        public bool Enabled { get { return _timer.Enabled; } }
+
+        /// <summary>
+        ///     Set the time to start a replication.
+        /// </summary>
+        /// <param name="start">Start date and time for the replication timer.</param>
+        /// <returns>Instance of SolrTimer for fluent configuration.</returns>
+        /// <remarks>If no interval is set, the replication will only happen once.</remarks>
+        public IScheduledTimer StartingAt(DateTime start)
+        {
+            _timerStart = start;
+
+            _timer.Interval = ProcessIntervalAndEnsureItIsGreaterThan0(start - DateTime.Now);
+
+            return this;
+        }
+
+        /// <summary>
+        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
+        /// </summary>
+        /// <filterpriority>2</filterpriority>
+        public void Dispose()
+        {
+            if (Status == ScheduleTimerStatus.Running)
+            {
+                End();
+            }
+
+            using (_timer)
+            {
+                _disposed = true;
+            }
+        }
+
+        /// <summary>
+        ///     Set the interval to send a replication command to a Solr server.
+        /// </summary>
+        /// <param name="interval">Interval this command is to be called.</param>
+        /// <returns>Instance of SolrTimer for fluent configuration.</returns>
+        /// <remarks>If no start time is set, the interval starts when the timer is started.</remarks>
+        public IScheduledTimer Every(TimeSpan interval)
+        {
+            _interval = interval;
+
+            if (!_timerStart.HasValue)
+            {
+                _timer.Interval = ProcessIntervalAndEnsureItIsGreaterThan0(_interval.Value);
+            }
+
+            return this;
+        }
+
+        /// <summary>
+        ///     Action to perform when the timer expires.
+        /// </summary>
+        public IScheduledTimer Do(Action action)
+        {
+            _action = action;
+
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the timer to execute and restart the timer without waiting for the Do method to finish.
+        /// </summary>
+        /// <returns></returns>
+        public IScheduledTimer DontWait()
+        {
+            _dontWait = true;
+            return this;
+        }
+
+        private static double ProcessIntervalAndEnsureItIsGreaterThan0(TimeSpan interval)
+        {
+            var intervalInMilliseconds = interval.TotalMilliseconds;
+
+            intervalInMilliseconds =
+                (intervalInMilliseconds < 1)
+                    ? 1
+                    : intervalInMilliseconds;
+
+            return intervalInMilliseconds;
+        }
+
+        /// <summary>
+        ///     Starts the timer
+        /// </summary>
+        public IScheduledTimer Begin()
+        {
+            if (!_timerStart.HasValue)
+            {
+                StartingAt(DateTime.Now);
+            }
+
+            Status = ScheduleTimerStatus.Running;
+
+            _timer.Enabled = true;
+
+            return this;
+        }
+
+        /// <summary>
+        ///     Stop the timer.
+        /// </summary>
+        public IScheduledTimer End()
+        {
+            Status = ScheduleTimerStatus.Stopped;
+            _timer.Enabled = false;
+
+            return this;
+        }
+
+        // Unit testing methods.
+        internal Timer ReplicationTimer
+        {
+            get { return _timer; }
+        }
+    }
+}

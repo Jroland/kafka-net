@@ -22,7 +22,7 @@ namespace KafkaNet
     {
         private readonly object _threadLock = new object();
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
-        private readonly Timer _responseTimeoutTimer;
+        private readonly IScheduledTimer _responseTimeoutTimer;
         private readonly int _responseTimeoutMS;
         private readonly IKafkaLog _log;
         private readonly Uri _kafkaUri;
@@ -42,7 +42,11 @@ namespace KafkaNet
             _log = log;
             _kafkaUri = serverAddress;
             _responseTimeoutMS = responseTimeoutMs;
-            _responseTimeoutTimer = new Timer(ResponseTimeoutCallback, null, TimeSpan.FromMilliseconds(_responseTimeoutMS), TimeSpan.FromMilliseconds(100));
+            _responseTimeoutTimer = new ScheduledTimer()
+                .Do(ResponseTimeoutCheck)
+                .Every(TimeSpan.FromMilliseconds(100))
+                .StartingAt(DateTime.Now.AddMilliseconds(_responseTimeoutMS))
+                .Begin();
         }
 
         /// <summary>
@@ -226,7 +230,7 @@ namespace KafkaNet
         /// <summary>
         /// Iterates the waiting response index for any requests that should be timed out and marks as exception.
         /// </summary>
-        private void ResponseTimeoutCallback(object state)
+        private void ResponseTimeoutCheck()
         {
             var timeouts = _requestIndex.Values.Where(x => x.CreatedOn < DateTime.UtcNow.AddMinutes(-1)).ToList();
 

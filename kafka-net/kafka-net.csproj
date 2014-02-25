@@ -42,7 +42,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Common\ScheduledTimer.cs" />
     <Compile Include="Consumer.cs" />
+    <Compile Include="Model\ConsumerOptions.cs" />
     <Compile Include="DefaultPartitionSelector.cs" />
     <Compile Include="Interfaces\IKafkaLog.cs" />
     <Compile Include="Interfaces\IPartitionSelector.cs" />
