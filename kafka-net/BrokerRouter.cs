@@ -3,12 +3,19 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using KafkaNet.Common;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
+    /// <summary>
+    /// This class provides an abstraction from querying multiple Kafka servers for Metadata details and caching this data.
+    /// 
+    /// All metadata queries are cached lazily.  If metadata from a topic does not exist in cache it will be queried for using
+    /// the default brokers provided in the constructor.  Each Uri will be queried to get metadata information in tern until a
+    /// response is received.  It is recommended therefore to provide more than one Kafka Uri as this API will be able to to get
+    /// metadata information even if one of the Kafka servers goes down.
+    /// </summary>
     public class BrokerRouter : IDisposable
     {
         private readonly KafkaOptions _kafkaOptions;
@@ -24,33 +31,52 @@ namespace KafkaNet
         }
 
         /// <summary>
-        /// Get list of default broker connections.  This list is provided on construction and is used to query for metadata.
+        /// Get list of default broker connections.  This list is provided by the class constructor options and is used to query for metadata.
         /// </summary>
         public List<KafkaConnection> DefaultBrokers { get { return _defaultConnections; } }
 
+        /// <summary>
+        /// Select a broker for a specific topic and partitionId.
+        /// </summary>
+        /// <param name="topic">The topic name to select a broker for.</param>
+        /// <param name="partitionId">The exact partition to select a broker for.</param>
+        /// <returns>A broker route for the given partition of the given topic.</returns>
+        /// <remarks>
+        /// This function does not use any selector criteria.  If the given partitionId does not exist an exception will be thrown.
+        /// </remarks>
+        /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
+        /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
+        /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
         public async Task<BrokerRoute> SelectBrokerRouteAsync(string topic, int partitionId)
         {
             var cachedTopic = await GetTopicMetadataAsync(topic);
 
             if (cachedTopic.Count <= 0)
-                throw new ApplicationException(string.Format("Unexpected exception occured.  GetTopicMetadataAsync return 0 topics for the given topic:{0}", topic));
+                throw new InvalidTopicMetadataException(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
 
             var topicMetadata = cachedTopic.First();
 
-            //TODO we throw here, but GetCachedRoute will return null.  Inconsistent.
             var partition = topicMetadata.Partitions.FirstOrDefault(x => x.PartitionId == partitionId);
             if (partition == null) throw new InvalidPartitionException(string.Format("The topic:{0} does not have a partitionId:{1} defined.", topic, partitionId));
 
             return GetCachedRoute(topicMetadata.Name, partition);
         }
 
+        /// <summary>
+        /// Select a broker for a given topic using the IPartitionSelector function.
+        /// </summary>
+        /// <param name="topic">The topic to retreive a broker route for.</param>
+        /// <param name="key">The key used by the IPartitionSelector to collate to a consistent partition. Null value means key will be ignored in selection process.</param>
+        /// <returns>A broker route for the given topic.</returns>
+        /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
+        /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
         public async Task<BrokerRoute> SelectBrokerRouteAsync(string topic, string key = null)
         {
             //get topic either from cache or server.
             var cachedTopic = await GetTopicMetadataAsync(topic);
 
             if (cachedTopic.Count <= 0)
-                throw new ApplicationException(string.Format("Unexpected exception occured.  GetTopicMetadataAsync return 0 topics for the given topic:{0}", topic));
+                throw new InvalidTopicMetadataException(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
 
             return SelectConnectionFromCache(cachedTopic.First(), key);
         }
