@@ -11,7 +11,7 @@ using KafkaNet.Protocol;
 namespace KafkaNet
 {
     /// <summary>
-    /// Provides a basic consumer of one Topic across all partitions and pulls them into one enumerable stream.
+    /// Provides a basic consumer of one Topic across all partitions or over a given whitelist of partitions.
     /// 
     /// TODO: provide automatic offset saving when the feature is available in 0.8.1
     /// https://issues.apache.org/jira/browse/KAFKA-993
@@ -59,7 +59,7 @@ namespace KafkaNet
             foreach (var partition in _topic.Partitions)
             {
                 var partitionId = partition.PartitionId;
-                if (_options.PartitionWhiteList.Count == 0 || _options.PartitionWhiteList.Any(x => x == partitionId))
+                if (_options.PartitionWhitelist.Count == 0 || _options.PartitionWhitelist.Any(x => x == partitionId))
                 {
                     _partitionPollingIndex.AddOrUpdate(partitionId,
                                                        i => ConsumeTopicPartitionAsync(_topic.Name, partitionId),

@@ -16,7 +16,7 @@ namespace KafkaNet
     /// response is received.  It is recommended therefore to provide more than one Kafka Uri as this API will be able to to get
     /// metadata information even if one of the Kafka servers goes down.
     /// </summary>
-    public class BrokerRouter : IDisposable
+    public class BrokerRouter : IBrokerRouter
     {
         private readonly KafkaOptions _kafkaOptions;
         private readonly ConcurrentDictionary<int, KafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, KafkaConnection>();
