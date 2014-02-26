@@ -51,4 +51,9 @@ namespace KafkaNet
     {
         public ServerUnreachableException(string message) : base(message) { }
     }
+
+    public class InvalidTopicMetadataException : Exception
+    {
+        public InvalidTopicMetadataException(string message) : base(message) { }
+    }
 }
