@@ -44,6 +44,7 @@
   <ItemGroup>
     <Compile Include="Common\ScheduledTimer.cs" />
     <Compile Include="Consumer.cs" />
+    <Compile Include="Interfaces\IKafkaConnection.cs" />
     <Compile Include="Interfaces\IBrokerRouter.cs" />
     <Compile Include="Model\ConsumerOptions.cs" />
     <Compile Include="DefaultPartitionSelector.cs" />
@@ -54,6 +55,7 @@
     <Compile Include="Common\ReadByteStream.cs" />
     <Compile Include="Common\Crc32.cs" />
     <Compile Include="Common\WriteByteStream.cs" />
+    <Compile Include="Interfaces\IKafkaConnectionFactory.cs" />
     <Compile Include="Producer.cs" />
     <Compile Include="KafkaConnection.cs" />
     <Compile Include="Common\Extensions.cs" />

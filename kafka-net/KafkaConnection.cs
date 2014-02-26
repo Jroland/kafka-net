@@ -18,8 +18,10 @@ namespace KafkaNet
     /// The Read response is handled by a single thread polling the stream for data and firing an OnResponseReceived
     /// event when a response is received.
     /// </summary>
-    public class KafkaConnection : IDisposable
+    public class KafkaConnection : IKafkaConnection
     {
+        private const int DefaultResponseTimeoutMs = 30000;
+
         private readonly object _threadLock = new object();
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
         private readonly IScheduledTimer _responseTimeoutTimer;
@@ -37,9 +39,9 @@ namespace KafkaNet
         /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
         /// <param name="serverAddress">The Uri address to this kafka server.</param>
         /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received from kafka.</param>
-        public KafkaConnection(Uri serverAddress, int responseTimeoutMs, IKafkaLog log)
+        public KafkaConnection(Uri serverAddress, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
         {
-            _log = log;
+            _log = log ?? new DefaultTraceLog();
             _kafkaUri = serverAddress;
             _responseTimeoutMS = responseTimeoutMs;
             _responseTimeoutTimer = new ScheduledTimer()

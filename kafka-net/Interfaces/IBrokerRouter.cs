@@ -10,7 +10,7 @@ namespace KafkaNet
         /// <summary>
         /// Get list of default broker connections.  This list is provided by the class constructor options and is used to query for metadata.
         /// </summary>
-        List<KafkaConnection> DefaultBrokers { get; }
+        List<IKafkaConnection> DefaultBrokers { get; }
 
         /// <summary>
         /// Select a broker for a specific topic and partitionId.

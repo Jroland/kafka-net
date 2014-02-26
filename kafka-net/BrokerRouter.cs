@@ -19,21 +19,21 @@ namespace KafkaNet
     public class BrokerRouter : IBrokerRouter
     {
         private readonly KafkaOptions _kafkaOptions;
-        private readonly ConcurrentDictionary<int, KafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, KafkaConnection>();
+        private readonly ConcurrentDictionary<int, IKafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, IKafkaConnection>();
         private readonly ConcurrentDictionary<string, Topic> _topicIndex = new ConcurrentDictionary<string, Topic>();
-        private readonly List<KafkaConnection> _defaultConnections = new List<KafkaConnection>();
+        private readonly List<IKafkaConnection> _defaultConnections = new List<IKafkaConnection>();
 
         public BrokerRouter(KafkaOptions kafkaOptions)
         {
             _kafkaOptions = kafkaOptions;
             _defaultConnections.AddRange(kafkaOptions.KafkaServerUri.Distinct()
-                .Select(uri => new KafkaConnection(uri, kafkaOptions.ResponseTimeoutMs, kafkaOptions.Log)));
+                .Select(uri => _kafkaOptions.KafkaConnectionFactory.Create(uri, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log)));
         }
 
         /// <summary>
         /// Get list of default broker connections.  This list is provided by the class constructor options and is used to query for metadata.
         /// </summary>
-        public List<KafkaConnection> DefaultBrokers { get { return _defaultConnections; } }
+        public List<IKafkaConnection> DefaultBrokers { get { return _defaultConnections; } }
 
         /// <summary>
         /// Select a broker for a specific topic and partitionId.
@@ -118,7 +118,7 @@ namespace KafkaNet
 
         private BrokerRoute GetCachedRoute(string topic, Partition partition)
         {
-            KafkaConnection conn;
+            IKafkaConnection conn;
             if (_brokerConnectionIndex.TryGetValue(partition.LeaderId, out conn))
             {
                 return new BrokerRoute
@@ -204,6 +204,6 @@ namespace KafkaNet
     {
         public string Topic { get; set; }
         public int PartitionId { get; set; }
-        public KafkaConnection Connection { get; set; }
+        public IKafkaConnection Connection { get; set; }
     }
 }
