@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using KafkaNet.Model;
+using KafkaNet.Protocol;
 
 namespace KafkaNet
 {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using KafkaNet.Common;
 
-namespace KafkaNet.Model
+namespace KafkaNet.Protocol
 {
     public class Topic
     {

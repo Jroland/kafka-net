@@ -1,7 +1,7 @@
 ﻿using System;
 using KafkaNet.Common;
 
-namespace KafkaNet.Model
+namespace KafkaNet.Protocol
 {
     public class Broker
     {
