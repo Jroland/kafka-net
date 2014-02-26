@@ -1,0 +1,89 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Ninject.MockingKernel.Moq</name>
+    </assembly>
+    <members>
+        <member name="T:Ninject.MockingKernel.Moq.MoqMockingKernel">
+            <summary>
+            Mocking kernel for moq
+            </summary>
+        </member>
+        <member name="M:Ninject.MockingKernel.Moq.MoqMockingKernel.#ctor">
+            <summary>
+            Initializes a new instance of the <see cref="T:Ninject.MockingKernel.Moq.MoqMockingKernel"/> class.
+            </summary>
+        </member>
+        <member name="M:Ninject.MockingKernel.Moq.MoqMockingKernel.#ctor(Ninject.INinjectSettings,Ninject.Modules.INinjectModule[])">
+            <summary>
+            Initializes a new instance of the <see cref="T:Ninject.MockingKernel.Moq.MoqMockingKernel"/> class.
+            </summary>
+            <param name="settings">The configuration to use.</param>
+            <param name="modules">The modules to load into the kernel.</param>
+        </member>
+        <member name="M:Ninject.MockingKernel.Moq.MoqMockingKernel.GetMock``1">
+            <summary>
+            Gets the mock.
+            </summary>
+            <typeparam name="T">The type of the mock to be returned.</typeparam>
+            <returns>The mock for the given type.</returns>
+        </member>
+        <member name="T:Ninject.MockingKernel.Moq.MoqMockProvider">
+            <summary>
+            Creates mocked instances via <c>Moq</c>.
+            </summary>
+        </member>
+        <member name="M:Ninject.MockingKernel.Moq.MoqMockProvider.GetCreationCallback">
+            <summary>
+            Gets a callback that creates an instance of the <see cref="T:Ninject.MockingKernel.Moq.MoqMockProvider"/>.
+            </summary>
+            <returns> The created callback.</returns>
+        </member>
+        <member name="M:Ninject.MockingKernel.Moq.MoqMockProvider.Create(Ninject.Activation.IContext)">
+            <summary>
+            Creates an instance within the specified context.
+            </summary>
+            <param name="context">The context.</param>
+            <returns>The created instance.</returns>
+        </member>
+        <member name="P:Ninject.MockingKernel.Moq.MoqMockProvider.Type">
+            <summary>
+            Gets the type (or prototype) of instances the provider creates.
+            </summary>
+        </member>
+        <member name="T:Ninject.MockingKernel.Moq.MoqModule">
+            <summary>
+            The module for moq
+            </summary>
+        </member>
+        <member name="M:Ninject.MockingKernel.Moq.MoqModule.Load">
+            <summary>
+            Loads the module into the kernel.
+            </summary>
+        </member>
+        <member name="T:Ninject.MockingKernel.Moq.NinjectSettingsExtensions">
+            <summary>
+            Extends the ninject settings with a getter and setter method for the default mock behavior.
+            </summary>
+        </member>
+        <member name="F:Ninject.MockingKernel.Moq.NinjectSettingsExtensions.MockBehaviorSettingsKey">
+            <summary>
+            The key used to store the mock behavior in the ninject settings. 
+            </summary>
+        </member>
+        <member name="M:Ninject.MockingKernel.Moq.NinjectSettingsExtensions.SetMockBehavior(Ninject.INinjectSettings,Moq.MockBehavior)">
+            <summary>
+            Sets the mock behavior.
+            </summary>
+            <param name="settings">The ninject settings.</param>
+            <param name="mockBehavior">The mock behavior.</param>
+        </member>
+        <member name="M:Ninject.MockingKernel.Moq.NinjectSettingsExtensions.GetMockBehavior(Ninject.INinjectSettings)">
+            <summary>
+            Gets the mock behavior.
+            </summary>
+            <param name="settings">The ninject settings.</param>
+            <returns>The configured mock behavior.</returns>
+        </member>
+    </members>
+</doc>

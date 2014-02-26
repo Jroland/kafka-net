@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Ninject.MockingKernel</id>
+    <version>3.0.0.5</version>
+    <authors>Ninject Project Contributors</authors>
+    <owners>Ninject Project Contributors</owners>
+    <licenseUrl>https://github.com/ninject/ninject.mockingkernel/raw/master/LICENSE.txt</licenseUrl>
+    <projectUrl>http://www.ninject.org/</projectUrl>
+    <iconUrl>https://github.com/ninject/ninject/raw/master/logos/Ninject-Logo32.png</iconUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>Automock implementation using Ninject to create the objects under test.</description>
+    <tags>Ninject ioc di automock</tags>
+    <dependencies>
+      <dependency id="Ninject" version="[3.0.0.0, 3.1.0.0)" />
+    </dependencies>
+  </metadata>
+</package>
