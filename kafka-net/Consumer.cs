@@ -39,7 +39,7 @@ namespace KafkaNet
         }
 
         /// <summary>
-        /// Returns a blocking enumerable of messages that receives messages when Kafka.
+        /// Returns a blocking enumerable of messages received from Kafka.
         /// </summary>
         /// <returns>Blocking enumberable of messages from Kafka.</returns>
         public IEnumerable<Message> Consume()
@@ -55,13 +55,16 @@ namespace KafkaNet
             if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
             _topic = topic.First();
 
-            //create one thread per partitions.  Only allow one.
+            //create one thread per partitions, if they are in the white list.
             foreach (var partition in _topic.Partitions)
             {
                 var partitionId = partition.PartitionId;
-                _partitionPollingIndex.AddOrUpdate(partitionId,
-                                                   i => ConsumeTopicPartitionAsync(_topic.Name, partitionId),
-                                                   (i, task) => task);
+                if (_options.PartitionWhiteList.Count == 0 || _options.PartitionWhiteList.Any(x => x == partitionId))
+                {
+                    _partitionPollingIndex.AddOrUpdate(partitionId,
+                                                       i => ConsumeTopicPartitionAsync(_topic.Name, partitionId),
+                                                       (i, task) => task);
+                }
             }
         }
 
