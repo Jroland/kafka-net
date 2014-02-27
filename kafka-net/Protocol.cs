@@ -56,4 +56,9 @@ namespace KafkaNet
     {
         public InvalidTopicMetadataException(string message) : base(message) { }
     }
+
+    public class LeaderNotFoundException : Exception
+    {
+        public LeaderNotFoundException(string message) : base(message) { }
+    }
 }

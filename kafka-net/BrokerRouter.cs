@@ -15,6 +15,8 @@ namespace KafkaNet
     /// the default brokers provided in the constructor.  Each Uri will be queried to get metadata information in tern until a
     /// response is received.  It is recommended therefore to provide more than one Kafka Uri as this API will be able to to get
     /// metadata information even if one of the Kafka servers goes down.
+    /// 
+    /// TODO : there is currently no way to update the cache once it is in there in this class
     /// </summary>
     public class BrokerRouter : IBrokerRouter
     {
@@ -104,7 +106,7 @@ namespace KafkaNet
             //Cycle method will throw if any of the topics cannot be found.
             if (missingTopics.Count > 0) await CycleDefaultBrokersForTopicMetadataAsync(missingTopics.ToArray());
 
-            topicMetadata.AddRange(missingTopics.Select(GetCachedTopic));
+            topicMetadata.AddRange(missingTopics.Select(GetCachedTopic).Where(x => x != null));
 
             return topicMetadata;
         }
@@ -129,9 +131,7 @@ namespace KafkaNet
                 };
             }
 
-            //TODO is returning a null route when a leader cannot be found the correct action?
-            //if a route cannot be found return null route
-            return null;
+            throw new LeaderNotFoundException(string.Format("Lead broker cannot be found for parition: {0}, leader: {1}", partition.PartitionId, partition.LeaderId));
         }
 
         private Topic GetCachedTopic(string topic)
@@ -140,7 +140,6 @@ namespace KafkaNet
             return _topicIndex.TryGetValue(topic, out cachedTopic) ? cachedTopic : null;
         }
 
-        //TODO : test to make sure we can be sure that all topics are found if requested.  If one is not found it must throw an exception.
         private async Task<MetadataResponse> CycleDefaultBrokersForTopicMetadataAsync(params string[] topics)
         {
             var request = new MetadataRequest { Topics = topics.ToList() };
