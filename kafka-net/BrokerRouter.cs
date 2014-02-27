@@ -131,6 +131,7 @@ namespace KafkaNet
                 };
             }
 
+            //TODO when we cant find a leader then maybe we need to refresh our cache.  Handle here?
             throw new LeaderNotFoundException(string.Format("Lead broker cannot be found for parition: {0}, leader: {1}", partition.PartitionId, partition.LeaderId));
         }
 
