@@ -10,7 +10,10 @@ namespace TestHarness
     {
         static void Main(string[] args)
         {
-            var options = new KafkaOptions(new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092"));
+            var options = new KafkaOptions(new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092"))
+                {
+                    Log = new ConsoleLog()
+                };
             var router = new BrokerRouter(options);
             var client = new Producer(options);
 
@@ -31,7 +34,12 @@ namespace TestHarness
                 if (message == "quit") break;
                 client.SendMessageAsync("TestHarness", new[] {new Message {Value = message}});
             }
-            
+
+            using (client)
+            using (router)
+            {
+
+            }
         }
     }
 }
