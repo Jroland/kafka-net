@@ -250,10 +250,10 @@ namespace KafkaNet
         public void Dispose()
         {
             using (_client)
-            using (_client.GetStream())
             using (_responseTimeoutTimer)
             {
                 _interrupt = true;
+                if (_client != null) using (_client.GetStream()) { }
             }
         }
 
