@@ -23,8 +23,17 @@ namespace KafkaNet
             _router = new BrokerRouter(kafkaOptions);
         }
 
+        /// <summary>
+        /// Send a enumerable of message objects to a given topic.
+        /// </summary>
+        /// <param name="topic">The name of the kafka topic to send the messages to.</param>
+        /// <param name="messages">The enumerable of messages that will be sent to the given topic.</param>
+        /// <param name="acks">The required level of acknowlegment from the kafka server.  0=none, 1=writen to leader, 2+=writen to replicas, -1=writen to all replicas.</param>
+        /// <param name="timeoutMS">Interal kafka timeout to wait for the requested level of ack to occur before returning.</param>
+        /// <returns>List of ProduceResponses for each message sent or empty list if acks = 0.</returns>
         public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1, int timeoutMS = 1000)
         {
+            //group message by the server connection they will be sent to
             var routeGroup = new ConcurrentDictionary<BrokerRoute, List<Message>>();
 
             foreach (var message in messages)
@@ -41,26 +50,30 @@ namespace KafkaNet
                     {
                         Acks = acks,
                         TimeoutMS = timeoutMS,
-                        Payload = new List<Payload>(new[] {new Payload{
+                        Payload = new List<Payload>{new Payload{
                             Topic = route.Topic,
                             Partition = route.PartitionId,
                             Messages = routeGroup[route]
-                        }})
+                        }}
                     };
 
                 sendTasks.Add(route.Connection.SendAsync(request));
             }
-
             
             await Task.WhenAll(sendTasks.ToArray());
-            
+
             return sendTasks.SelectMany(t => t.Result).ToList();
         }
 
+        /// <summary>
+        /// Get metadata on the given topic.
+        /// </summary>
+        /// <param name="topic">The metadata on the requested topic.</param>
+        /// <returns>Topic object containing the metadata on the requested topic.</returns>
         public async Task<Topic> GetTopicAsync(string topic)
         {
             var response = await _router.GetTopicMetadataAsync(topic);
-            
+
             return response.First();
         }
 
