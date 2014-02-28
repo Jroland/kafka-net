@@ -22,7 +22,7 @@ namespace TestHarness
                     var consumer = new Consumer(new ConsumerOptions {Topic = "TestHarness", Router = router});
                     foreach (var data in consumer.Consume())
                     {
-                        Console.WriteLine("Response: {0}", data.Value);
+                        Console.WriteLine("Response: P{0},O{1} : {2}", data.Meta.PartitionId, data.Meta.Offset, data.Value);
                     }
                 });
 
