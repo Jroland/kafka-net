@@ -77,15 +77,18 @@ namespace KafkaNet.Protocol
                 var partitionCount = stream.ReadInt();
                 for (int j = 0; j < partitionCount; j++)
                 {
+                    var partitionId = stream.ReadInt();
                     var response = new FetchResponse
                     {
                         Topic = topic,
-                        PartitionId = stream.ReadInt(),
+                        PartitionId = partitionId,
                         Error = stream.ReadInt16(),
                         HighWaterMark = stream.ReadLong()
                     };
                     //note: dont use initializer here as it breaks stream position.
-                    response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes()).ToList();
+                    response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes())
+                        .Select(x => { x.Meta.PartitionId = partitionId; return x; })
+                        .ToList();
                     yield return response;
                 }
             }

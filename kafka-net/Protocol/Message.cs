@@ -22,9 +22,12 @@ namespace KafkaNet.Protocol
         private static readonly Crc32 Crc32 = new Crc32();
 
         /// <summary>
-        /// The offset of the message within the kafka log.
+        /// Metadata on source offset and partition location for this message.
         /// </summary>
-        public long Offset { get; set; }
+        public MessageMetadata Meta { get; set; }
+        /// <summary>
+        /// This is a version id used to allow backwards compatible evolution of the message binary format.  Reserved for future use.  
+        /// </summary>
         public byte MagicNumber { get; set; }
         /// <summary>
         /// Attribute value outside message body used for added codec/compression info.
@@ -116,7 +119,7 @@ namespace KafkaNet.Protocol
 
             var message = new Message
             {
-                Offset = offset,
+                Meta = new MessageMetadata { Offset = offset },
                 MagicNumber = stream.ReadByte(),
                 Attribute = stream.ReadByte(),
                 Key = stream.ReadIntString(),
@@ -128,5 +131,24 @@ namespace KafkaNet.Protocol
 
             yield return message;
         }
+    }
+
+    /// <summary>
+    /// Provides metadata about the message received from the FetchResponse
+    /// </summary>
+    /// <remarks>
+    /// The purpose of this metadata is to allow client applications to track their own offset information about messages received from Kafka.
+    /// <see cref="http://kafka.apache.org/documentation.html#semantics"/>
+    /// </remarks>
+    public class MessageMetadata
+    {
+        /// <summary>
+        /// The log offset of this message as stored by the Kafka server.
+        /// </summary>
+        public long Offset { get; set; }
+        /// <summary>
+        /// The partition id this offset is from.
+        /// </summary>
+        public int PartitionId { get; set; }
     }
 }
