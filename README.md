@@ -29,7 +29,7 @@ Provides the logic for routing which partition the BrokerRouter should choose.  
 Provides a higher level class which uses the combination of the BrokerRouter and KafkaConnection to send batches of messages to a Kafka broker.
 
 ##### Consumer
-Provides a higher level class which will consumer messages from a whitelist of partitions from a single topic.  The consumption mechanism is a blocking IEnumerable of messages.  If no whitelist is provided then all partitions will be consumed creating one KafkaConnection for each broker.
+Provides a higher level class which will consumer messages from a whitelist of partitions from a single topic.  The consumption mechanism is a blocking IEnumerable of messages.  If no whitelist is provided then all partitions will be consumed creating one KafkaConnection for each partition leader.
 
 
 
@@ -50,25 +50,6 @@ The current version of this project is a functioning "work in progress" as it wa
 Comment
 ----------
 This is a pet project for me and is not currently backed by a need for a Kafka server client.  Which means the client is only currently being tested against a small set of Kafka test servers and not against any server that has any real data load.  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
