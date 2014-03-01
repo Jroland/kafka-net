@@ -176,13 +176,13 @@ namespace KafkaNet
             {
                 var localBroker = broker;
                 _brokerConnectionIndex.AddOrUpdate(broker.BrokerId,
-                    i => new KafkaConnection(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log),
+                    i => _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log),
                     (i, connection) =>
                     {
                         //if a connection changes for a broker close old connection and create a new one
                         if (connection.KafkaUri == localBroker.Address) return connection;
                         _kafkaOptions.Log.WarnFormat("Broker:{0} Uri changed from:{1} to {2}", localBroker.BrokerId, connection.KafkaUri, localBroker.Address);
-                        using (connection) { return new KafkaConnection(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log); }
+                        using (connection) { return _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log); }
                     });  
             }
 
