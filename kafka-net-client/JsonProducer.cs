@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using KafkaNet.Model;
 using KafkaNet.Protocol;
 using Newtonsoft.Json;
 
@@ -12,9 +11,9 @@ namespace KafkaNet.Client
     {
         private readonly Producer _producer;
 
-        public JsonProducer(KafkaOptions options)
+        public JsonProducer(IBrokerRouter brokerRouter)
         {
-            _producer = new Producer(options);
+            _producer = new Producer(brokerRouter);
         }
 
         public Task<List<ProduceResponse>> Publish<T>(string topic, IEnumerable<T> messages, Int16 acks = 1, int timeoutMS = 1000) where T : class 

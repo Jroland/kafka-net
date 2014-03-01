@@ -14,13 +14,11 @@ namespace KafkaNet
     /// </summary>
     public class Producer : IDisposable
     {
-        private readonly KafkaOptions _kafkaOptions;
-        private readonly BrokerRouter _router;
+        private readonly IBrokerRouter _router;
 
-        public Producer(KafkaOptions kafkaOptions)
+        public Producer(IBrokerRouter brokerRouter)
         {
-            _kafkaOptions = kafkaOptions;
-            _router = new BrokerRouter(kafkaOptions);
+            _router = brokerRouter;
         }
 
         /// <summary>

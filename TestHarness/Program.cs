@@ -15,7 +15,7 @@ namespace TestHarness
                     Log = new ConsoleLog()
                 };
             var router = new BrokerRouter(options);
-            var client = new Producer(options);
+            var client = new Producer(router);
 
             Task.Factory.StartNew(() =>
                 {
