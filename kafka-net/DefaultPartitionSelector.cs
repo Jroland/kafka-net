@@ -28,7 +28,7 @@ namespace KafkaNet
             }
             
             //use key hash
-            var partitionId = key.GetHashCode() % partitions.Count;
+            var partitionId = Math.Abs(key.GetHashCode()) % partitions.Count;
             var partition = partitions.FirstOrDefault(x => x.PartitionId == partitionId);
 
             if (partition == null)
