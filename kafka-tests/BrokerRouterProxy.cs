@@ -8,55 +8,58 @@ using KafkaNet.Model;
 using KafkaNet.Protocol;
 using Moq;
 using Ninject.MockingKernel.Moq;
+using kafka_tests.Fakes;
 
 namespace kafka_tests
 {
-    public class BrokerRouterMock
+    public class BrokerRouterProxy
     {
         private const string TestTopic = "UnitTest";
 
         private readonly MoqMockingKernel _kernel;
-        private Mock<IPartitionSelector> _partitionSelectorMock;
-        private Mock<IKafkaConnection> _connMock0;
-        private Mock<IKafkaConnection> _connMock1;
+        private int _offset0;
+        private int _offset1;
+        private FakeKafkaConnection _fakeConn0;
+        private FakeKafkaConnection _fakeConn1;
         private Mock<IKafkaConnectionFactory> _factoryMock;
 
-        public Mock<IKafkaConnection> BrokerConn0 { get { return _connMock0; } }
-        public Mock<IKafkaConnection> BrokerConn1 { get { return _connMock1; } }
+        public FakeKafkaConnection BrokerConn0 { get { return _fakeConn0; } }
+        public FakeKafkaConnection BrokerConn1 { get { return _fakeConn1; } }
         public Mock<IKafkaConnectionFactory> KafkaConnectionFactory { get { return _factoryMock; } }
 
-        public BrokerRouterMock(MoqMockingKernel kernel)
+        public Func<MetadataResponse> MetadataResponse = () => DefaultMetadataResponse();
+
+        public IPartitionSelector PartitionSelector = new DefaultPartitionSelector();
+
+        public BrokerRouterProxy(MoqMockingKernel kernel)
         {
             _kernel = kernel;
 
             //setup mock IKafkaConnection
-            _connMock0 = _kernel.GetMock<IKafkaConnection>();
-            _connMock1 = _kernel.GetMock<IKafkaConnection>();
+            _fakeConn0 = new FakeKafkaConnection(new Uri("http://localhost:1"));
+            _fakeConn0.ProduceResponseFunction = () => new ProduceResponse { Offset = _offset0++, PartitionId = 0, Topic = TestTopic };
+            _fakeConn0.MetadataResponseFunction = () => MetadataResponse();
+
+            _fakeConn1 = new FakeKafkaConnection(new Uri("http://localhost:2"));
+            _fakeConn1.ProduceResponseFunction = () => new ProduceResponse { Offset = _offset1++, PartitionId = 1, Topic = TestTopic };
+            _fakeConn1.MetadataResponseFunction = () => MetadataResponse();
+            
             _factoryMock = _kernel.GetMock<IKafkaConnectionFactory>();
-            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _connMock0.Object);
-            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _connMock1.Object);
-        }
-        
-        public IBrokerRouter CreateBrokerRouter()
-        {
-            return CreateBrokerRouter(CreateMetaResponse());
+            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _fakeConn0);
+            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _fakeConn1);
         }
 
-        public IBrokerRouter CreateBrokerRouter(MetadataResponse response)
+        public IBrokerRouter Create()
         {
-            var router = new BrokerRouter(new KafkaNet.Model.KafkaOptions
+            return new BrokerRouter(new KafkaNet.Model.KafkaOptions
             {
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },
-                KafkaConnectionFactory = _factoryMock.Object
+                KafkaConnectionFactory = _factoryMock.Object,
+                PartitionSelector = PartitionSelector
             });
-
-            _connMock0.Setup(x => x.SendAsync(It.IsAny<IKafkaRequest<MetadataResponse>>()))
-                      .Returns(() => Task.Factory.StartNew(() => new List<MetadataResponse> { response }));
-
-            return router;
         }
 
-        public MetadataResponse CreateMetaResponse()
+        public static MetadataResponse DefaultMetadataResponse()
         {
             return new MetadataResponse
                 {
