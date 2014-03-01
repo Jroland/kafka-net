@@ -47,6 +47,22 @@ namespace kafka_tests.Unit
             Assert.That(result.DefaultBrokers.Count, Is.EqualTo(1));
         }
 
+        [Test]
+        public void BrokerRouterUsesFactoryToAddNewBrokers()
+        {
+            var router = new BrokerRouter(new KafkaNet.Model.KafkaOptions
+            {
+                KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
+                KafkaConnectionFactory = _factoryMock.Object
+            });
+
+            _connMock1.Setup(x => x.SendAsync(It.IsAny<IKafkaRequest<MetadataResponse>>()))
+                      .Returns(() => Task.Factory.StartNew(() => new List<MetadataResponse> { CreateMetaResponse() }));
+
+            var topics = router.GetTopicMetadataAsync(TestTopic).Result;
+            _factoryMock.Verify(x => x.Create(It.Is<Uri>(uri => uri.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>()), Times.Once());
+        }
+
         #region MetadataRequest Tests...
         [Test]
         public void BrokerRouteShouldCycleThroughEachBrokerUntilOneIsFound()
