@@ -40,20 +40,24 @@ namespace kafka_tests.Fakes
 
         public Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
         {
-            var tcs = new TaskCompletionSource<List<T>>();
-
-            if (typeof(T) == typeof(ProduceResponse))
+            var task = new Task<List<T>>(() =>
             {
-                ProduceRequestCallCount++;
-                tcs.SetResult(new List<T> { (T)(object)ProduceResponseFunction() });
-            }
-            else if (typeof(T) == typeof(MetadataResponse))
-            {
-                MetadataRequestCallCount++;
-                tcs.SetResult(new List<T> { (T)(object)MetadataResponseFunction() });
-            }
+                if (typeof(T) == typeof(ProduceResponse))
+                {
+                    ProduceRequestCallCount++;
+                    return new List<T> { (T)(object)ProduceResponseFunction() };
+                }
+                else if (typeof(T) == typeof(MetadataResponse))
+                {
+                    MetadataRequestCallCount++;
+                    return new List<T> { (T)(object)MetadataResponseFunction() };
+                }
 
-            return tcs.Task;
+                return null;
+            });
+
+            task.Start();
+            return task;          
         }
 
         public void Dispose()
