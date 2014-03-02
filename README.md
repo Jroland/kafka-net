@@ -44,13 +44,13 @@ Pieces of the Puzzel
 The protocol has been divided up into concrete classes for each request/response pair.  Each class knows how to encode and decode itself into/from their appropriate Kafka protocol byte array.  One benefit of this is that it allows for a nice generic send method on the KafkaConnection.
 
 ##### KafkaConnection
-Provides async methods on a persistent connection to a kafka broker (server).  The send method uses the TcpClient send async function and the read stream has a dedicated thread which uses the correlation Id to match send requests to the correct response.
+Provides async methods on a persistent connection to a kafka broker (server).  The send method uses the TcpClient send async function and the read stream has a dedicated thread which uses the correlation Id to match send responses to the correct request.
 
 ##### BrokerRouter
-Provides metadata based routing of messages to the correct Kafka partition.  This class also manages the multiple KafkaConnections for each Kafka server returned by the broker section in the metadata request.  Routing logic is provided by the IPartitionSelector.
+Provides metadata based routing of messages to the correct Kafka partition.  This class also manages the multiple KafkaConnections for each Kafka server returned by the broker section in the metadata response.  Routing logic is provided by the IPartitionSelector.
 
 ##### IPartitionSelector
-Provides the logic for routing which partition the BrokerRouter should choose.  DefaultPartitionSelector will use round robin partition selection if the key property on the message is null and a mod/hash of the key value if present.
+Provides the logic for routing which partition the BrokerRouter should choose.  The default selector is the DefaultPartitionSelector which will use round robin partition selection if the key property on the message is null and a mod/hash of the key value if present.
 
 ##### Producer
 Provides a higher level class which uses the combination of the BrokerRouter and KafkaConnection to send batches of messages to a Kafka broker.
@@ -65,7 +65,7 @@ Status
 The current version of this project is a functioning "work in progress" as it was only started in early February.  The wire protocol is complete except for Offset Commits to the servers (as there is a bug in 0.8.0 which prevents testing of this feature).  The library is functioning in that there is a complete Producer and Consumer class thus messages can pass to and from a Kafka server.  
 
 ##### The major items that needs work are:
-* IOC for providing customization of internal behaviour of the base API. (right now the classes pass around option parameters)
+* Better handling of options for providing customization of internal behaviour of the base API. (right now the classes pass around option parameters)
 * General structure of the classes is not finalized and breaking changes will occur.
 * Compression of message sets is not currently implemented.  
 * Offset Commits - central storage of offset progress, not implemented
