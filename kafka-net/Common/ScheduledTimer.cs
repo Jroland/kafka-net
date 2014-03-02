@@ -67,7 +67,9 @@ namespace KafkaNet.Common
     }
 
     /// <summary>
-    ///     Timer class to handle replication and optimization remotely.
+    /// Timer class which providers a fluent interface for scheduling task for threads to execute at some future point.
+    /// 
+    /// Thanks goes to Jeff Vanzella for this nifty little fluent class for scheduling tasks.
     /// </summary>
     public class ScheduledTimer : IScheduledTimer
     {
@@ -151,11 +153,11 @@ namespace KafkaNet.Common
         public bool Enabled { get { return _timer.Enabled; } }
 
         /// <summary>
-        ///     Set the time to start a replication.
+        ///     Set the time to start the first execution of the scheduled task.
         /// </summary>
         /// <param name="start">Start date and time for the replication timer.</param>
-        /// <returns>Instance of SolrTimer for fluent configuration.</returns>
-        /// <remarks>If no interval is set, the replication will only happen once.</remarks>
+        /// <returns>Instance of IScheduleTimer for fluent configuration.</returns>
+        /// <remarks>If no start time is set, the interval starts when the timer is started.</remarks>
         public IScheduledTimer StartingAt(DateTime start)
         {
             _timerStart = start;
@@ -168,7 +170,6 @@ namespace KafkaNet.Common
         /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
         /// </summary>
-        /// <filterpriority>2</filterpriority>
         public void Dispose()
         {
             if (Status == ScheduleTimerStatus.Running)
@@ -183,11 +184,11 @@ namespace KafkaNet.Common
         }
 
         /// <summary>
-        ///     Set the interval to send a replication command to a Solr server.
+        ///     Set the interval to wait between each execution of the task.
         /// </summary>
-        /// <param name="interval">Interval this command is to be called.</param>
-        /// <returns>Instance of SolrTimer for fluent configuration.</returns>
-        /// <remarks>If no start time is set, the interval starts when the timer is started.</remarks>
+        /// <param name="interval">Interval to wait between execution of tasks.</param>
+        /// <returns>Instance of IScheduleTimer for fluent configuration.</returns>
+        /// <remarks>If no interval is set, the schedule will only execute once.</remarks>
         public IScheduledTimer Every(TimeSpan interval)
         {
             _interval = interval;
@@ -213,7 +214,11 @@ namespace KafkaNet.Common
         /// <summary>
         /// Sets the timer to execute and restart the timer without waiting for the Do method to finish.
         /// </summary>
-        /// <returns></returns>
+        /// <remarks>
+        /// Setting this will start the countdown timer to the next execution imediately 
+        /// after the current execution is triggered.  If the execution action takes longer than
+        /// the timer interval, the execution task will stack and run concurrently.
+        /// </remarks>
         public IScheduledTimer DontWait()
         {
             _dontWait = true;
