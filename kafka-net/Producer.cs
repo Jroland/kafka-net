@@ -72,6 +72,8 @@ namespace KafkaNet
         {
             var response = await _router.GetTopicMetadataAsync(topic);
 
+            if (response.Count <= 0) throw new InvalidTopicMetadataException(string.Format("No metadata could be found for topic: {0}", topic));
+
             return response.First();
         }
 
