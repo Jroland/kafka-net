@@ -37,6 +37,11 @@ foreach (var message in consumer.Consume())
 }
 ```
 
+##### TestHarness
+The TestHarness project it a simple example console application that will read message from a kafka server and write them to the screen.  It will also take anything typed in the console and send this as a message to the kafka servers.  
+
+Simply modify the kafka server Uri in the code to point to a functioning test server.
+
 
 Pieces of the Puzzel
 -----------
