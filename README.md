@@ -11,6 +11,33 @@ Summary
 -----------
 This project is a .NET implementation of the [Apache Kafka] protocol.  The wire protocol portion is based on the [kafka-python] library writen by [David Arthur] and the general class layout attempts to follow a similar pattern as his project.  To that end, this project builds up from the low level KafkaConnection object for handling async requests to/from the kafka server, all the way up to a higher level Producer/Consumer classes.
 
+Examples
+-----------
+##### Producer
+```sh
+var options = new KafkaOptions(new Uri("http://SERVER1:9092"), new Uri("http://SERVER2:9092"));
+var router = new BrokerRouter(options);
+var client = new Producer(router);
+
+client.SendMessageAsync("TestHarness", new[] { new Message { Value = message } }).Wait();
+
+using (client) { }
+```
+##### Consumer
+```sh
+var options = new KafkaOptions(new Uri("http://SERVER1:9092"), new Uri("http://SERVER2:9092"));
+var router = new BrokerRouter(options);
+var consumer = new Consumer(new ConsumerOptions { Topic = "TestHarness", Router = router });
+
+//Consume returns a blocking IEnumerable (ie: never ending stream)
+foreach (var message in consumer.Consume())
+{
+    Console.WriteLine("Response: P{0},O{1} : {2}", 
+        message.Meta.PartitionId, message.Meta.Offset, message.Value);  
+}
+```
+
+
 Pieces of the Puzzel
 -----------
 ##### Protocol
@@ -41,7 +68,7 @@ The current version of this project is a functioning "work in progress" as it wa
 * IOC for providing customization of internal behaviour of the base API. (right now the classes pass around option parameters)
 * General structure of the classes is not finalized and breaking changes will occur.
 * Compression of message sets is not currently implemented.  
-* Offset Commits - central storage of offset progress.
+* Offset Commits - central storage of offset progress, not implemented
 * Currently only works with .NET Framework 4.5 as it uses the await command.
 * nuget package.
 * Test coverage.
