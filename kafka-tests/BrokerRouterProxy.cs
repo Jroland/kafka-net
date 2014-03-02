@@ -14,7 +14,7 @@ namespace kafka_tests
 {
     public class BrokerRouterProxy
     {
-        private const string TestTopic = "UnitTest";
+        public const string TestTopic = "UnitTest";
 
         private readonly MoqMockingKernel _kernel;
         private int _offset0;
