@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Kafka-net : Native C# client for Kafka queue servers." />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Kafka-net</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/Jroland/kafka-net">View on GitHub</a>
+
+          <h1 id="project_title">Kafka-net</h1>
+          <h2 id="project_tagline">Native C# client for Kafka queue servers.</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/Jroland/kafka-net/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/Jroland/kafka-net/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <h1>
+<a name="kafka-net" class="anchor" href="#kafka-net"><span class="octicon octicon-link"></span></a>kafka-net</h1>
+
+<p>Native C# client for Kafka queue servers.  </p>
+
+<h2>
+<a name="license" class="anchor" href="#license"><span class="octicon octicon-link"></span></a>License</h2>
+
+<p>Copyright 2014, James Roland under Apache License, V2.0. See LICENSE file.</p>
+
+<h2>
+<a name="summary" class="anchor" href="#summary"><span class="octicon octicon-link"></span></a>Summary</h2>
+
+<p>This project is a .NET implementation of the <a href="http://kafka.apache.org">Apache Kafka</a> protocol.  The wire protocol portion is based on the <a href="https://github.com/mumrah/kafka-python">kafka-python</a> library writen by <a href="https://github.com/mumrah">David Arthur</a> and the general class layout attempts to follow a similar pattern as his project.  To that end, this project builds up from the low level KafkaConnection object for handling async requests to/from the kafka server, all the way up to a higher level Producer/Consumer classes.</p>
+
+<h2>
+<a name="examples" class="anchor" href="#examples"><span class="octicon octicon-link"></span></a>Examples</h2>
+
+<h5>
+<a name="producer" class="anchor" href="#producer"><span class="octicon octicon-link"></span></a>Producer</h5>
+
+<div class="highlight highlight-sh"><pre>var <span class="nv">options</span> <span class="o">=</span> new KafkaOptions<span class="o">(</span>new Uri<span class="o">(</span><span class="s2">"http://SERVER1:9092"</span><span class="o">)</span>, new Uri<span class="o">(</span><span class="s2">"http://SERVER2:9092"</span><span class="o">))</span><span class="p">;</span>
+var <span class="nv">router</span> <span class="o">=</span> new BrokerRouter<span class="o">(</span>options<span class="o">)</span><span class="p">;</span>
+var <span class="nv">client</span> <span class="o">=</span> new Producer<span class="o">(</span>router<span class="o">)</span><span class="p">;</span>
+
+client.SendMessageAsync<span class="o">(</span><span class="s2">"TestHarness"</span>, new<span class="o">[]</span> <span class="o">{</span> new Message <span class="o">{</span> <span class="nv">Value</span> <span class="o">=</span> message <span class="o">}</span> <span class="o">})</span>.Wait<span class="o">()</span><span class="p">;</span>
+
+using <span class="o">(</span>client<span class="o">)</span> <span class="o">{</span> <span class="o">}</span>
+</pre></div>
+
+<h5>
+<a name="consumer" class="anchor" href="#consumer"><span class="octicon octicon-link"></span></a>Consumer</h5>
+
+<div class="highlight highlight-sh"><pre>var <span class="nv">options</span> <span class="o">=</span> new KafkaOptions<span class="o">(</span>new Uri<span class="o">(</span><span class="s2">"http://SERVER1:9092"</span><span class="o">)</span>, new Uri<span class="o">(</span><span class="s2">"http://SERVER2:9092"</span><span class="o">))</span><span class="p">;</span>
+var <span class="nv">router</span> <span class="o">=</span> new BrokerRouter<span class="o">(</span>options<span class="o">)</span><span class="p">;</span>
+var <span class="nv">consumer</span> <span class="o">=</span> new Consumer<span class="o">(</span>new ConsumerOptions <span class="o">{</span> <span class="nv">Topic</span> <span class="o">=</span> <span class="s2">"TestHarness"</span>, <span class="nv">Router</span> <span class="o">=</span> router <span class="o">})</span><span class="p">;</span>
+
+//Consume returns a blocking IEnumerable <span class="o">(</span>ie: never ending stream<span class="o">)</span>
+foreach <span class="o">(</span>var message in consumer.Consume<span class="o">())</span>
+<span class="o">{</span>
+    Console.WriteLine<span class="o">(</span><span class="s2">"Response: P{0},O{1} : {2}"</span>, 
+        message.Meta.PartitionId, message.Meta.Offset, message.Value<span class="o">)</span><span class="p">;</span>  
+<span class="o">}</span>
+</pre></div>
+
+<h2>
+<a name="pieces-of-the-puzzel" class="anchor" href="#pieces-of-the-puzzel"><span class="octicon octicon-link"></span></a>Pieces of the Puzzel</h2>
+
+<h5>
+<a name="protocol" class="anchor" href="#protocol"><span class="octicon octicon-link"></span></a>Protocol</h5>
+
+<p>The protocol has been divided up into concrete classes for each request/response pair.  Each class knows how to encode and decode itself into/from their appropriate Kafka protocol byte array.  One benefit of this is that it allows for a nice generic send method on the KafkaConnection.</p>
+
+<h5>
+<a name="kafkaconnection" class="anchor" href="#kafkaconnection"><span class="octicon octicon-link"></span></a>KafkaConnection</h5>
+
+<p>Provides async methods on a persistent connection to a kafka broker (server).  The send method uses the TcpClient send async function and the read stream has a dedicated thread which uses the correlation Id to match send responses to the correct request.</p>
+
+<h5>
+<a name="brokerrouter" class="anchor" href="#brokerrouter"><span class="octicon octicon-link"></span></a>BrokerRouter</h5>
+
+<p>Provides metadata based routing of messages to the correct Kafka partition.  This class also manages the multiple KafkaConnections for each Kafka server returned by the broker section in the metadata response.  Routing logic is provided by the IPartitionSelector.</p>
+
+<h5>
+<a name="ipartitionselector" class="anchor" href="#ipartitionselector"><span class="octicon octicon-link"></span></a>IPartitionSelector</h5>
+
+<p>Provides the logic for routing which partition the BrokerRouter should choose.  The default selector is the DefaultPartitionSelector which will use round robin partition selection if the key property on the message is null and a mod/hash of the key value if present.</p>
+
+<h5>
+<a name="producer-1" class="anchor" href="#producer-1"><span class="octicon octicon-link"></span></a>Producer</h5>
+
+<p>Provides a higher level class which uses the combination of the BrokerRouter and KafkaConnection to send batches of messages to a Kafka broker.</p>
+
+<h5>
+<a name="consumer-1" class="anchor" href="#consumer-1"><span class="octicon octicon-link"></span></a>Consumer</h5>
+
+<p>Provides a higher level class which will consumer messages from a whitelist of partitions from a single topic.  The consumption mechanism is a blocking IEnumerable of messages.  If no whitelist is provided then all partitions will be consumed creating one KafkaConnection for each partition leader.</p>
+
+<h2>
+<a name="status" class="anchor" href="#status"><span class="octicon octicon-link"></span></a>Status</h2>
+
+<p>The current version of this project is a functioning "work in progress" as it was only started in early February.  The wire protocol is complete except for Offset Commits to the servers (as there is a bug in 0.8.0 which prevents testing of this feature).  The library is functioning in that there is a complete Producer and Consumer class thus messages can pass to and from a Kafka server.  </p>
+
+<h5>
+<a name="the-major-items-that-needs-work-are" class="anchor" href="#the-major-items-that-needs-work-are"><span class="octicon octicon-link"></span></a>The major items that needs work are:</h5>
+
+<ul>
+<li>Better handling of options for providing customization of internal behaviour of the base API. (right now the classes pass around option parameters)</li>
+<li>General structure of the classes is not finalized and breaking changes will occur.</li>
+<li>Compression of message sets is not currently implemented.<br>
+</li>
+<li>Offset Commits - central storage of offset progress, not implemented</li>
+<li>Currently only works with .NET Framework 4.5 as it uses the await command.</li>
+<li>nuget package.</li>
+<li>Test coverage.</li>
+<li>Documentation.</li>
+</ul><h2>
+<a name="comment" class="anchor" href="#comment"><span class="octicon octicon-link"></span></a>Comment</h2>
+
+<p>This is a pet project for me and is not currently backed by a need for a Kafka server client.  Which means the client is only currently being tested against a small set of Kafka test servers and not against any server that has any real data load.  </p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Kafka-net maintained by <a href="https://github.com/Jroland">Jroland</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-48567102-2");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+
+  </body>
+</html>
