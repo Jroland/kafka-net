@@ -26,19 +26,23 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public void SendAsyncShouldHandle100KMessages()
+        [TestCase(10)]
+        [TestCase(100)]
+        [TestCase(1000)]
+        [TestCase(10000)]
+        public void SendAsyncShouldHandleHighVolumeOfMessages(int amount)
         {
-            var tasks = new Task<List<ProduceResponse>>[100000];
+            var tasks = new Task<List<ProduceResponse>>[amount];
             var producer = new Producer(_router);
 
-            for (var i = 0; i < 100000; i++)
+            for (var i = 0; i < amount; i++)
             {
                 tasks[i] = producer.SendMessageAsync("LoadTest", new Message[] {new Message {Value = Guid.NewGuid().ToString()}});
             }
 
             var results = tasks.SelectMany(x => x.Result).ToList();
 
-            Assert.That(results.Count, Is.EqualTo(100000));
+            Assert.That(results.Count, Is.EqualTo(amount));
             Assert.That(results.Any(x => x.Error != 0), Is.False);
         }
     }

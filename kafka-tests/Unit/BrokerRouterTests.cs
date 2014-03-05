@@ -33,17 +33,17 @@ namespace kafka_tests.Unit
             _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _connMock1.Object);
         }
 
-        [Test]
-        public void BrokerRouterCanConstruct()
-        {
-            var result = new BrokerRouter(new KafkaNet.Model.KafkaOptions
-            {
-                KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
-                KafkaConnectionFactory = _factoryMock.Object
-            });
+        //[Test]
+        //public void BrokerRouterCanConstruct()
+        //{
+        //    var result = new BrokerRouter(new KafkaNet.Model.KafkaOptions
+        //    {
+        //        KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
+        //        KafkaConnectionFactory = _factoryMock.Object
+        //    });
 
-            Assert.That(result.DefaultBrokers.Count, Is.EqualTo(1));
-        }
+        //    Assert.That(result.DefaultBrokers.Count, Is.EqualTo(1));
+        //}
 
         [Test]
         public void BrokerRouterUsesFactoryToAddNewBrokers()
