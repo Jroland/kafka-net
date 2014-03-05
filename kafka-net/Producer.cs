@@ -37,7 +37,7 @@ namespace KafkaNet
             foreach (var message in messages)
             {
                 var messageTemp = message;
-                var route = await _router.SelectBrokerRouteAsync(topic, messageTemp.Key);
+                var route = _router.SelectBrokerRoute(topic, messageTemp.Key);
                 routeGroup.AddOrUpdate(route, b => new List<Message>(new[] { messageTemp }), (b, list) => { list.Add(messageTemp); return list; });
             }
 
@@ -68,9 +68,9 @@ namespace KafkaNet
         /// </summary>
         /// <param name="topic">The metadata on the requested topic.</param>
         /// <returns>Topic object containing the metadata on the requested topic.</returns>
-        public async Task<Topic> GetTopicAsync(string topic)
+        public Topic GetTopic(string topic)
         {
-            var response = await _router.GetTopicMetadataAsync(topic);
+            var response = _router.GetTopicMetadata(topic);
 
             if (response.Count <= 0) throw new InvalidTopicMetadataException(string.Format("No metadata could be found for topic: {0}", topic));
 

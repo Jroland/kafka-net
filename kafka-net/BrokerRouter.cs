@@ -46,9 +46,9 @@ namespace KafkaNet
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        public async Task<BrokerRoute> SelectBrokerRouteAsync(string topic, int partitionId)
+        public BrokerRoute SelectBrokerRoute(string topic, int partitionId)
         {
-            var cachedTopic = await GetTopicMetadataAsync(topic);
+            var cachedTopic = GetTopicMetadata(topic);
 
             if (cachedTopic.Count <= 0)
                 throw new InvalidTopicMetadataException(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
@@ -69,10 +69,10 @@ namespace KafkaNet
         /// <returns>A broker route for the given topic.</returns>
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        public async Task<BrokerRoute> SelectBrokerRouteAsync(string topic, string key = null)
+        public BrokerRoute SelectBrokerRoute(string topic, string key = null)
         {
             //get topic either from cache or server.
-            var cachedTopic = await GetTopicMetadataAsync(topic);
+            var cachedTopic = GetTopicMetadata(topic);
 
             if (cachedTopic.Count <= 0)
                 throw new InvalidTopicMetadataException(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
@@ -86,7 +86,7 @@ namespace KafkaNet
         /// <param name="topics">Collection of topids to request metadata for.</param>
         /// <returns>List of Topics as provided by Kafka.</returns>
         /// <remarks>The topic metadata will by default check the cache first and then request metadata from the server if it does not exist in cache.</remarks>
-        public Task<List<Topic>> GetTopicMetadataAsync(params string[] topics)
+        public List<Topic> GetTopicMetadata(params string[] topics)
         {
             var hitMissTopic = GetHitAndMissCachedTopic(topics);
             if (hitMissTopic.Item2.Count > 0)
@@ -101,14 +101,10 @@ namespace KafkaNet
                     }
                 }
 
-                hitMissTopic.Item1.AddRange(hitMissTopic.Item2.Select(GetCachedTopic));
+                hitMissTopic.Item1.AddRange(hitMissTopic.Item2.Select(GetCachedTopic).Where(x => x != null));
             }
 
-
-            //TODO i am faking he async here.  Need to remove async all together for this one I think.
-            var tcs = new TaskCompletionSource<List<Topic>>();
-            tcs.SetResult(topics.Select(GetCachedTopic).ToList());
-            return tcs.Task;
+            return hitMissTopic.Item1;
         }
             
         private Tuple<List<Topic>, List<string>> GetHitAndMissCachedTopic(IEnumerable<string> topics)
@@ -163,7 +159,7 @@ namespace KafkaNet
             //we retreived a collection of brokers, get this from the default
             if (_defaultConnections.Count > 0)
             {
-                CycleConnectionsForTopicMetadataAsync(_defaultConnections, topics).Wait();
+                CycleConnectionsForTopicMetadataAsync(_defaultConnections, topics);
                 if (_brokerConnectionIndex.Values.Count > 0)
                 {
                     _defaultConnections.ForEach(x => { using (x) { } });
@@ -175,12 +171,12 @@ namespace KafkaNet
             //cycle the brokers to get metadata update
             if (_brokerConnectionIndex.Values.Count > 0)
             {
-                CycleConnectionsForTopicMetadataAsync(_brokerConnectionIndex.Values, topics).Wait();
+                CycleConnectionsForTopicMetadataAsync(_brokerConnectionIndex.Values, topics);
                 return;
             }
         }
 
-        private async Task<MetadataResponse> CycleConnectionsForTopicMetadataAsync(IEnumerable<IKafkaConnection> connections, IEnumerable<string> topics)
+        private MetadataResponse CycleConnectionsForTopicMetadataAsync(IEnumerable<IKafkaConnection> connections, IEnumerable<string> topics)
         {
             var request = new MetadataRequest { Topics = topics.ToList() };
 
@@ -189,7 +185,7 @@ namespace KafkaNet
             {
                 try
                 {
-                    var response = await conn.SendAsync(request);
+                    var response = conn.SendAsync(request).Result;
                     if (response != null && response.Count > 0)
                     {
                         var metadataResponse = response.First();

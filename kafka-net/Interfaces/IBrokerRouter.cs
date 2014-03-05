@@ -20,7 +20,7 @@ namespace KafkaNet
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        Task<BrokerRoute> SelectBrokerRouteAsync(string topic, int partitionId);
+        BrokerRoute SelectBrokerRoute(string topic, int partitionId);
 
         /// <summary>
         /// Select a broker for a given topic using the IPartitionSelector function.
@@ -30,7 +30,7 @@ namespace KafkaNet
         /// <returns>A broker route for the given topic.</returns>
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        Task<BrokerRoute> SelectBrokerRouteAsync(string topic, string key = null);
+        BrokerRoute SelectBrokerRoute(string topic, string key = null);
 
         /// <summary>
         /// Returns Topic metadata for each topic requested. 
@@ -38,6 +38,6 @@ namespace KafkaNet
         /// <param name="topics">Collection of topids to request metadata for.</param>
         /// <returns>List of Topics as provided by Kafka.</returns>
         /// <remarks>The topic metadata will by default check the cache first and then request metadata from the server if it does not exist in cache.</remarks>
-        Task<List<Topic>> GetTopicMetadataAsync(params string[] topics);
+        List<Topic> GetTopicMetadata(params string[] topics);
     }
 }

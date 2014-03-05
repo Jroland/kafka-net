@@ -102,22 +102,18 @@ namespace kafka_tests.Unit
             var router = _routerProxy.Create();
             var producer = new Producer(router);
 
-            var result = producer.GetTopicAsync(BrokerRouterProxy.TestTopic).Result;
+            var result = producer.GetTopic(BrokerRouterProxy.TestTopic);
             Assert.That(result.Name, Is.EqualTo(BrokerRouterProxy.TestTopic));
         }
 
         [Test]
+        [ExpectedException(typeof(InvalidTopicMetadataException))]
         public void EmptyTopicMetadataShouldThrowException()
         {
             var router = _routerProxy.Create();
             var producer = new Producer(router);
 
-            producer.GetTopicAsync("MissingTopic").ContinueWith(t =>
-            {
-                Assert.That(t.IsFaulted, Is.True);
-                Assert.That(t.Exception, Is.Not.Null);
-                Assert.That(t.Exception.ToString(), Is.StringContaining("InvalidTopicMetadataException"));
-            }).Wait(); 
+            producer.GetTopic("MissingTopic");
         }
 
         #endregion

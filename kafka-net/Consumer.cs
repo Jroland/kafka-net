@@ -51,7 +51,7 @@ namespace KafkaNet
 
         private void RefreshTopicPartition()
         {
-            var topic = _options.Router.GetTopicMetadataAsync(_options.Topic).Result;
+            var topic = _options.Router.GetTopicMetadata(_options.Topic);
             if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
             _topic = topic.First();
 
@@ -96,7 +96,7 @@ namespace KafkaNet
                             };
 
                         //make request and post to queue
-                        var route = _options.Router.SelectBrokerRouteAsync(topic, partitionId).Result;
+                        var route = _options.Router.SelectBrokerRoute(topic, partitionId);
                         var responses = route.Connection.SendAsync(fetchRequest).Result;
 
                         if (responses.Count > 0)
