@@ -106,7 +106,7 @@ namespace KafkaNet
 
             return hitMissTopic.Item1;
         }
-            
+
         private Tuple<List<Topic>, List<string>> GetHitAndMissCachedTopic(IEnumerable<string> topics)
         {
             var missingTopics = new List<string>();
@@ -139,6 +139,22 @@ namespace KafkaNet
 
         private BrokerRoute GetCachedRoute(string topic, Partition partition)
         {
+            var route = TryGetRouteFromCache(topic, partition);
+
+            //leader could not be found, refresh the broker information and try one more time
+            if (route == null)
+            {
+                RefreshTopicMetadata(new[] { topic });
+                route = TryGetRouteFromCache(topic, partition);
+            }
+
+            if (route != null) return route;
+
+            throw new LeaderNotFoundException(string.Format("Lead broker cannot be found for parition: {0}, leader: {1}", partition.PartitionId, partition.LeaderId));
+        }
+
+        private BrokerRoute TryGetRouteFromCache(string topic, Partition partition)
+        {
             IKafkaConnection conn;
             if (_brokerConnectionIndex.TryGetValue(partition.LeaderId, out conn))
             {
@@ -150,8 +166,7 @@ namespace KafkaNet
                 };
             }
 
-            //TODO when we cant find a leader then maybe we need to refresh our cache.  Handle here?
-            throw new LeaderNotFoundException(string.Format("Lead broker cannot be found for parition: {0}, leader: {1}", partition.PartitionId, partition.LeaderId));
+            return null;
         }
 
         private void RefreshTopicMetadata(IEnumerable<string> topics)
