@@ -11,6 +11,7 @@ using KafkaNet.Protocol;
 namespace kafka_tests.Unit
 {
     [TestFixture]
+    [Category("Unit")]
     public class DefaultPartitionSelectorTests
     {
         private Topic _topicA;

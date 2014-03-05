@@ -13,6 +13,7 @@ using Ninject.MockingKernel.Moq;
 namespace kafka_tests.Unit
 {
     [TestFixture]
+    [Category("Unit")]
     public class ProducerTests
     {
         private MoqMockingKernel _kernel;

@@ -9,11 +9,6 @@ namespace KafkaNet
     public interface IBrokerRouter : IDisposable
     {
         /// <summary>
-        /// Get list of default broker connections.  This list is provided by the class constructor options and is used to query for metadata.
-        /// </summary>
-        List<IKafkaConnection> DefaultBrokers { get; }
-
-        /// <summary>
         /// Select a broker for a specific topic and partitionId.
         /// </summary>
         /// <param name="topic">The topic name to select a broker for.</param>

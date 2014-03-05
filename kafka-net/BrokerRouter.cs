@@ -20,6 +20,7 @@ namespace KafkaNet
     /// </summary>
     public class BrokerRouter : IBrokerRouter
     {
+        private readonly object _threadLock = new object();
         private readonly KafkaOptions _kafkaOptions;
         private readonly ConcurrentDictionary<int, IKafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, IKafkaConnection>();
         private readonly ConcurrentDictionary<string, Topic> _topicIndex = new ConcurrentDictionary<string, Topic>();
@@ -28,14 +29,10 @@ namespace KafkaNet
         public BrokerRouter(KafkaOptions kafkaOptions)
         {
             _kafkaOptions = kafkaOptions;
-            _defaultConnections.AddRange(kafkaOptions.KafkaServerUri.Distinct()
+            _defaultConnections
+                .AddRange(kafkaOptions.KafkaServerUri.Distinct()
                 .Select(uri => _kafkaOptions.KafkaConnectionFactory.Create(uri, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log)));
         }
-
-        /// <summary>
-        /// Get list of default broker connections.  This list is provided by the class constructor options and is used to query for metadata.
-        /// </summary>
-        public List<IKafkaConnection> DefaultBrokers { get { return _defaultConnections; } }
 
         /// <summary>
         /// Select a broker for a specific topic and partitionId.
@@ -89,7 +86,49 @@ namespace KafkaNet
         /// <param name="topics">Collection of topids to request metadata for.</param>
         /// <returns>List of Topics as provided by Kafka.</returns>
         /// <remarks>The topic metadata will by default check the cache first and then request metadata from the server if it does not exist in cache.</remarks>
-        public async Task<List<Topic>> GetTopicMetadataAsync(params string[] topics)
+        public Task<List<Topic>> GetTopicMetadataAsync(params string[] topics)
+        {
+            //TODO : need to stop the thread race here so faking async for the moment
+            var missingTopics = topics.Where(x => _topicIndex.ContainsKey(x) == false).ToList();
+
+            if (missingTopics.Count > 0)
+            {
+                //if any are missing we need to lock so we dont race here
+                lock (_threadLock)
+                {
+                    missingTopics = topics.Where(x => _topicIndex.ContainsKey(x) == false).ToList();
+                    if (missingTopics.Count > 0)
+                    {
+                        //Cycle method will throw if any of the topics cannot be found.
+                        CycleDefaultBrokersForTopicMetadataAsync(missingTopics).Wait();
+                    }
+                }
+            }
+
+            var tcs = new TaskCompletionSource<List<Topic>>();
+            tcs.SetResult(topics.Select(GetCachedTopic).ToList());
+            return tcs.Task;
+        }
+
+        private Topic GetCachedTopic(string topic)
+        {
+            Topic cachedTopic;
+            return _topicIndex.TryGetValue(topic, out cachedTopic) ? cachedTopic : null;
+        }
+
+        private List<Topic> RefreshTopicMetadata(IEnumerable<string> topics)
+        {
+            lock (_threadLock)
+            {
+                //we have not found the collection of brokers get this from 
+                if (_defaultConnections.Count > 0)
+                {
+
+                }
+            }
+        }
+
+        private Tuple<List<Topic>, List<string>> GetHitAndMissCachedTopic(IEnumerable<string> topics)
         {
             var missingTopics = new List<string>();
 
@@ -103,12 +142,7 @@ namespace KafkaNet
                     topicMetadata.Add(cachedTopic);
             }
 
-            //Cycle method will throw if any of the topics cannot be found.
-            if (missingTopics.Count > 0) await CycleDefaultBrokersForTopicMetadataAsync(missingTopics.ToArray());
-
-            topicMetadata.AddRange(missingTopics.Select(GetCachedTopic).Where(x => x != null));
-
-            return topicMetadata;
+            return new Tuple<List<Topic>, List<string>>(topicMetadata, missingTopics);
         }
 
         private BrokerRoute SelectConnectionFromCache(Topic topic, string key = null)
@@ -135,13 +169,7 @@ namespace KafkaNet
             throw new LeaderNotFoundException(string.Format("Lead broker cannot be found for parition: {0}, leader: {1}", partition.PartitionId, partition.LeaderId));
         }
 
-        private Topic GetCachedTopic(string topic)
-        {
-            Topic cachedTopic;
-            return _topicIndex.TryGetValue(topic, out cachedTopic) ? cachedTopic : null;
-        }
-
-        private async Task<MetadataResponse> CycleDefaultBrokersForTopicMetadataAsync(params string[] topics)
+        private async Task<MetadataResponse> CycleDefaultBrokersForTopicMetadataAsync(IEnumerable<string> topics)
         {
             var request = new MetadataRequest { Topics = topics.ToList() };
 
@@ -176,14 +204,18 @@ namespace KafkaNet
             {
                 var localBroker = broker;
                 _brokerConnectionIndex.AddOrUpdate(broker.BrokerId,
-                    i => _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log),
+                    i =>
+                        {
+                            var existing = _defaultConnections.FirstOrDefault(x => x.KafkaUri.Host == broker.Host && x.KafkaUri.Port == broker.Port);
+                            return existing ?? _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log);
+                        },
                     (i, connection) =>
-                    {
-                        //if a connection changes for a broker close old connection and create a new one
-                        if (connection.KafkaUri == localBroker.Address) return connection;
-                        _kafkaOptions.Log.WarnFormat("Broker:{0} Uri changed from:{1} to {2}", localBroker.BrokerId, connection.KafkaUri, localBroker.Address);
-                        using (connection) { return _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log); }
-                    });  
+                        {
+                            //if a connection changes for a broker close old connection and create a new one
+                            if (connection.KafkaUri == localBroker.Address) return connection;
+                            _kafkaOptions.Log.WarnFormat("Broker:{0} Uri changed from:{1} to {2}", localBroker.BrokerId, connection.KafkaUri, localBroker.Address);
+                            using (connection) { return _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log); }
+                        });
             }
 
             foreach (var topic in metadata.Topics)

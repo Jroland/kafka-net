@@ -5,6 +5,7 @@ using NUnit.Framework;
 namespace kafka_tests
 {
     [TestFixture]
+    [Category("Unit")]
     public class ProtocolBaseRequestTests
     {
         [Test]

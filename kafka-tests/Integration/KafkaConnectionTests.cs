@@ -14,6 +14,7 @@ namespace kafka_tests.Integration
     /// Note these integration tests require an actively running kafka server defined in the app.config file.
     /// </summary>
     [TestFixture]
+    [Category("Integration")]
     public class KafkaConnectionTests
     {
         private KafkaConnection _conn;
