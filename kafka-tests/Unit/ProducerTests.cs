@@ -92,32 +92,7 @@ namespace kafka_tests.Unit
             var test = producer.SendMessageAsync("UnitTest", messages).Result;
         }
         #endregion
-
-
-
-        #region GetTopicAsync Tests...
-        [Test]
-        public void GetTopicShouldReturnTopic()
-        {
-            var router = _routerProxy.Create();
-            var producer = new Producer(router);
-
-            var result = producer.GetTopic(BrokerRouterProxy.TestTopic);
-            Assert.That(result.Name, Is.EqualTo(BrokerRouterProxy.TestTopic));
-        }
-
-        [Test]
-        [ExpectedException(typeof(InvalidTopicMetadataException))]
-        public void EmptyTopicMetadataShouldThrowException()
-        {
-            var router = _routerProxy.Create();
-            var producer = new Producer(router);
-
-            producer.GetTopic("MissingTopic");
-        }
-
-        #endregion
-
+        
         [Test]
         public void EnsureProducerDisposesRouter()
         {
