@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
+using System.Collections.Generic;
 
 namespace TestHarness
 {
@@ -16,8 +17,6 @@ namespace TestHarness
                 };
             var router = new BrokerRouter(options);
             var client = new Producer(router);
-
-            var topic = client.GetTopic("LoadTest");
 
             Task.Factory.StartNew(() =>
                 {

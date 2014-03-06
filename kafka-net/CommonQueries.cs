@@ -22,22 +22,35 @@ namespace KafkaNet
         /// <param name="maxOffsets"></param>
         /// <param name="time"></param>
         /// <returns></returns>
-        public Task<List<OffsetResponse>> GetTopicOffset(string topic, int maxOffsets = 1, int time = -1)
+        public Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
         {
             var topicMetadata = GetTopic(topic);
+            
+            //send the offset request to each partition leader
+            var sendRequests = topicMetadata.Partitions
+                .GroupBy(x => x.PartitionId)
+                .Select(p =>
+                    {
+                        var route = _brokerRouter.SelectBrokerRoute(topic, p.Key);
+                        var request = new OffsetRequest
+                                        {
+                                            Offsets = new List<Offset>
+                                                {
+                                                    new Offset
+                                                    {
+                                                        Topic = topic,
+                                                        PartitionId = p.Key,
+                                                        MaxOffsets = maxOffsets,
+                                                        Time = time
+                                                    }
+                                                }
+                                        };
 
-            var offsets = new List<Offset>(topicMetadata.Partitions.Select(x => new Offset
-                                {
-                                    Topic = topic,
-                                    PartitionId = x.PartitionId,
-                                    MaxOffsets = maxOffsets,
-                                    Time = time
-                                }));
-
-            var offsetRequest = new OffsetRequest { Offsets = offsets };
-
-            var route = _brokerRouter.SelectBrokerRoute(topic);
-            return route.Connection.SendAsync(offsetRequest);
+                        return route.Connection.SendAsync(request);
+                    }).ToArray();
+                 
+               return Task.WhenAll(sendRequests)
+                   .ContinueWith(t => sendRequests.SelectMany(x => x.Result).ToList());
         }
 
         /// <summary>
