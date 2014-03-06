@@ -14,6 +14,8 @@ namespace kafka_tests.Fakes
 
         public Func<ProduceResponse> ProduceResponseFunction;
         public Func<MetadataResponse> MetadataResponseFunction;
+        public Func<OffsetResponse> OffsetResponseFunction;
+        public Func<FetchResponse> FetchResponseFunction;
 
         public FakeKafkaConnection(Uri address)
         {
@@ -22,6 +24,8 @@ namespace kafka_tests.Fakes
 
         public int MetadataRequestCallCount { get; set; }
         public int ProduceRequestCallCount { get; set; }
+        public int OffsetRequestCallCount { get; set; }
+        public int FetchRequestCallCount { get; set; }
 
         public Uri KafkaUri
         {
@@ -52,12 +56,22 @@ namespace kafka_tests.Fakes
                     MetadataRequestCallCount++;
                     return new List<T> { (T)(object)MetadataResponseFunction() };
                 }
+                else if (typeof(T) == typeof(OffsetResponse))
+                {
+                    OffsetRequestCallCount++;
+                    return new List<T> { (T)(object)OffsetResponseFunction() };
+                }
+                else if (typeof(T) == typeof(FetchResponse))
+                {
+                    FetchRequestCallCount++;
+                    return new List<T> { (T)(object)FetchResponseFunction() };
+                }
 
                 return null;
             });
 
             task.Start();
-            return task;          
+            return task;
         }
 
         public void Dispose()
