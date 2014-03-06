@@ -6,6 +6,10 @@ using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
+    /// <summary>
+    /// This class provides a set of common queries that are useful for both the Consumer and Producer classes.  
+    /// Both those classes derive from this base class simply to expose these metadata query methods.
+    /// </summary>
     public class CommonQueries : IDisposable
     {
         private readonly IBrokerRouter _brokerRouter;
