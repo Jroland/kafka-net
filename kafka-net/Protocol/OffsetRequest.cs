@@ -107,4 +107,10 @@ namespace KafkaNet.Protocol
         public Int16 Error { get; set; }
         public List<long> Offsets { get; set; }
     }
+
+    public class OffsetPosition
+    {
+        public int PartitionId { get; set; }
+        public long Offset { get; set; }
+    }
 }

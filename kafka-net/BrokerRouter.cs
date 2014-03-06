@@ -106,7 +106,7 @@ namespace KafkaNet
 
             return hitMissTopic.Item1;
         }
-
+        
         private Tuple<List<Topic>, List<string>> GetHitAndMissCachedTopic(IEnumerable<string> topics)
         {
             var missingTopics = new List<string>();

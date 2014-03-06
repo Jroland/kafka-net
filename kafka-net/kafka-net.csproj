@@ -46,6 +46,7 @@
     <Compile Include="Consumer.cs" />
     <Compile Include="Interfaces\IKafkaConnection.cs" />
     <Compile Include="Interfaces\IBrokerRouter.cs" />
+    <Compile Include="CommonQueries.cs" />
     <Compile Include="Model\ConsumerOptions.cs" />
     <Compile Include="DefaultPartitionSelector.cs" />
     <Compile Include="Interfaces\IKafkaLog.cs" />

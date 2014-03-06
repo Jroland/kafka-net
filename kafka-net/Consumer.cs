@@ -16,7 +16,7 @@ namespace KafkaNet
     /// TODO: provide automatic offset saving when the feature is available in 0.8.1
     /// https://issues.apache.org/jira/browse/KAFKA-993
     /// </summary>
-    public class Consumer : IDisposable
+    public class Consumer : CommonQueries
     {
         private readonly ConsumerOptions _options;
         private readonly BlockingCollection<Message> _fetchResponseQueue;
@@ -27,7 +27,7 @@ namespace KafkaNet
         private Topic _topic;
         private bool _interrupted;
 
-        public Consumer(ConsumerOptions options)
+        public Consumer(ConsumerOptions options) : base(options.Router)
         {
             _options = options;
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
@@ -49,6 +49,29 @@ namespace KafkaNet
             return _fetchResponseQueue.GetConsumingEnumerable();
         }
 
+        /// <summary>
+        /// Force reset the offset position for a specific partition to a specific offset value.
+        /// </summary>
+        /// <param name="positions">Collection of positions to reset to.</param>
+        public void SetOffsetPosition(params OffsetPosition[] positions)
+        {
+            foreach (var position in positions)
+            {
+                var temp = position;
+                _partitionOffsetIndex.AddOrUpdate(position.PartitionId, i => temp.Offset, (i, l) => temp.Offset);
+            }
+        }
+
+        /// <summary>
+        /// Get the current running position (offset) for all consuming partition.
+        /// </summary>
+        /// <returns>List of positions for each consumed partitions.</returns>
+        /// <remarks>Will only return data if the consumer is actively being consumed.</remarks>
+        public List<OffsetPosition> GetOffsetPosition()
+        {
+            return _partitionOffsetIndex.Select(x => new OffsetPosition { PartitionId = x.Key, Offset = x.Value }).ToList();
+        }
+
         private void RefreshTopicPartition()
         {
             var topic = _options.Router.GetTopicMetadata(_options.Topic);
@@ -67,6 +90,8 @@ namespace KafkaNet
                 }
             }
         }
+
+        
 
         private Task ConsumeTopicPartitionAsync(string topic, int partitionId)
         {
@@ -123,10 +148,10 @@ namespace KafkaNet
             });
         }
 
-        public void Dispose()
+        public new void Dispose()
         {
+            base.Dispose();
             using (_topicPartitionQueryTimer)
-            using (_options.Router)
             {
                 _interrupted = true;
             }

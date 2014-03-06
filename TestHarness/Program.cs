@@ -17,6 +17,8 @@ namespace TestHarness
             var router = new BrokerRouter(options);
             var client = new Producer(router);
 
+            var topic = client.GetTopic("LoadTest");
+
             Task.Factory.StartNew(() =>
                 {
                     var consumer = new Consumer(new ConsumerOptions {Topic = "TestHarness", Router = router});

@@ -12,11 +12,11 @@ namespace KafkaNet
     /// <summary>
     /// Provides a simplified high level API for producing messages on a topic.
     /// </summary>
-    public class Producer : IDisposable
+    public class Producer : CommonQueries
     {
         private readonly IBrokerRouter _router;
 
-        public Producer(IBrokerRouter brokerRouter)
+        public Producer(IBrokerRouter brokerRouter) : base(brokerRouter)
         {
             _router = brokerRouter;
         }
@@ -61,28 +61,6 @@ namespace KafkaNet
             await Task.WhenAll(sendTasks.ToArray());
 
             return sendTasks.SelectMany(t => t.Result).ToList();
-        }
-
-        /// <summary>
-        /// Get metadata on the given topic.
-        /// </summary>
-        /// <param name="topic">The metadata on the requested topic.</param>
-        /// <returns>Topic object containing the metadata on the requested topic.</returns>
-        public Topic GetTopic(string topic)
-        {
-            var response = _router.GetTopicMetadata(topic);
-
-            if (response.Count <= 0) throw new InvalidTopicMetadataException(string.Format("No metadata could be found for topic: {0}", topic));
-
-            return response.First();
-        }
-
-        public void Dispose()
-        {
-            using (_router)
-            {
-
-            }
         }
     }
 
