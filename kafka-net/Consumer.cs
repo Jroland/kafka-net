@@ -32,11 +32,18 @@ namespace KafkaNet
             _options = options;
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
 
+            //this timer will periodically look for new partitions and automatically add them to the consuming queue
+            //using the same whitelist logic
             _topicPartitionQueryTimer = new ScheduledTimer()
                 .Do(RefreshTopicPartition)
                 .Every(TimeSpan.FromMilliseconds(_options.TopicPartitionQueryTimeMs))
                 .StartingAt(DateTime.Now);
         }
+
+        /// <summary>
+        /// Get the number of tasks created for consuming each partition.
+        /// </summary>
+        public int ConsumerTaskCount { get { return _partitionPollingIndex.Count; } }
 
         /// <summary>
         /// Returns a blocking enumerable of messages received from Kafka.
@@ -74,20 +81,27 @@ namespace KafkaNet
 
         private void RefreshTopicPartition()
         {
-            var topic = _options.Router.GetTopicMetadata(_options.Topic);
-            if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
-            _topic = topic.First();
-
-            //create one thread per partitions, if they are in the white list.
-            foreach (var partition in _topic.Partitions)
+            try
             {
-                var partitionId = partition.PartitionId;
-                if (_options.PartitionWhitelist.Count == 0 || _options.PartitionWhitelist.Any(x => x == partitionId))
+                var topic = _options.Router.GetTopicMetadata(_options.Topic);
+                if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
+                _topic = topic.First();
+
+                //create one thread per partitions, if they are in the white list.
+                foreach (var partition in _topic.Partitions)
                 {
-                    _partitionPollingIndex.AddOrUpdate(partitionId,
-                                                       i => ConsumeTopicPartitionAsync(_topic.Name, partitionId),
-                                                       (i, task) => task);
+                    var partitionId = partition.PartitionId;
+                    if (_options.PartitionWhitelist.Count == 0 || _options.PartitionWhitelist.Any(x => x == partitionId))
+                    {
+                        _partitionPollingIndex.AddOrUpdate(partitionId,
+                                                           i => ConsumeTopicPartitionAsync(_topic.Name, partitionId),
+                                                           (i, task) => task);
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                _options.Log.ErrorFormat("Exception occured trying to setup consumer for topic:{0}.  Exception={1}", _options.Topic, ex);
             }
         }
 
