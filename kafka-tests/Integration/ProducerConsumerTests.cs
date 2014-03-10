@@ -106,5 +106,35 @@ namespace kafka_tests.Integration
                 Assert.That(results[i].Value == i.ToString());
             }
         }
+
+        [Test]
+        public void ConsumerShouldBeAbleToGetCurrentOffsetInformation()
+        {
+            var producer = new Producer(_router);
+
+            var startOffsets = producer.GetTopicOffsetAsync("LoadTest").Result
+                .Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray();
+
+            var consumer = new Consumer(new ConsumerOptions("LoadTest", _router), startOffsets);
+
+            var tasks = new List<Task<List<ProduceResponse>>>();
+            for (int i = 0; i < 20; i++)
+            {
+                tasks.Add(producer.SendMessageAsync("LoadTest", new[] { new Message { Value = i.ToString(), Key = "1" } }));
+            }
+            Task.WaitAll(tasks.ToArray());
+
+            var results = consumer.Consume().Take(20).ToList();
+
+            //ensure the produced messages arrived
+            for (int i = 0; i < 20; i++)
+            {
+                Assert.That(results[i].Value == i.ToString());
+            }
+
+            //the current offsets should be 20 positions higher than start
+            var currentOffsets = consumer.GetOffsetPosition();         
+            Assert.That(currentOffsets.Sum(x => x.Offset) - startOffsets.Sum(x => x.Offset), Is.EqualTo(20));
+        }
     }
 }
