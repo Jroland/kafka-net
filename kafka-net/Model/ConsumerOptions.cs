@@ -30,8 +30,10 @@ namespace KafkaNet.Model
         /// </summary>
         public int ConsumerBufferSize { get; set; }
 
-        public ConsumerOptions()
+        public ConsumerOptions(string topic, IBrokerRouter router)
         {
+            Topic = topic;
+            Router = router;
             PartitionWhitelist = new List<int>();
             Log = new DefaultTraceLog();
             TopicPartitionQueryTimeMs = (int)TimeSpan.FromMinutes(15).TotalMilliseconds;

@@ -13,7 +13,7 @@ namespace kafka_tests.Integration
 {
     [TestFixture]
     [Category("Integration")]
-    public class HighVolumeTests
+    public class ProducerTests
     {
         private BrokerRouter _router;
 
@@ -38,13 +38,38 @@ namespace kafka_tests.Integration
 
             for (var i = 0; i < amount; i++)
             {
-                tasks[i] = producer.SendMessageAsync("LoadTest", new Message[] {new Message {Value = Guid.NewGuid().ToString()}});
+                tasks[i] = producer.SendMessageAsync("LoadTest", new Message[] { new Message { Value = Guid.NewGuid().ToString() } });
             }
 
             var results = tasks.SelectMany(x => x.Result).ToList();
 
             Assert.That(results.Count, Is.EqualTo(amount));
             Assert.That(results.Any(x => x.Error != 0), Is.False);
+        }
+
+        [Test]
+        public void ConsumerShouldConsumeInSameOrderAsProduced()
+        {
+            var producer = new Producer(_router);
+
+            var offsets = producer.GetTopicOffsetAsync("LoadTest").Result;
+
+            var consumer = new Consumer(new ConsumerOptions("LoadTest", _router),
+                offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray());
+            
+            var tasks = new List<Task<List<ProduceResponse>>>();
+            for (int i = 0; i < 20; i++)
+            {
+                tasks.Add(producer.SendMessageAsync("LoadTest", new[] { new Message { Value = i.ToString(), Key = "1" } }));
+            }
+            Task.WaitAll(tasks.ToArray());
+
+            var results = consumer.Consume().Take(20).ToList();
+
+            for (int i = 0; i < 20; i++)
+            {
+                Assert.That(results[i].Value == i.ToString());
+            }
         }
     }
 }

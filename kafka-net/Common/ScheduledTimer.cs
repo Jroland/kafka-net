@@ -67,6 +67,7 @@ namespace KafkaNet.Common
     }
 
     /// <summary>
+    /// TODO there is a bug in this that sometimes calls the do function twice on startup
     /// Timer class which providers a fluent interface for scheduling task for threads to execute at some future point.
     /// 
     /// Thanks goes to Jeff Vanzella for this nifty little fluent class for scheduling tasks.

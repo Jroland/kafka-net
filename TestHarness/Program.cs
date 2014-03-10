@@ -20,7 +20,7 @@ namespace TestHarness
 
             Task.Factory.StartNew(() =>
                 {
-                    var consumer = new Consumer(new ConsumerOptions {Topic = "TestHarness", Router = router});
+                    var consumer = new Consumer(new ConsumerOptions("TestHarness", router));
                     foreach (var data in consumer.Consume())
                     {
                         Console.WriteLine("Response: P{0},O{1} : {2}", data.Meta.PartitionId, data.Meta.Offset, data.Value);

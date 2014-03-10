@@ -110,6 +110,12 @@ namespace KafkaNet.Protocol
 
     public class OffsetPosition
     {
+        public OffsetPosition() { }
+        public OffsetPosition(int partitionId, long offset)
+        {
+            PartitionId = partitionId;
+            Offset = offset;
+        }
         public int PartitionId { get; set; }
         public long Offset { get; set; }
     }

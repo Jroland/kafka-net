@@ -57,9 +57,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BrokerRouterProxy.cs" />
+    <Compile Include="Fakes\BrokerRouterProxy.cs" />
     <Compile Include="Fakes\FakeKafkaConnection.cs" />
-    <Compile Include="Integration\HighVolumeTests.cs" />
+    <Compile Include="Integration\ProducerTests.cs" />
     <Compile Include="Integration\KafkaConnectionTests.cs" />
     <Compile Include="RequestFactory.cs" />
     <Compile Include="Unit\BrokerRouterTests.cs" />

@@ -22,12 +22,14 @@ namespace KafkaNet
         private readonly BlockingCollection<Message> _fetchResponseQueue;
         private readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
         private readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
-
         private readonly IScheduledTimer _topicPartitionQueryTimer;
+
+        private int _ensureOneThread;
         private Topic _topic;
         private bool _interrupted;
 
-        public Consumer(ConsumerOptions options) : base(options.Router)
+        public Consumer(ConsumerOptions options, params OffsetPosition[] positions)
+            : base(options.Router)
         {
             _options = options;
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
@@ -38,6 +40,8 @@ namespace KafkaNet
                 .Do(RefreshTopicPartition)
                 .Every(TimeSpan.FromMilliseconds(_options.TopicPartitionQueryTimeMs))
                 .StartingAt(DateTime.Now);
+
+            SetOffsetPosition(positions);
         }
 
         /// <summary>
@@ -83,25 +87,32 @@ namespace KafkaNet
         {
             try
             {
-                var topic = _options.Router.GetTopicMetadata(_options.Topic);
-                if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
-                _topic = topic.First();
-
-                //create one thread per partitions, if they are in the white list.
-                foreach (var partition in _topic.Partitions)
+                if (Interlocked.Increment(ref _ensureOneThread) == 1)
                 {
-                    var partitionId = partition.PartitionId;
-                    if (_options.PartitionWhitelist.Count == 0 || _options.PartitionWhitelist.Any(x => x == partitionId))
+                    var topic = _options.Router.GetTopicMetadata(_options.Topic);
+                    if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
+                    _topic = topic.First();
+
+                    //create one thread per partitions, if they are in the white list.
+                    foreach (var partition in _topic.Partitions)
                     {
-                        _partitionPollingIndex.AddOrUpdate(partitionId,
-                                                           i => ConsumeTopicPartitionAsync(_topic.Name, partitionId),
-                                                           (i, task) => task);
+                        var partitionId = partition.PartitionId;
+                        if (_options.PartitionWhitelist.Count == 0 || _options.PartitionWhitelist.Any(x => x == partitionId))
+                        {
+                            _partitionPollingIndex.AddOrUpdate(partitionId,
+                                                               i => ConsumeTopicPartitionAsync(_topic.Name, partitionId),
+                                                               (i, task) => task);
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
                 _options.Log.ErrorFormat("Exception occured trying to setup consumer for topic:{0}.  Exception={1}", _options.Topic, ex);
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _ensureOneThread);
             }
         }
 

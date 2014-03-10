@@ -28,8 +28,10 @@ namespace KafkaNet
         private readonly int _responseTimeoutMS;
         private readonly IKafkaLog _log;
         private readonly Uri _kafkaUri;
+
         private TcpClient _client;
         private bool _interrupt;
+        private int _ensureOneThread;
         private int _readerActive;
         private int _correlationIdSeed;
 
@@ -234,16 +236,26 @@ namespace KafkaNet
         /// </summary>
         private void ResponseTimeoutCheck()
         {
-            var timeouts = _requestIndex.Values.Where(x => x.CreatedOn < DateTime.UtcNow.AddMinutes(-1)).ToList();
-
-            foreach (var timeout in timeouts)
+            try
             {
-                AsyncRequestItem request;
-                if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
+                if (Interlocked.Increment(ref _ensureOneThread) == 1)
                 {
-                    request.ReceiveTask.SetException(new ResponseTimeoutException(
-                        string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
+                    var timeouts = _requestIndex.Values.Where(x => x.CreatedOn < DateTime.UtcNow.AddMinutes(-1)).ToList();
+
+                    foreach (var timeout in timeouts)
+                    {
+                        AsyncRequestItem request;
+                        if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
+                        {
+                            request.ReceiveTask.SetException(new ResponseTimeoutException(
+                                string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
+                        }
+                    }
                 }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _ensureOneThread);
             }
         }
 

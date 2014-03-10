@@ -33,7 +33,7 @@ namespace kafka_tests.Unit
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int> { 0 };
             var consumer = new Consumer(options);
-            
+
             var test = consumer.Consume().Take(1);
             while (consumer.ConsumerTaskCount <= 0)
             {
@@ -43,6 +43,68 @@ namespace kafka_tests.Unit
             Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
             Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.EqualTo(0));
         }
+
+        [Test]
+        public void ConsumerWithEMptyWhitelistShouldConsumeAllPartition()
+        {
+            var routerProxy = new BrokerRouterProxy(_kernel);
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            var router = routerProxy.Create();
+            var options = CreateOptions(router);
+            options.PartitionWhitelist = new List<int>();
+            var consumer = new Consumer(options);
+
+            var test = consumer.Consume().Take(1);
+            while (consumer.ConsumerTaskCount <= 0)
+            {
+                Thread.Sleep(100);
+            }
+
+            Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
+        }
+
+        [Test]
+        public void ConsumerShouldCreateTaskForEachBroker()
+        {
+            var routerProxy = new BrokerRouterProxy(_kernel);
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            var router = routerProxy.Create();
+            var options = CreateOptions(router);
+            options.PartitionWhitelist = new List<int>();
+            var consumer = new Consumer(options);
+
+            var test = consumer.Consume().Take(1);
+            while (consumer.ConsumerTaskCount <= 0)
+            {
+                Thread.Sleep(100);
+            }
+
+            Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
+        }
+
+
+        [Test]
+        public void ConsumerShouldReturnOffset()
+        {
+            var routerProxy = new BrokerRouterProxy(_kernel);
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            var router = routerProxy.Create();
+            var options = CreateOptions(router);
+            options.PartitionWhitelist = new List<int>();
+            var consumer = new Consumer(options);
+
+            var test = consumer.Consume().Take(1);
+            while (consumer.ConsumerTaskCount <= 0)
+            {
+                Thread.Sleep(100);
+            }
+
+            Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
+        }
+
+
+
 
         [Test]
         public void EnsureConsumerDisposesRouter()
@@ -55,7 +117,7 @@ namespace kafka_tests.Unit
 
         private ConsumerOptions CreateOptions(IBrokerRouter router)
         {
-            return new ConsumerOptions { Router = router, Topic = BrokerRouterProxy.TestTopic };
+            return new ConsumerOptions(BrokerRouterProxy.TestTopic, router);
         }
     }
 }
