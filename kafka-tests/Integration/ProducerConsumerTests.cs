@@ -13,7 +13,7 @@ namespace kafka_tests.Integration
 {
     [TestFixture]
     [Category("Integration")]
-    public class ProducerTests
+    public class ProducerConsumerTests
     {
         private BrokerRouter _router;
 
@@ -56,7 +56,7 @@ namespace kafka_tests.Integration
 
             var consumer = new Consumer(new ConsumerOptions("LoadTest", _router),
                 offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray());
-            
+
             var tasks = new List<Task<List<ProduceResponse>>>();
             for (int i = 0; i < 20; i++)
             {
@@ -66,6 +66,41 @@ namespace kafka_tests.Integration
 
             var results = consumer.Consume().Take(20).ToList();
 
+            for (int i = 0; i < 20; i++)
+            {
+                Assert.That(results[i].Value == i.ToString());
+            }
+        }
+
+        [Test]
+        public void ConsumerShouldBeAbleToSeekBackToEarlierOffset()
+        {
+            var producer = new Producer(_router);
+
+            var offsets = producer.GetTopicOffsetAsync("LoadTest").Result
+                .Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray();
+
+            var consumer = new Consumer(new ConsumerOptions("LoadTest", _router), offsets);
+
+            var tasks = new List<Task<List<ProduceResponse>>>();
+            for (int i = 0; i < 20; i++)
+            {
+                tasks.Add(producer.SendMessageAsync("LoadTest", new[] { new Message { Value = i.ToString(), Key = "1" } }));
+            }
+            Task.WaitAll(tasks.ToArray());
+
+            var results = consumer.Consume().Take(20).ToList();
+
+            //ensure the produced messages arrived
+            for (int i = 0; i < 20; i++)
+            {
+                Assert.That(results[i].Value == i.ToString());
+            }
+
+            //seek back to initial offset
+            consumer.SetOffsetPosition(offsets);
+
+            //ensure all produced messages arrive again
             for (int i = 0; i < 20; i++)
             {
                 Assert.That(results[i].Value == i.ToString());
