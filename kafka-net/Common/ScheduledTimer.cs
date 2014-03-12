@@ -3,7 +3,7 @@ using System.Timers;
 
 namespace KafkaNet.Common
 {
-    public enum ScheduleTimerStatus
+    public enum ScheduledTimerStatus
     {
         /// <summary>
         ///     Timer is stopped.
@@ -21,7 +21,7 @@ namespace KafkaNet.Common
         /// <summary>
         ///     Current running status of the timer.
         /// </summary>
-        ScheduleTimerStatus Status { get; }
+        ScheduledTimerStatus Status { get; }
 
         /// <summary>
         /// Indicates if the timer is running.
@@ -32,7 +32,7 @@ namespace KafkaNet.Common
         ///     Set the time to start a replication.
         /// </summary>
         /// <param name="start">Start date and time for the replication timer.</param>
-        /// <returns>Instance of SolrTimer for fluent configuration.</returns>
+        /// <returns>Instance of ScheduledTimer for fluent configuration.</returns>
         /// <remarks>If no interval is set, the replication will only happen once.</remarks>
         IScheduledTimer StartingAt(DateTime start);
 
@@ -40,7 +40,7 @@ namespace KafkaNet.Common
         ///     Set the interval to send a replication command to a Solr server.
         /// </summary>
         /// <param name="interval">Interval this command is to be called.</param>
-        /// <returns>Instance of SolrTimer for fluent configuration.</returns>
+        /// <returns>Instance of ScheduledTimer for fluent configuration.</returns>
         /// <remarks>If no start time is set, the interval starts when the timer is started.</remarks>
         IScheduledTimer Every(TimeSpan interval);
 
@@ -84,7 +84,7 @@ namespace KafkaNet.Common
         /// <summary>
         ///     Current running status of the timer.
         /// </summary>
-        public ScheduleTimerStatus Status { get; private set; }
+        public ScheduledTimerStatus Status { get; private set; }
 
         /// <summary>
         ///     Constructor.
@@ -98,7 +98,7 @@ namespace KafkaNet.Common
             _timer.Elapsed += ReplicationStartupTimerElapsed;
             _timer.AutoReset = true;
 
-            Status = ScheduleTimerStatus.Stopped;
+            Status = ScheduledTimerStatus.Stopped;
         }
 
         private void WaitActionWrapper()
@@ -157,7 +157,7 @@ namespace KafkaNet.Common
         ///     Set the time to start the first execution of the scheduled task.
         /// </summary>
         /// <param name="start">Start date and time for the replication timer.</param>
-        /// <returns>Instance of IScheduleTimer for fluent configuration.</returns>
+        /// <returns>Instance of IScheduledTimer for fluent configuration.</returns>
         /// <remarks>If no start time is set, the interval starts when the timer is started.</remarks>
         public IScheduledTimer StartingAt(DateTime start)
         {
@@ -173,7 +173,7 @@ namespace KafkaNet.Common
         /// </summary>
         public void Dispose()
         {
-            if (Status == ScheduleTimerStatus.Running)
+            if (Status == ScheduledTimerStatus.Running)
             {
                 End();
             }
@@ -188,7 +188,7 @@ namespace KafkaNet.Common
         ///     Set the interval to wait between each execution of the task.
         /// </summary>
         /// <param name="interval">Interval to wait between execution of tasks.</param>
-        /// <returns>Instance of IScheduleTimer for fluent configuration.</returns>
+        /// <returns>Instance of IScheduledTimer for fluent configuration.</returns>
         /// <remarks>If no interval is set, the schedule will only execute once.</remarks>
         public IScheduledTimer Every(TimeSpan interval)
         {
@@ -248,7 +248,7 @@ namespace KafkaNet.Common
                 StartingAt(DateTime.Now);
             }
 
-            Status = ScheduleTimerStatus.Running;
+            Status = ScheduledTimerStatus.Running;
 
             _timer.Enabled = true;
 
@@ -260,14 +260,16 @@ namespace KafkaNet.Common
         /// </summary>
         public IScheduledTimer End()
         {
-            Status = ScheduleTimerStatus.Stopped;
+            Status = ScheduledTimerStatus.Stopped;
             _timer.Enabled = false;
 
             return this;
         }
 
-        // Unit testing methods.
-        internal Timer ReplicationTimer
+        /// <summary>
+        /// Exposes the timer object for unit testing.
+        /// </summary>
+        public Timer TimerObject
         {
             get { return _timer; }
         }
