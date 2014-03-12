@@ -32,6 +32,18 @@ namespace KafkaNet
         OffsetMetadataTooLargeCode = 12
     }
 
+    public struct ProtocolConstants
+    {
+        public static byte AttributeCodeMask = 0x03;
+    }
+
+    public enum MessageCodec
+    {
+        CodecNone = 0x00,
+        CodecGzip = 0x01,
+        CodecSnappy = 0x02
+    }
+    
     public class FailCrcCheckException : Exception
     {
         public FailCrcCheckException(string message) : base(message) { }
