@@ -238,18 +238,16 @@ namespace KafkaNet
         {
             try
             {
-                if (Interlocked.Increment(ref _ensureOneThread) == 1)
-                {
-                    var timeouts = _requestIndex.Values.Where(x => x.CreatedOn < DateTime.UtcNow.AddMinutes(-1)).ToList();
+                if (Interlocked.Increment(ref _ensureOneThread) != 1) return;
+                var timeouts = _requestIndex.Values.Where(x => x.CreatedOn < DateTime.UtcNow.AddMinutes(-1)).ToList();
 
-                    foreach (var timeout in timeouts)
+                foreach (var timeout in timeouts)
+                {
+                    AsyncRequestItem request;
+                    if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
                     {
-                        AsyncRequestItem request;
-                        if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
-                        {
-                            request.ReceiveTask.SetException(new ResponseTimeoutException(
-                                string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
-                        }
+                        request.ReceiveTask.SetException(new ResponseTimeoutException(
+                                                             string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
                     }
                 }
             }
