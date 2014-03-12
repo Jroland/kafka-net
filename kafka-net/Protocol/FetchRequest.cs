@@ -8,7 +8,7 @@ namespace KafkaNet.Protocol
     public class FetchRequest : BaseRequest, IKafkaRequest<FetchResponse>
     {
         internal const int DefaultMinBlockingByteBufferSize = 4096;
-        private const int DefaultMaxBlockingWaitTime = 1000;
+        private const int DefaultMaxBlockingWaitTime = 5000;
 
         /// <summary>
         /// Indicates the type of kafka encoding this request is
