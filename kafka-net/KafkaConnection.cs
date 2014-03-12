@@ -99,6 +99,8 @@ namespace KafkaNet
                 {
                     var response = request.Decode(data.Result);
                     tcs.SetResult(response.ToList());
+
+                    //TODO should we check for errors type here and throw?
                 }
                 catch (Exception ex)
                 {
