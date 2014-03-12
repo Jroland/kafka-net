@@ -59,6 +59,7 @@
   <ItemGroup>
     <Compile Include="Fakes\BrokerRouterProxy.cs" />
     <Compile Include="Fakes\FakeKafkaConnection.cs" />
+    <Compile Include="Integration\GzipProducerConsumerTests.cs" />
     <Compile Include="Integration\ProducerConsumerTests.cs" />
     <Compile Include="Integration\KafkaConnectionTests.cs" />
     <Compile Include="RequestFactory.cs" />
@@ -70,6 +71,7 @@
     <Compile Include="Unit\ProtocolBaseRequestTests.cs" />
     <Compile Include="Unit\ProtocolMessageTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Unit\ScheduleTimerTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

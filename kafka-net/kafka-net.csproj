@@ -61,7 +61,7 @@
     <Compile Include="KafkaConnection.cs" />
     <Compile Include="Common\Extensions.cs" />
     <Compile Include="Model\KafkaOptions.cs" />
-    <Compile Include="Protocol.cs" />
+    <Compile Include="Protocol\Protocol.cs" />
     <Compile Include="Protocol\BaseRequest.cs" />
     <Compile Include="Interfaces\IKafkaRequest.cs" />
     <Compile Include="Protocol\FetchRequest.cs" />
