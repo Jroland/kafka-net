@@ -28,8 +28,8 @@ namespace kafka_tests.Integration
         [Test]
         [TestCase(10, -1)]
         //TODO ignoring these for now as the auto test running take forever with this.  
-        //[TestCase(100)]
-        //[TestCase(1000)]
+        //[TestCase(100, -1)]
+        //[TestCase(1000, -1)]
         //[TestCase(10000, 100)]
         public void SendAsyncShouldHandleHighVolumeOfMessages(int amount, int maxAsync)
         {
