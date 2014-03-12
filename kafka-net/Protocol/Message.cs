@@ -1,5 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Text;
 using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
@@ -9,8 +13,14 @@ namespace KafkaNet.Protocol
     /// </summary>
     public class Payload
     {
+        public Payload()
+        {
+            Codec = MessageCodec.CodecNone;
+        }
+
         public string Topic { get; set; }
         public int Partition { get; set; }
+        public MessageCodec Codec { get; set; }
         public List<Message> Messages { get; set; }
     }
 
@@ -126,10 +136,39 @@ namespace KafkaNet.Protocol
                 Value = stream.ReadIntString()
             };
 
-            //TODO if message compressed then expand more messages
-            //use attribute to determine compression
+            var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
+            switch (codec)
+            {
+                case MessageCodec.CodecNone:
+                    yield return message;
+                    break;
+                case MessageCodec.CodecGzip:
+                    var decompressedBuffer = DecompressWithGzip(message);
+                    foreach (var m in DecodeMessageSet(decompressedBuffer))
+                    {
+                        yield return m;
+                    }
+                    break;
+                default:
+                    throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
+            }
+        }
 
-            yield return message;
+        private static byte[] DecompressWithGzip(Message message)
+        {
+            using (var ms = new MemoryStream())
+            using (var gZipStream = new GZipStream(ms, CompressionMode.Decompress, false))
+            {
+                var compressedBuffer = Encoding.ASCII.GetBytes(message.Value);
+                gZipStream.Read(compressedBuffer, 0, compressedBuffer.Length);
+                gZipStream.Flush();
+                gZipStream.Close();
+                ms.Position = 0;
+
+                byte[] decompressedBuffer = new byte[ms.Length];
+                ms.Read(decompressedBuffer, 0, decompressedBuffer.Length);
+                return decompressedBuffer;
+            }
         }
     }
 

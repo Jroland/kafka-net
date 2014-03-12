@@ -33,7 +33,8 @@ namespace KafkaNet
         /// messages sitting in the async queue then a message may spend its entire timeout cycle waiting in this queue and never getting
         /// attempted to send to Kafka before a timeout exception is thrown.
         /// </remarks>
-        public Producer(IBrokerRouter brokerRouter, int maximumAsyncQueue = -1) : base(brokerRouter)
+        public Producer(IBrokerRouter brokerRouter, int maximumAsyncQueue = -1)
+            : base(brokerRouter)
         {
             _router = brokerRouter;
             _maximumAsyncQueue = maximumAsyncQueue;
@@ -46,8 +47,9 @@ namespace KafkaNet
         /// <param name="messages">The enumerable of messages that will be sent to the given topic.</param>
         /// <param name="acks">The required level of acknowlegment from the kafka server.  0=none, 1=writen to leader, 2+=writen to replicas, -1=writen to all replicas.</param>
         /// <param name="timeoutMS">Interal kafka timeout to wait for the requested level of ack to occur before returning.</param>
+        /// <param name="codec">The codec to apply to the message collection.  Defaults to none.</param>
         /// <returns>List of ProduceResponses for each message sent or empty list if acks = 0.</returns>
-        public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1, int timeoutMS = 1000)
+        public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1, int timeoutMS = 1000, MessageCodec codec = MessageCodec.CodecNone)
         {
             Interlocked.Increment(ref _currentAsyncQueue);
 
@@ -60,29 +62,31 @@ namespace KafkaNet
                 }
 
                 //group message by the server connection they will be sent to
-                var routeGroup = new ConcurrentDictionary<BrokerRoute, List<Message>>();
-
-                foreach (var message in messages)
-                {
-                    var messageTemp = message;
-                    var route = _router.SelectBrokerRoute(topic, messageTemp.Key);
-                    routeGroup.AddOrUpdate(route, b => new List<Message>(new[] { messageTemp }), (b, list) => { list.Add(messageTemp); return list; });
-                }
-
+                var routeGroup = from message in messages
+                                 select new {Route = _router.SelectBrokerRoute(topic, message.Key), Message = message}
+                                 into routes
+                                 group routes by routes.Route;
+                
                 var sendTasks = new List<Task<List<ProduceResponse>>>();
-                foreach (var route in routeGroup.Keys)
+                foreach (var route in routeGroup)
                 {
                     var request = new ProduceRequest
                         {
                             Acks = acks,
                             TimeoutMS = timeoutMS,
-                            Payload = new List<Payload>{new Payload{
-                            Topic = route.Topic,
-                            Partition = route.PartitionId,
-                            Messages = routeGroup[route]
-                        }}};
+                            Payload = new List<Payload>
+                                {
+                                    new Payload
+                                        {
+                                            Codec = codec,
+                                            Topic = route.Key.Topic,
+                                            Partition = route.Key.PartitionId,
+                                            Messages = route.Select(x => x.Message).ToList()
+                                        }
+                                }
+                        };
 
-                    sendTasks.Add(route.Connection.SendAsync(request));
+                    sendTasks.Add(route.Key.Connection.SendAsync(request));
                 }
 
                 await Task.WhenAll(sendTasks.ToArray());
@@ -94,6 +98,8 @@ namespace KafkaNet
                 Interlocked.Decrement(ref _currentAsyncQueue);
             }
         }
+
+
     }
 
 }
