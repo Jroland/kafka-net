@@ -34,12 +34,14 @@ namespace kafka_tests.Integration
             var consumer = new Consumer(new ConsumerOptions("LoadTest", _router),
                 offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray());
 
-            producer.SendMessageAsync("LoadTest", new[]
+            var response = producer.SendMessageAsync("LoadTest", new[]
                 {
+                    new Message {Value = "0", Key = "1"},
                     new Message {Value = "1", Key = "1"},
-                    new Message {Value = "2", Key = "1"},
-                    new Message {Value = "3", Key = "1"}
-                }, codec: MessageCodec.CodecGzip).Wait();
+                    new Message {Value = "2", Key = "1"}
+                }, codec: MessageCodec.CodecGzip).Result;
+
+            Assert.That(response.First().Error, Is.EqualTo(0));
 
             var results = consumer.Consume().Take(3).ToList();
 
