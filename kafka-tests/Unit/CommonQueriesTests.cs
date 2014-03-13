@@ -1,4 +1,5 @@
 ﻿using KafkaNet;
+using KafkaNet.Protocol;
 using Moq;
 using Ninject.MockingKernel.Moq;
 using NUnit.Framework;

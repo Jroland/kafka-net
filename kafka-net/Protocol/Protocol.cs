@@ -1,7 +1,41 @@
 ﻿using System;
+using System.IO;
+using System.IO.Compression;
+using System.Text;
 
-namespace KafkaNet
+namespace KafkaNet.Protocol
 {
+    public static class Compression
+    {
+        public static byte[] Zip(byte[] bytes)
+        {
+            using (var source = new MemoryStream(bytes))
+            using (var destination = new MemoryStream())
+            {
+                using (var gzip = new GZipStream(destination, CompressionMode.Compress))
+                {
+                    source.CopyTo(gzip);
+                }
+
+                return destination.ToArray();
+            }
+        }
+
+        public static byte[] Unzip(byte[] bytes)
+        {
+            using (var source = new MemoryStream(bytes))
+            using (var destination = new MemoryStream())
+            {
+                using (var gzip = new GZipStream(source, CompressionMode.Decompress))
+                {
+                    gzip.CopyTo(destination);
+                }
+
+                return destination.ToArray();
+            }
+        }
+    }
+
     public enum ApiKeyRequestType
     {
         Produce = 0,
@@ -43,7 +77,8 @@ namespace KafkaNet
         CodecGzip = 0x01,
         CodecSnappy = 0x02
     }
-    
+
+    #region Exceptions...
     public class FailCrcCheckException : Exception
     {
         public FailCrcCheckException(string message) : base(message) { }
@@ -72,5 +107,8 @@ namespace KafkaNet
     public class LeaderNotFoundException : Exception
     {
         public LeaderNotFoundException(string message) : base(message) { }
-    }
+    } 
+    #endregion
+
+
 }
