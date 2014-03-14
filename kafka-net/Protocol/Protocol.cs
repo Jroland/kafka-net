@@ -12,7 +12,7 @@ namespace KafkaNet.Protocol
             using (var source = new MemoryStream(bytes))
             using (var destination = new MemoryStream())
             {
-                using (var gzip = new GZipStream(destination, CompressionMode.Compress))
+                using (var gzip = new GZipStream(destination, CompressionMode.Compress, false))
                 {
                     source.CopyTo(gzip);
                 }
@@ -26,7 +26,7 @@ namespace KafkaNet.Protocol
             using (var source = new MemoryStream(bytes))
             using (var destination = new MemoryStream())
             {
-                using (var gzip = new GZipStream(source, CompressionMode.Decompress))
+                using (var gzip = new GZipStream(source, CompressionMode.Decompress, false))
                 {
                     gzip.CopyTo(destination);
                 }
@@ -107,7 +107,7 @@ namespace KafkaNet.Protocol
     public class LeaderNotFoundException : Exception
     {
         public LeaderNotFoundException(string message) : base(message) { }
-    } 
+    }
     #endregion
 
 
