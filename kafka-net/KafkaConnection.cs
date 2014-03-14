@@ -134,7 +134,7 @@ namespace KafkaNet
         public override int GetHashCode()
         {
             return (_kafkaUri != null ? _kafkaUri.GetHashCode() : 0);
-        } 
+        }
         #endregion
 
         private byte[] Read(int size, NetworkStream stream)
@@ -242,15 +242,17 @@ namespace KafkaNet
             try
             {
                 if (Interlocked.Increment(ref _ensureOneThread) != 1) return;
-                var timeouts = _requestIndex.Values.Where(x => x.CreatedOn < DateTime.UtcNow.AddMinutes(-1)).ToList();
+                var timeouts = _requestIndex.Values.Where(x => x.CreatedOnUtc < DateTime.UtcNow.AddMilliseconds(_responseTimeoutMS) || _interrupt).ToList();
 
                 foreach (var timeout in timeouts)
                 {
                     AsyncRequestItem request;
                     if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
                     {
+                        if (_interrupt) request.ReceiveTask.SetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
+
                         request.ReceiveTask.SetException(new ResponseTimeoutException(
-                                                             string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
+                            string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
                     }
                 }
             }
@@ -266,6 +268,7 @@ namespace KafkaNet
             using (_responseTimeoutTimer)
             {
                 _interrupt = true;
+                ResponseTimeoutCheck();
                 if (_client != null) using (_client.GetStream()) { }
             }
         }
@@ -276,16 +279,16 @@ namespace KafkaNet
             public AsyncRequestItem(int correlationId)
             {
                 CorrelationId = correlationId;
-                CreatedOn = DateTime.UtcNow;
+                CreatedOnUtc = DateTime.UtcNow;
                 ReceiveTask = new TaskCompletionSource<byte[]>();
             }
 
             public int CorrelationId { get; private set; }
             public TaskCompletionSource<byte[]> ReceiveTask { get; private set; }
-            public DateTime CreatedOn { get; private set; }
+            public DateTime CreatedOnUtc { get; set; }
         }
         #endregion
     }
 
-    
+
 }
