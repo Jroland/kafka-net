@@ -132,42 +132,25 @@ namespace KafkaNet.Protocol
                 Meta = new MessageMetadata { Offset = offset },
                 MagicNumber = stream.ReadByte(),
                 Attribute = stream.ReadByte(),
-                Key = stream.ReadIntString(),
-                Value = stream.ReadIntString()
+                Key = stream.ReadIntString()
             };
 
             var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
             switch (codec)
             {
                 case MessageCodec.CodecNone:
+                    message.Value = stream.ReadIntString();
                     yield return message;
                     break;
                 case MessageCodec.CodecGzip:
-                    var decompressedBuffer = DecompressWithGzip(message);
-                    foreach (var m in DecodeMessageSet(decompressedBuffer))
+                    var gZipData = stream.ReadIntPrefixedBytes();
+                    foreach (var m in DecodeMessageSet(Compression.Unzip(gZipData)))
                     {
                         yield return m;
                     }
                     break;
                 default:
                     throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
-            }
-        }
-
-        private static byte[] DecompressWithGzip(Message message)
-        {
-            using (var ms = new MemoryStream())
-            using (var gZipStream = new GZipStream(ms, CompressionMode.Decompress, false))
-            {
-                var compressedBuffer = Encoding.ASCII.GetBytes(message.Value);
-                gZipStream.Read(compressedBuffer, 0, compressedBuffer.Length);
-                gZipStream.Flush();
-                gZipStream.Close();
-                ms.Position = 0;
-
-                byte[] decompressedBuffer = new byte[ms.Length];
-                ms.Read(decompressedBuffer, 0, decompressedBuffer.Length);
-                return decompressedBuffer;
             }
         }
     }
