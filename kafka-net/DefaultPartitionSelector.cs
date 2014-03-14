@@ -12,7 +12,7 @@ namespace KafkaNet
         public Partition Select(Topic topic, string key)
         {
             if (topic == null) throw new ArgumentNullException("topic");
-            if (topic.Partitions.Count <= 0) throw new ApplicationException(string.Format("Topic ({0}) has no partitions.", topic));
+            if (topic.Partitions.Count <= 0) throw new ApplicationException(string.Format("Topic ({0}) has no partitions.", topic.Name));
             
             //use round robing
             var partitions = topic.Partitions;
