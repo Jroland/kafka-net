@@ -44,5 +44,28 @@ namespace kafka_tests
             Assert.That(testMessage.Key, Is.EqualTo(result.Key));
             Assert.That(testMessage.Value, Is.EqualTo(result.Value));
         }
+
+        [Test]
+        public void EncodeMessageSetEncodesMultipleMessages()
+        {
+            //expected generated from python library
+            var expected = new byte[]
+                {
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16, 45, 70, 24, 62, 0, 0, 0, 0, 0, 1, 49, 0, 0, 0, 1, 48, 0, 0, 0,
+                    0, 0, 0, 0, 0, 0, 0, 0, 16, 90, 65, 40, 168, 0, 0, 0, 0, 0, 1, 49, 0, 0, 0, 1, 49, 0, 0, 0, 0, 0, 0,
+                    0, 0, 0, 0, 0, 16, 195, 72, 121, 18, 0, 0, 0, 0, 0, 1, 49, 0, 0, 0, 1, 50
+                };
+
+            var messages = new[]
+                {
+                    new Message {Value = "0", Key = "1"},
+                    new Message {Value = "1", Key = "1"},
+                    new Message {Value = "2", Key = "1"}
+                };
+
+            var result = Message.EncodeMessageSet(messages);
+
+            Assert.That(expected, Is.EqualTo(result));
+        }
     }
 }
