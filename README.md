@@ -43,7 +43,7 @@ The TestHarness project it a simple example console application that will read m
 Simply modify the kafka server Uri in the code to point to a functioning test server.
 
 
-Pieces of the Puzzel
+Pieces of the Puzzle
 -----------
 ##### Protocol
 The protocol has been divided up into concrete classes for each request/response pair.  Each class knows how to encode and decode itself into/from their appropriate Kafka protocol byte array.  One benefit of this is that it allows for a nice generic send method on the KafkaConnection.
