@@ -10,6 +10,13 @@ namespace KafkaNet.Protocol
 {
     public class ProduceRequest : BaseRequest, IKafkaRequest<ProduceResponse>
     {
+        private Func<MessageCodec, byte[], byte[]> compressionFunction;
+
+        public ProduceRequest(Func<MessageCodec, byte[], byte[]> compression = null)
+        {
+            compressionFunction = compression;    
+        }
+
         /// <summary>
         /// Indicates the type of kafka encoding this request is.
         /// </summary>
@@ -27,6 +34,7 @@ namespace KafkaNet.Protocol
         /// Collection of payloads to post to kafka
         /// </summary>
         public List<Payload> Payload = new List<Payload>();
+       
 
         public byte[] Encode()
         {

@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 namespace kafka_tests.Unit
 {
     [TestFixture]
+    [Category("Unit")]
     public class CommonQueriesTest
     {
         private MoqMockingKernel _kernel;

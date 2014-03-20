@@ -253,6 +253,7 @@ namespace KafkaNet
         }
     }
 
+    #region BrokerRoute Class...
     public class BrokerRoute
     {
         public string Topic { get; set; }
@@ -279,7 +280,8 @@ namespace KafkaNet
             if (ReferenceEquals(this, obj)) return true;
             if (obj.GetType() != this.GetType()) return false;
             return Equals((BrokerRoute)obj);
-        } 
+        }
         #endregion
-    }
+    } 
+    #endregion
 }

@@ -10,6 +10,7 @@ using NUnit.Framework;
 namespace kafka_tests.Integration
 {
     [TestFixture]
+    [Category("Integration")]
     public class GzipProducerConsumerTests
     {
         private BrokerRouter _router;
