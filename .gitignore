@@ -28,6 +28,10 @@ local.properties
 # PDT-specific
 .buildpath
 
+# FAKE
+.build
+.tools
+
 
 #################
 ## Visual Studio
