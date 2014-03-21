@@ -1,7 +1,7 @@
 kafka-net
 =========
 
-Native C# client for Kafka queue servers.  
+Native C# client for Apache Kafka.  
 
 License
 -----------
