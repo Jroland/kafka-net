@@ -8,6 +8,7 @@ RestorePackages()
 let buildDir  = "./.build/app"
 let testDir   = "./.build/test/"
 let deployDir = "./.deploy/"
+let packageDir = "./.deploy/package/"
 
 let kafkaNetSource = !! "src/kafka-net/*.csproj"
 
@@ -22,7 +23,9 @@ Target "Record-Version-Increment" (fun _ ->
 )
 
 Target "Clean" (fun _ -> 
-    CleanDir buildDir
+    CleanDir buildDir 
+    CleanDir testDir
+    CleanDir deployDir
 )
 
 Target "Build-Kafka-Net" (fun _ ->
@@ -64,6 +67,18 @@ Target "Run-Unit-Tests" (fun _ ->
              OutputFile = testDir + "UnitTestResults.xml" })
 )
 
+Target "CreateNugetPackage" (fun _ ->
+    CopyDir (packageDir + "/lib") buildDir (fun x -> true)
+    CopyFile deployDir "./src/kafka-net.nuspec"
+
+    NuGet (fun p -> 
+        {p with 
+            Version = (buildVersion + "-alpha")
+            OutputPath = deployDir
+            WorkingDir = packageDir
+        }) (deployDir + "/kafka-net.nuspec")
+)
+
 Target "Default" (fun _ ->
     trace "Building..."
 )
@@ -72,6 +87,7 @@ Target "Default" (fun _ ->
   ==> "Record-Version-Increment"
   ==> "Build-Kafka-Net"
   ==> "Build-Kafka-Tests"
+  ==> "CreateNugetPackage"
   =?> ("Run-Integration-Tests", hasBuildParam "Integration")
   =?> ("Run-Unit-Tests", hasBuildParam "Unit")
   ==> "Default"
