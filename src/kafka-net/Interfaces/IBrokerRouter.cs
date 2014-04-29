@@ -39,5 +39,14 @@ namespace KafkaNet
         /// <returns>List of Topics as provided by Kafka.</returns>
         /// <remarks>The topic metadata will by default check the cache first and then request metadata from the server if it does not exist in cache.</remarks>
         List<Topic> GetTopicMetadata(params string[] topics);
+
+        /// <summary>
+        /// Force a call to the kafka servers to refresh metadata for the given topics.
+        /// </summary>
+        /// <param name="topics">List of topics to update metadata for.</param>
+        /// <remarks>
+        /// This method will initiate a call to the kafka servers and retrieve metadata for all given topics, updating the broke cache in the process.
+        /// </remarks>
+        void RefreshTopicMetadata(params string[] topics);
     }
 }

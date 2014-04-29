@@ -5,8 +5,6 @@ using Ninject.MockingKernel.Moq;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace kafka_tests.Unit
@@ -110,6 +108,19 @@ namespace kafka_tests.Unit
             Assert.That(result1[0].Name, Is.EqualTo(TestTopic));
             Assert.That(result2.Count, Is.EqualTo(1));
             Assert.That(result2[0].Name, Is.EqualTo(TestTopic));
+        }
+
+        [Test]
+        public void RefreshTopicMetadataShouldIgnoreCacheAndAlwayCauseMetadataRequest()
+        {
+            var routerProxy = new BrokerRouterProxy(_kernel);
+            var router = routerProxy.Create();
+
+            router.RefreshTopicMetadata(TestTopic);
+            Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(1));
+
+            router.RefreshTopicMetadata(TestTopic);
+            Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(2));
         }
         #endregion
 

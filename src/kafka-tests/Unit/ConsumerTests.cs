@@ -4,12 +4,9 @@ using KafkaNet.Protocol;
 using Moq;
 using Ninject.MockingKernel.Moq;
 using NUnit.Framework;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace kafka_tests.Unit
 {
@@ -46,7 +43,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void ConsumerWithEMptyWhitelistShouldConsumeAllPartition()
+        public void ConsumerWithEmptyWhitelistShouldConsumeAllPartition()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
