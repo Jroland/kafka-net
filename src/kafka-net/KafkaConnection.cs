@@ -251,7 +251,8 @@ namespace KafkaNet
                     {
                         if (_interrupt) request.ReceiveTask.SetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
 
-                        request.ReceiveTask.SetException(new ResponseTimeoutException(
+						// TrySetException instead of SetException would be more safe because the task might have been terminated at this moment
+                        request.ReceiveTask.TrySetException(new ResponseTimeoutException(
                             string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
                     }
                 }

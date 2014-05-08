@@ -44,8 +44,18 @@ namespace KafkaNet.Protocol
         MetaData = 3,
         LeaderAndIsr = 4,
         StopReplica = 5,
-        OffsetCommit = 6,
-        OffsetFetch = 7
+
+		/// <summary>
+		/// Offset commit 
+		/// The correct value is 8, please see <see href="http://grokbase.com/t/kafka/dev/143hbtan25/jira-created-kafka-1306-offset-commit-api-does-it-work"/>
+		/// </summary>
+		OffsetCommit = 8,
+
+		/// <summary>
+		/// Offset fetch 
+		/// The correct value is 9, please see <see href="http://grokbase.com/t/kafka/dev/143hbtan25/jira-created-kafka-1306-offset-commit-api-does-it-work"/>
+		/// </summary>
+        OffsetFetch = 9
     }
 
     public enum ErrorResponseCode

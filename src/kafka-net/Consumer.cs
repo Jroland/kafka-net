@@ -161,6 +161,9 @@ namespace KafkaNet
 
                                 _partitionOffsetIndex.AddOrUpdate(partitionId, i => response.HighWaterMark, (i, l) => response.HighWaterMark);
                             }
+
+							// sleep is not needed if responses were received
+	                        continue;
                         }
 
                         Thread.Sleep(100);
