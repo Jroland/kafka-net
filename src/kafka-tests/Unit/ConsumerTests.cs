@@ -9,6 +9,7 @@ using NUnit.Framework;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using kafka_tests.Helpers;
 
 namespace kafka_tests.Unit
 {
@@ -28,7 +29,7 @@ namespace kafka_tests.Unit
          public void CancellationShouldInterruptConsumption()
          {
              var routerProxy = new BrokerRouterProxy(_kernel);
-             routerProxy.BrokerConn0.FetchResponseFunction = () => { while (true) Thread.Yield(); };
+             routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
  
              var router = routerProxy.Create();
  
@@ -39,9 +40,9 @@ namespace kafka_tests.Unit
              var tokenSrc = new CancellationTokenSource();
  
              var consumeTask = Task.Run(() => consumer.Consume(tokenSrc.Token).FirstOrDefault());
- 
-             if (consumeTask.Wait(TimeSpan.FromSeconds(3)))
-                 Assert.Fail();
+
+            //wait until the fake broker is running and requesting fetches
+            TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 10);
              
              tokenSrc.Cancel();
  
@@ -61,10 +62,7 @@ namespace kafka_tests.Unit
             var consumer = new Consumer(options);
 
             var test = consumer.Consume().Take(1);
-            while (consumer.ConsumerTaskCount <= 0)
-            {
-                Thread.Sleep(100);
-            }
+            TaskTest.WaitFor(() => consumer.ConsumerTaskCount > 0);
 
             Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
             Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.EqualTo(0));
@@ -82,10 +80,9 @@ namespace kafka_tests.Unit
             var consumer = new Consumer(options);
             var test = consumer.Consume().Take(1);
 
-            while (consumer.ConsumerTaskCount <= 1)
-            {
-                Thread.Sleep(100);
-            }
+            TaskTest.WaitFor(() => consumer.ConsumerTaskCount <= 1);
+            TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0);
+            TaskTest.WaitFor(() => routerProxy.BrokerConn1.FetchRequestCallCount > 0);
 
             Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn0 not sent FetchRequest");
             Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn1 not sent FetchRequest");
@@ -102,10 +99,7 @@ namespace kafka_tests.Unit
             var consumer = new Consumer(options);
 
             var test = consumer.Consume().Take(1);
-            while (consumer.ConsumerTaskCount <= 0)
-            {
-                Thread.Sleep(100);
-            }
+            TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
 
             Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
         }
@@ -122,10 +116,7 @@ namespace kafka_tests.Unit
             var consumer = new Consumer(options);
 
             var test = consumer.Consume().Take(1);
-            while (consumer.ConsumerTaskCount <= 0)
-            {
-                Thread.Sleep(100);
-            }
+            TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
 
             Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
         }

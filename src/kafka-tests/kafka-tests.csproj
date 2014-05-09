@@ -59,6 +59,7 @@
   <ItemGroup>
     <Compile Include="Fakes\BrokerRouterProxy.cs" />
     <Compile Include="Fakes\FakeKafkaConnection.cs" />
+    <Compile Include="Helpers\TaskTest.cs" />
     <Compile Include="Integration\GzipProducerConsumerTests.cs" />
     <Compile Include="Integration\ProducerConsumerTests.cs" />
     <Compile Include="Integration\KafkaConnectionTests.cs" />
