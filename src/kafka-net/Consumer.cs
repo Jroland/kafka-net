@@ -151,8 +151,8 @@ namespace KafkaNet
 
                         if (responses.Count > 0)
                         {
-                            var response = responses.First(); //we only asked for one response
-                            if (response.Messages.Count > 0)
+                            var response = responses.FirstOrDefault(); //we only asked for one response
+                            if (response != null && response.Messages.Count > 0)
                             {
                                 foreach (var message in response.Messages)
                                 {
@@ -160,10 +160,10 @@ namespace KafkaNet
                                 }
 
                                 _partitionOffsetIndex.AddOrUpdate(partitionId, i => response.HighWaterMark, (i, l) => response.HighWaterMark);
-                            }
 
-                            // sleep is not needed if responses were received
-                            continue;
+                                // sleep is not needed if responses were received
+                                continue;
+                            }
                         }
 
                         //no message received from server wait a while before we try another long poll
