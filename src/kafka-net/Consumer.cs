@@ -13,8 +13,8 @@ namespace KafkaNet
     /// <summary>
     /// Provides a basic consumer of one Topic across all partitions or over a given whitelist of partitions.
     /// 
-    /// TODO: provide automatic offset saving when the feature is available in 0.8.1
-    /// https://issues.apache.org/jira/browse/KAFKA-993
+    /// TODO: provide automatic offset saving when the feature is available in 0.8.2
+    /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
     /// </summary>
     public class Consumer : CommonQueries
     {
