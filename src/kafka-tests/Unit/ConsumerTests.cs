@@ -10,6 +10,9 @@ using System.Threading;
 
 namespace kafka_tests.Unit
 {
+    using System;
+    using System.Threading.Tasks;
+
     [TestFixture]
     [Category("Unit")]
     public class ConsumerTests
@@ -20,6 +23,32 @@ namespace kafka_tests.Unit
         public void Setup()
         {
             _kernel = new MoqMockingKernel();
+        }
+
+        [Test]
+        public void CancellationShouldInterruptConsumption()
+        {
+            var routerProxy = new BrokerRouterProxy(_kernel);
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { while (true) Thread.Yield(); };
+
+            var router = routerProxy.Create();
+
+            var options = CreateOptions(router);
+
+            var consumer = new Consumer(options);
+
+            var tokenSrc = new CancellationTokenSource();
+
+            var consumeTask = Task.Run(() => consumer.Consume(tokenSrc.Token).FirstOrDefault());
+
+            if (consumeTask.Wait(TimeSpan.FromSeconds(3)))
+                Assert.Fail();
+            
+            tokenSrc.Cancel();
+
+            Assert.That(
+                Assert.Throws<AggregateException>(consumeTask.Wait).InnerException,
+                Is.TypeOf<OperationCanceledException>());
         }
 
         [Test]
