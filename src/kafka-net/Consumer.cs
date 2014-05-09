@@ -161,8 +161,13 @@ namespace KafkaNet
 
                                 _partitionOffsetIndex.AddOrUpdate(partitionId, i => response.HighWaterMark, (i, l) => response.HighWaterMark);
                             }
+
+                            // sleep is not needed if responses were received
+                            continue;
                         }
 
+                        //no message received from server wait a while before we try another long poll
+                        //TODO : allow this delay to be configurable
                         Thread.Sleep(100);
                     }
                     catch (Exception ex)
