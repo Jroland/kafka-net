@@ -1,4 +1,6 @@
-﻿using KafkaNet;
+﻿using System;
+using System.Threading.Tasks;
+using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using Moq;
@@ -21,6 +23,32 @@ namespace kafka_tests.Unit
         {
             _kernel = new MoqMockingKernel();
         }
+
+        [Test]
+         public void CancellationShouldInterruptConsumption()
+         {
+             var routerProxy = new BrokerRouterProxy(_kernel);
+             routerProxy.BrokerConn0.FetchResponseFunction = () => { while (true) Thread.Yield(); };
+ 
+             var router = routerProxy.Create();
+ 
+             var options = CreateOptions(router);
+ 
+             var consumer = new Consumer(options);
+ 
+             var tokenSrc = new CancellationTokenSource();
+ 
+             var consumeTask = Task.Run(() => consumer.Consume(tokenSrc.Token).FirstOrDefault());
+ 
+             if (consumeTask.Wait(TimeSpan.FromSeconds(3)))
+                 Assert.Fail();
+             
+             tokenSrc.Cancel();
+ 
+             Assert.That(
+                 Assert.Throws<AggregateException>(consumeTask.Wait).InnerException,
+                 Is.TypeOf<OperationCanceledException>());
+         }
 
         [Test]
         public void ConsumerWhitelistShouldOnlyConsumeSpecifiedPartition()
@@ -50,16 +78,17 @@ namespace kafka_tests.Unit
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int>();
-            var consumer = new Consumer(options);
 
+            var consumer = new Consumer(options);
             var test = consumer.Consume().Take(1);
-            while (consumer.ConsumerTaskCount <= 0)
+
+            while (consumer.ConsumerTaskCount <= 1)
             {
                 Thread.Sleep(100);
             }
 
-            Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
-            Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn0 not sent FetchRequest");
+            Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn1 not sent FetchRequest");
         }
 
         [Test]

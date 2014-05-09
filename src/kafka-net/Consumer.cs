@@ -53,11 +53,11 @@ namespace KafkaNet
         /// Returns a blocking enumerable of messages received from Kafka.
         /// </summary>
         /// <returns>Blocking enumberable of messages from Kafka.</returns>
-        public IEnumerable<Message> Consume()
+        public IEnumerable<Message> Consume(CancellationToken? cancellationToken = null)
         {
             _topicPartitionQueryTimer.Begin();
 
-            return _fetchResponseQueue.GetConsumingEnumerable();
+            return _fetchResponseQueue.GetConsumingEnumerable(cancellationToken ?? new CancellationToken(false));
         }
 
         /// <summary>
