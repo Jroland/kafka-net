@@ -118,5 +118,10 @@ namespace KafkaNet.Protocol
         public Int16 Error { get; set; }
         public long HighWaterMark { get; set; }
         public List<Message> Messages { get; set; }
+
+        public FetchResponse()
+        {
+            Messages = new List<Message>();
+        }
     }
 }
