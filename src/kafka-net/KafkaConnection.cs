@@ -241,7 +241,9 @@ namespace KafkaNet
         {
             try
             {
+                //ensure only one thread performs this action, allow all others to pass through
                 if (Interlocked.Increment(ref _ensureOneThread) != 1) return;
+
                 var timeouts = _requestIndex.Values.Where(x => x.CreatedOnUtc < DateTime.UtcNow.AddMilliseconds(_responseTimeoutMS) || _interrupt).ToList();
 
                 foreach (var timeout in timeouts)
@@ -249,9 +251,9 @@ namespace KafkaNet
                     AsyncRequestItem request;
                     if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
                     {
-                        if (_interrupt) request.ReceiveTask.SetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
+                        if (_interrupt) request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
 
-                        request.ReceiveTask.SetException(new ResponseTimeoutException(
+                        request.ReceiveTask.TrySetException(new ResponseTimeoutException(
                             string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
                     }
                 }
