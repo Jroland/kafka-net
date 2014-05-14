@@ -16,8 +16,12 @@ namespace KafkaNet
     public class Producer : CommonQueries
     {
         private readonly IBrokerRouter _router;
-        private readonly int _maximumAsyncQueue;
         private int _currentAsyncQueue;
+
+        /// <summary>
+        /// Semaphore for reducing concurrent threads in SendMessageAsync
+        /// </summary>
+        private readonly SemaphoreSlim _sendSemaphore;
 
         /// <summary>
         /// Construct a Producer class.
@@ -37,7 +41,9 @@ namespace KafkaNet
             : base(brokerRouter)
         {
             _router = brokerRouter;
-            _maximumAsyncQueue = maximumAsyncQueue;
+
+            maximumAsyncQueue = maximumAsyncQueue == -1 ? int.MaxValue : maximumAsyncQueue;
+            _sendSemaphore = new SemaphoreSlim(maximumAsyncQueue, maximumAsyncQueue);
         }
 
         /// <summary>
@@ -51,16 +57,10 @@ namespace KafkaNet
         /// <returns>List of ProduceResponses for each message sent or empty list if acks = 0.</returns>
         public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1, int timeoutMS = 1000, MessageCodec codec = MessageCodec.CodecNone)
         {
-            Interlocked.Increment(ref _currentAsyncQueue);
+            _sendSemaphore.Wait();
 
             try
             {
-                //This goes against async philosophy but it convenient for dataflow management
-                while (_maximumAsyncQueue != -1 && _currentAsyncQueue >= _maximumAsyncQueue)
-                {
-                    Thread.Sleep(100);
-                }
-
                 //group message by the server connection they will be sent to
                 var routeGroup = from message in messages
                                  select new {Route = _router.SelectBrokerRoute(topic, message.Key), Message = message}
@@ -90,12 +90,11 @@ namespace KafkaNet
                 }
 
                 await Task.WhenAll(sendTasks.ToArray());
-
                 return sendTasks.SelectMany(t => t.Result).ToList();
             }
             finally
             {
-                Interlocked.Decrement(ref _currentAsyncQueue);
+                _sendSemaphore.Release();
             }
         }
 
