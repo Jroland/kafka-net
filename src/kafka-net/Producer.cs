@@ -16,7 +16,6 @@ namespace KafkaNet
     public class Producer : CommonQueries
     {
         private readonly IBrokerRouter _router;
-        private int _currentAsyncQueue;
 
         /// <summary>
         /// Semaphore for reducing concurrent threads in SendMessageAsync
