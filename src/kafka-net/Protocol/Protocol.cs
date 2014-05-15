@@ -88,6 +88,12 @@ namespace KafkaNet.Protocol
         CodecSnappy = 0x02
     }
 
+    public enum OffsetTime
+    {
+        Latest = -1,
+        Earliest = -2
+    }
+
     #region Exceptions...
     public class FailCrcCheckException : Exception
     {

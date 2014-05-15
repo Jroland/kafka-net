@@ -152,7 +152,15 @@ namespace KafkaNet
                         if (responses.Count > 0)
                         {
                             var response = responses.First(); //we only asked for one response
-                            if (response.Messages.Count > 0)
+
+                            if (response.Error != 0)
+                            {
+                                if (response.Error == (short)ErrorResponseCode.OffsetOutOfRange)
+                                {
+                                    FixOffsetRangeError(fetchRequest, response);
+                                }
+                            }
+                            else if (response.Messages.Count > 0)
                             {
                                 foreach (var message in response.Messages)
                                 {
@@ -174,6 +182,21 @@ namespace KafkaNet
                     }
                 }
             });
+        }
+
+        private void FixOffsetRangeError(FetchRequest fetchRequest, FetchResponse response)
+        {
+            var fetch = fetchRequest.Fetches[0];
+
+            var latest = this.GetTopicOffsetAsync(response.Topic, 1, (int)OffsetTime.Latest).Result[0].Offsets[0];
+            var earliest = this.GetTopicOffsetAsync(response.Topic, 1, (int)OffsetTime.Earliest).Result[0].Offsets[0];
+
+            var asked = fetch.Offset;
+
+            if (asked < earliest)
+                _partitionOffsetIndex.AddOrUpdate(fetch.PartitionId, k => earliest, (k, current) => earliest);
+            else if (asked > latest)
+                _partitionOffsetIndex.AddOrUpdate(fetch.PartitionId, k => latest, (k, current) => latest);
         }
 
         public new void Dispose()
