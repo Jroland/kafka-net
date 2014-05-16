@@ -186,17 +186,27 @@ namespace KafkaNet
 
         private void FixOffsetRangeError(FetchRequest fetchRequest, FetchResponse response)
         {
-            var fetch = fetchRequest.Fetches[0];
+            try
+            {
+                var fetch = fetchRequest.Fetches[0];
 
-            var latest = this.GetTopicOffsetAsync(response.Topic, 1, (int)OffsetTime.Latest).Result[0].Offsets[0];
-            var earliest = this.GetTopicOffsetAsync(response.Topic, 1, (int)OffsetTime.Earliest).Result[0].Offsets[0];
+                Func<OffsetTime, long> getOffset =
+                    offsetTime =>
+                    this.GetTopicOffsetAsync(response.Topic, 1, (int)offsetTime)
+                        .Result.First(r => r.PartitionId == fetch.PartitionId).Offsets[0];
 
-            var asked = fetch.Offset;
+                var latest = getOffset(OffsetTime.Latest);
+                var earliest = getOffset(OffsetTime.Earliest);
 
-            if (asked < earliest)
-                _partitionOffsetIndex.AddOrUpdate(fetch.PartitionId, k => earliest, (k, current) => earliest);
-            else if (asked > latest)
-                _partitionOffsetIndex.AddOrUpdate(fetch.PartitionId, k => latest, (k, current) => latest);
+                var asked = fetch.Offset;
+
+                if (asked < earliest) _partitionOffsetIndex.AddOrUpdate(fetch.PartitionId, k => earliest, (k, current) => earliest);
+                else if (asked > latest) _partitionOffsetIndex.AddOrUpdate(fetch.PartitionId, k => latest, (k, current) => latest);
+            }
+            catch
+            {
+                this.RefreshTopicPartition();
+            }
         }
 
         public new void Dispose()
