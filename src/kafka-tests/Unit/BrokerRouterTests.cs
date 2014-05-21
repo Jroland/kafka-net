@@ -116,10 +116,10 @@ namespace kafka_tests.Unit
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
 
-            router.RefreshTopicMetadata(TestTopic);
+            router.RefreshTopicMetadata(new[] { TestTopic });
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(1));
 
-            router.RefreshTopicMetadata(TestTopic);
+            router.RefreshTopicMetadata(new[] { TestTopic });
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(2));
         }
         #endregion

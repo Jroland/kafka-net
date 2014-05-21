@@ -44,17 +44,7 @@ namespace KafkaNet.Protocol
         MetaData = 3,
         LeaderAndIsr = 4,
         StopReplica = 5,
-
-		/// <summary>
-		/// Offset commit 
-		/// The correct value is 8, please see <see href="http://grokbase.com/t/kafka/dev/143hbtan25/jira-created-kafka-1306-offset-commit-api-does-it-work"/>
-		/// </summary>
-		OffsetCommit = 8,
-
-		/// <summary>
-		/// Offset fetch 
-		/// The correct value is 9, please see <see href="http://grokbase.com/t/kafka/dev/143hbtan25/jira-created-kafka-1306-offset-commit-api-does-it-work"/>
-		/// </summary>
+        OffsetCommit = 8,
         OffsetFetch = 9
     }
 
@@ -76,6 +66,12 @@ namespace KafkaNet.Protocol
         OffsetMetadataTooLargeCode = 12
     }
 
+    public enum OffsetTime
+    {
+        Latest = -1,
+        Earliest = -2
+    }
+
     public struct ProtocolConstants
     {
         public static byte AttributeCodeMask = 0x03;
@@ -86,12 +82,6 @@ namespace KafkaNet.Protocol
         CodecNone = 0x00,
         CodecGzip = 0x01,
         CodecSnappy = 0x02
-    }
-
-    public enum OffsetTime
-    {
-        Latest = -1,
-        Earliest = -2
     }
 
     #region Exceptions...

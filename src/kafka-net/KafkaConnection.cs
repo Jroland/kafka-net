@@ -31,10 +31,13 @@ namespace KafkaNet
         private readonly Uri _kafkaUri;
 
         private TcpClient _client;
-        private bool _interrupt;
-        private int _ensureOneThread;
-        private int _readerActive;
+
         private int _correlationIdSeed;
+
+        private readonly SemaphoreSlim _readerSemaphore;
+        private readonly SemaphoreSlim _responseTimeoutSemaphore;
+
+        private CancellationTokenSource _cancellationTokenSource;
 
         /// <summary>
         /// Initializes a new instance of the KafkaConnection class.
@@ -44,6 +47,8 @@ namespace KafkaNet
         /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received from kafka.</param>
         public KafkaConnection(Uri serverAddress, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
         {
+            _readerSemaphore = new SemaphoreSlim(1, 1);
+            _responseTimeoutSemaphore = new SemaphoreSlim(1, 1);
             _log = log ?? new DefaultTraceLog();
             _kafkaUri = serverAddress;
             _responseTimeoutMS = responseTimeoutMs;
@@ -59,7 +64,10 @@ namespace KafkaNet
         /// </summary>
         public bool ReadPolling
         {
-            get { return _readerActive >= 1; }
+            get
+            {
+                return _readerSemaphore.CurrentCount == 0;
+            }
         }
 
         /// <summary>
@@ -137,13 +145,6 @@ namespace KafkaNet
         }
         #endregion
 
-        private byte[] Read(int size, NetworkStream stream)
-        {
-            var buffer = new byte[size];
-            stream.Read(buffer, 0, size);
-            return buffer;
-        }
-
         private TcpClient GetClient()
         {
             if (_client == null || _client.Connected == false || ReadPolling == false)
@@ -156,7 +157,11 @@ namespace KafkaNet
                         _client.Connect(_kafkaUri.Host, _kafkaUri.Port);
                     }
 
-                    if (ReadPolling == false) StartReadSteamPoller();
+                    if (ReadPolling == false)
+                    {
+                        this._cancellationTokenSource = new CancellationTokenSource();
+                        StartReadSteamPoller();
+                    }
                 }
             }
             return _client;
@@ -174,26 +179,19 @@ namespace KafkaNet
             //and trigger an event with the message payload
             Task.Factory.StartNew(() =>
                 {
-                    while (_interrupt == false)
+                    while (!this._cancellationTokenSource.IsCancellationRequested)
                     {
+                        _readerSemaphore.Wait();
                         try
                         {
-                            //only allow one reader to execute
-                            if (Interlocked.Increment(ref _readerActive) > 1) return;
-
                             var stream = GetStream();
-                            while (_interrupt == false)
+                            while (!this._cancellationTokenSource.IsCancellationRequested)
                             {
-                                while (stream.DataAvailable)
-                                {
-                                    //get message size
-                                    var size = Read(4, stream).ToInt32();
-
-                                    //load message and fire event with payload
-                                    CorrelatePayloadToRequest(Read(size, stream));
-                                }
-
-                                Thread.Sleep(100);
+                                //get message size
+                                var size = stream.ReadAsync(4).Result.ToInt32();
+                               
+                                //load message and fire event with payload
+                                CorrelatePayloadToRequest(stream.ReadAsync(size).Result);
                             }
                         }
                         catch (Exception ex)
@@ -204,10 +202,10 @@ namespace KafkaNet
                         }
                         finally
                         {
-                            Interlocked.Decrement(ref _readerActive);
+                            _readerSemaphore.Release();
                         }
                     }
-                });
+                }, this._cancellationTokenSource.Token);
         }
 
         private void CorrelatePayloadToRequest(byte[] payload)
@@ -239,19 +237,20 @@ namespace KafkaNet
         /// </summary>
         private void ResponseTimeoutCheck()
         {
+            _responseTimeoutSemaphore.Wait();
             try
             {
-                if (Interlocked.Increment(ref _ensureOneThread) != 1) return;
-                var timeouts = _requestIndex.Values.Where(x => x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _interrupt).ToList();
+                
+
+                var timeouts = _requestIndex.Values.Where(x => DateTime.UtcNow > x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) || this._cancellationTokenSource.IsCancellationRequested).ToList();
 
                 foreach (var timeout in timeouts)
                 {
                     AsyncRequestItem request;
                     if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
                     {
-                        if (_interrupt) request.ReceiveTask.SetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
+                        if (!this._cancellationTokenSource.IsCancellationRequested) request.ReceiveTask.SetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
 
-						// TrySetException instead of SetException would be more safe because the task might have been terminated at this moment
                         request.ReceiveTask.TrySetException(new ResponseTimeoutException(
                             string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
                     }
@@ -259,7 +258,7 @@ namespace KafkaNet
             }
             finally
             {
-                Interlocked.Decrement(ref _ensureOneThread);
+                _responseTimeoutSemaphore.Release();
             }
         }
 
@@ -268,8 +267,10 @@ namespace KafkaNet
             using (_client)
             using (_responseTimeoutTimer)
             {
-                _interrupt = true;
+                if (this._cancellationTokenSource != null) this._cancellationTokenSource.Cancel();
+
                 ResponseTimeoutCheck();
+
                 if (_client != null) using (_client.GetStream()) { }
             }
         }
@@ -286,7 +287,7 @@ namespace KafkaNet
 
             public int CorrelationId { get; private set; }
             public TaskCompletionSource<byte[]> ReceiveTask { get; private set; }
-            public DateTime CreatedOnUtc { get; set; }
+            public DateTime CreatedOnUtc { get; private set; }
         }
         #endregion
     }

@@ -92,11 +92,14 @@ namespace KafkaNet.Common
             _stream.Read(buffer, 0, size);
             return buffer;
         }
-        
-        private byte[] ReadBytesFromStream(int size)
+
+        public byte[] ReadBytesFromStream(int size)
         {
-            var buffer = new byte[size];
-            _stream.Read(buffer, 0, size);
+            var bytesLeft = Convert.ToInt32(Math.Min(size, _stream.Length - _stream.Position));
+
+            var buffer = new byte[bytesLeft];
+            _stream.Read(buffer, 0, bytesLeft);
+
             return buffer;
         }
     }

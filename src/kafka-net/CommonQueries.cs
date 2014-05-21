@@ -6,7 +6,9 @@ using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
-    /// <summary>
+	using System.Diagnostics.CodeAnalysis;
+
+	/// <summary>
     /// This class provides a set of common queries that are useful for both the Consumer and Producer classes.  
     /// Both those classes derive from this base class simply to expose these metadata query methods.
     /// </summary>
@@ -14,7 +16,9 @@ namespace KafkaNet
     {
         private readonly IBrokerRouter _brokerRouter;
 
-        public CommonQueries(IBrokerRouter brokerRouter)
+	    private bool _disposed;
+
+	    public CommonQueries(IBrokerRouter brokerRouter)
         {
             _brokerRouter = brokerRouter;
         }
@@ -52,10 +56,10 @@ namespace KafkaNet
 
                         return route.Connection.SendAsync(request);
                     }).ToArray();
-                 
-               return Task.WhenAll(sendRequests)
-                   .ContinueWith(t => sendRequests.SelectMany(x => x.Result).ToList());
-        }
+
+			return Task.WhenAll(sendRequests)
+				.ContinueWith(t => sendRequests.SelectMany(x => x.Result).ToList());
+		}
 
         /// <summary>
         /// Get metadata on the given topic.
@@ -74,7 +78,19 @@ namespace KafkaNet
 
         public void Dispose()
         {
-            using (_brokerRouter) { }
+            this.Dispose(true);
         }
+
+	    protected virtual void Dispose(bool disposing)
+	    {
+	        if (_disposed) return;
+
+	        if (disposing)
+	        {
+	            _brokerRouter.Dispose();
+	        }
+
+	        _disposed = true;
+	    }
     }
 }

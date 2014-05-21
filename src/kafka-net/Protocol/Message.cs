@@ -81,7 +81,12 @@ namespace KafkaNet.Protocol
             while (stream.HasData)
             {
                 var offset = stream.ReadLong();
-                foreach (var message in DecodeMessage(offset, stream.ReadIntPrefixedBytes()))
+                var size = stream.ReadInt();
+                var payload = stream.ReadBytesFromStream(size);
+
+                if (payload.Length < size) throw new InsufficientDataException(payload.Length, size);
+                
+                foreach (var message in DecodeMessage(offset, payload))
                 {
                     yield return message;
                 }

@@ -5,6 +5,8 @@ namespace KafkaNet.Model
 {
     public class ConsumerOptions
     {
+        private const int DefaultFetchSize = 1 << 16;
+
         /// <summary>
         /// The topic to consume messages from.
         /// </summary>

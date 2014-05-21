@@ -87,8 +87,8 @@ namespace KafkaNet.Protocol
                     };
                     //note: dont use initializer here as it breaks stream position.
                     response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes())
-                        .Select(x => { x.Meta.PartitionId = partitionId; return x; })
-                        .ToList();
+                        .Select(x => { x.Meta.PartitionId = partitionId; return x; });
+
                     yield return response;
                 }
             }
@@ -97,9 +97,11 @@ namespace KafkaNet.Protocol
 
     public class Fetch
     {
+        public const int DefaultMaxBytes = 8 * FetchRequest.DefaultMinBlockingByteBufferSize;
+
         public Fetch()
         {
-            MaxBytes = FetchRequest.DefaultMinBlockingByteBufferSize * 8;
+            MaxBytes = DefaultMaxBytes;
         }
 
         public string Topic { get; set; }
@@ -117,6 +119,6 @@ namespace KafkaNet.Protocol
         public int PartitionId { get; set; }
         public Int16 Error { get; set; }
         public long HighWaterMark { get; set; }
-        public List<Message> Messages { get; set; }
+        public IEnumerable<Message> Messages { get; set; }
     }
 }
