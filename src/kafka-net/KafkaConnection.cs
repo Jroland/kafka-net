@@ -155,7 +155,7 @@ namespace KafkaNet
                 {
                     if (_client == null || _client.Connected == false)
                     {
-                        _client = new TcpClient { ReceiveBufferSize = DefaultTcpBufferSize, SendBufferSize = DefaultTcpBufferSize };
+                        _client = new TcpClient { ReceiveBufferSize = DefaultTcpBufferSize, SendBufferSize = DefaultTcpBufferSize, NoDelay = true};
                         _client.Connect(_kafkaUri.Host, _kafkaUri.Port);
                     }
 
