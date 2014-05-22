@@ -244,7 +244,7 @@ namespace KafkaNet
                 //ensure only one thread performs this action, allow all others to pass through
                 if (Interlocked.Increment(ref _ensureOneThread) != 1) return;
 
-                var timeouts = _requestIndex.Values.Where(x => x.CreatedOnUtc < DateTime.UtcNow.AddMilliseconds(_responseTimeoutMS) || _interrupt).ToList();
+                var timeouts = _requestIndex.Values.Where(x => x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _interrupt).ToList();
 
                 foreach (var timeout in timeouts)
                 {
