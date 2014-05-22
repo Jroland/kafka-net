@@ -23,6 +23,8 @@ namespace KafkaNet
     {
         private const int DefaultResponseTimeoutMs = 30000;
 
+        private const int DefaultTcpBufferSize = (int)5e5;
+
         private readonly object _threadLock = new object();
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
         private readonly IScheduledTimer _responseTimeoutTimer;
@@ -153,7 +155,7 @@ namespace KafkaNet
                 {
                     if (_client == null || _client.Connected == false)
                     {
-                        _client = new TcpClient();
+                        _client = new TcpClient { ReceiveBufferSize = DefaultTcpBufferSize, SendBufferSize = DefaultTcpBufferSize };
                         _client.Connect(_kafkaUri.Host, _kafkaUri.Port);
                     }
 
@@ -270,8 +272,6 @@ namespace KafkaNet
                 if (this._cancellationTokenSource != null) this._cancellationTokenSource.Cancel();
 
                 ResponseTimeoutCheck();
-
-                if (_client != null) using (_client.GetStream()) { }
             }
         }
 

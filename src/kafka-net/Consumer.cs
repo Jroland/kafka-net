@@ -66,6 +66,9 @@ namespace KafkaNet
         /// <param name="positions">Collection of positions to reset to.</param>
         public void SetOffsetPosition(params OffsetPosition[] positions)
         {
+            if (positions.Any(p => !_partitionPollingIndex.Values.Select(c => c.PartitionId).Contains(p.PartitionId))) 
+                RefreshTopicPartition();
+
             positions.Join(_partitionPollingIndex.Values, position => position.PartitionId, consumer => consumer.PartitionId, (position, consumer) => new{position, consumer}).ToList().ForEach(t => t.consumer.Offset = t.position.Offset);
         }
 
