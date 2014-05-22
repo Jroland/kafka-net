@@ -9,6 +9,8 @@ using KafkaNet.Protocol;
 using Moq;
 using NUnit.Framework;
 using Ninject.MockingKernel.Moq;
+using System.Threading;
+using kafka_tests.Helpers;
 
 namespace kafka_tests.Unit
 {
@@ -66,7 +68,39 @@ namespace kafka_tests.Unit
                 Assert.That(t.Exception.ToString(), Is.StringContaining("ApplicationException"));
                 Assert.That(routerProxy.BrokerConn0.ProduceRequestCallCount, Is.EqualTo(1));
                 Assert.That(routerProxy.BrokerConn1.ProduceRequestCallCount, Is.EqualTo(1));
-            }).Wait(); 
+            }).Wait();
+        }
+
+        [Test]
+        public void SendAsyncShouldBlockWhenMaximumAsyncQueueReached()
+        {
+            int count = 0;
+            var semaphore = new SemaphoreSlim(0);
+            var routerProxy = new BrokerRouterProxy(_kernel);
+            //block the second call returning from send message async
+            routerProxy.BrokerConn0.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
+
+            var router = routerProxy.Create();
+            var producer = new Producer(router, 1);
+
+            var messages = new List<Message>
+                {
+                    new Message{Value = "1"}, new Message{Value = "2"}
+                };
+
+            Task.Factory.StartNew(() => {
+                producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+                count++;
+                producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+                count++;
+            });
+
+            TaskTest.WaitFor(() => count > 0);
+            Assert.That(count, Is.EqualTo(1), "Only one SendMessageAsync should continue.");
+            Assert.That(producer.ActiveCount, Is.EqualTo(1), "One async call shoud be active.");
+            semaphore.Release();
+            TaskTest.WaitFor(() => count > 1);
+            Assert.That(count, Is.EqualTo(2), "The second SendMessageAsync should continue after semaphore is released.");
         }
 
         [Test]
@@ -92,7 +126,7 @@ namespace kafka_tests.Unit
             var test = producer.SendMessageAsync("UnitTest", messages).Result;
         }
         #endregion
-        
+
         [Test]
         public void EnsureProducerDisposesRouter()
         {

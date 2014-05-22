@@ -44,6 +44,7 @@ namespace kafka_tests.Fakes
 
         public Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
         {
+            //start a thread to handle the request and return
             var task = new Task<List<T>>(() =>
             {
                 if (typeof(T) == typeof(ProduceResponse))

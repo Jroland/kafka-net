@@ -16,8 +16,13 @@ namespace KafkaNet
     public class Producer : CommonQueries
     {
         private readonly IBrokerRouter _router;
+        private readonly SemaphoreSlim _sendSemaphore;
         private readonly int _maximumAsyncQueue;
-        private int _currentAsyncQueue;
+
+        /// <summary>
+        /// Get the current count of active async calls
+        /// </summary>
+        public int ActiveCount { get { return _maximumAsyncQueue - _sendSemaphore.CurrentCount; } }
 
         /// <summary>
         /// Construct a Producer class.
@@ -37,7 +42,8 @@ namespace KafkaNet
             : base(brokerRouter)
         {
             _router = brokerRouter;
-            _maximumAsyncQueue = maximumAsyncQueue;
+            _maximumAsyncQueue = maximumAsyncQueue == -1 ? int.MaxValue : maximumAsyncQueue;
+            _sendSemaphore = new SemaphoreSlim(_maximumAsyncQueue, _maximumAsyncQueue);
         }
 
         /// <summary>
@@ -51,15 +57,9 @@ namespace KafkaNet
         /// <returns>List of ProduceResponses for each message sent or empty list if acks = 0.</returns>
         public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1, int timeoutMS = 1000, MessageCodec codec = MessageCodec.CodecNone)
         {
-            Interlocked.Increment(ref _currentAsyncQueue);
-
             try
             {
-                //This goes against async philosophy but it convenient for dataflow management
-                while (_maximumAsyncQueue != -1 && _currentAsyncQueue >= _maximumAsyncQueue)
-                {
-                    Thread.Sleep(100);
-                }
+                _sendSemaphore.Wait();
 
                 //group message by the server connection they will be sent to
                 var routeGroup = from message in messages
@@ -95,11 +95,9 @@ namespace KafkaNet
             }
             finally
             {
-                Interlocked.Decrement(ref _currentAsyncQueue);
+                _sendSemaphore.Release();
             }
         }
-
-
     }
 
 }
