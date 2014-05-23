@@ -28,12 +28,11 @@ namespace KafkaNet
         private readonly IScheduledTimer _responseTimeoutTimer;
         private readonly int _responseTimeoutMS;
         private readonly IKafkaLog _log;
-        private readonly Uri _kafkaUri;
 
-        private TcpClient _client;
+        private ITcpSocket _client;
         private bool _interrupt;
-        private int _ensureOneThread;
-        private int _readerActive;
+        private int _ensureOneTimeoutThread;
+        private int _ensureOneActiveReader;
         private int _correlationIdSeed;
 
         /// <summary>
@@ -42,16 +41,18 @@ namespace KafkaNet
         /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
         /// <param name="serverAddress">The Uri address to this kafka server.</param>
         /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received from kafka.</param>
-        public KafkaConnection(Uri serverAddress, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
+        public KafkaConnection(ITcpSocket client, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
         {
+            _client = client;
             _log = log ?? new DefaultTraceLog();
-            _kafkaUri = serverAddress;
             _responseTimeoutMS = responseTimeoutMs;
             _responseTimeoutTimer = new ScheduledTimer()
                 .Do(ResponseTimeoutCheck)
                 .Every(TimeSpan.FromMilliseconds(100))
                 .StartingAt(DateTime.Now.AddMilliseconds(_responseTimeoutMS))
                 .Begin();
+
+            StartReadStreamPoller();
         }
 
         /// <summary>
@@ -59,7 +60,7 @@ namespace KafkaNet
         /// </summary>
         public bool ReadPolling
         {
-            get { return _readerActive >= 1; }
+            get { return _ensureOneActiveReader >= 1; }
         }
 
         /// <summary>
@@ -67,7 +68,7 @@ namespace KafkaNet
         /// </summary>
         public Uri KafkaUri
         {
-            get { return _kafkaUri; }
+            get { return _client.ClientUri; }
         }
 
         /// <summary>
@@ -77,7 +78,7 @@ namespace KafkaNet
         /// <returns>Task which signals the completion of the upload of data to the server.</returns>
         public Task SendAsync(byte[] payload)
         {
-            return GetStream().WriteAsync(payload, 0, payload.Length);
+            return _client.WriteAsync(payload, 0, payload.Length);
         }
 
 
@@ -128,45 +129,14 @@ namespace KafkaNet
 
         protected bool Equals(KafkaConnection other)
         {
-            return Equals(_kafkaUri, other._kafkaUri);
+            return Equals(KafkaUri, other.KafkaUri);
         }
 
         public override int GetHashCode()
         {
-            return (_kafkaUri != null ? _kafkaUri.GetHashCode() : 0);
+            return (KafkaUri != null ? KafkaUri.GetHashCode() : 0);
         }
         #endregion
-
-        //private byte[] Read(int size, NetworkStream stream)
-        //{
-        //    var buffer = new byte[size];
-        //    stream.Read(buffer, 0, size);
-        //    return buffer;
-        //}
-
-        private TcpClient GetClient()
-        {
-            if (_client == null || _client.Connected == false || ReadPolling == false)
-            {
-                lock (_threadLock)
-                {
-                    if (_client == null || _client.Connected == false)
-                    {
-                        _client = new TcpClient();
-                        _client.Connect(_kafkaUri.Host, _kafkaUri.Port);
-                    }
-
-                    if (ReadPolling == false) StartReadStreamPoller();
-                }
-            }
-            return _client;
-        }
-
-        private NetworkStream GetStream()
-        {
-            var client = GetClient();
-            return client.GetStream();
-        }
 
         private void StartReadStreamPoller()
         {
@@ -177,19 +147,17 @@ namespace KafkaNet
                     try
                     {
                         //only allow one reader to execute, dump out all other requests
-                        if (Interlocked.Increment(ref _readerActive) > 1) return;
+                        if (Interlocked.Increment(ref _ensureOneActiveReader) != 1) return;
 
                         while (_interrupt == false)
                         {
                             try
                             {
-                                var stream = GetStream();
                                 while (_interrupt == false)
                                 {
-                                    //TODO add cancellation token
-                                    var messageSize = stream.ReadAsync(4).Result.ToInt32();
+                                    var messageSize = _client.ReadAsync(4).Result.ToInt32();
 
-                                    var message = stream.ReadAsync(messageSize).Result;
+                                    var message = _client.ReadAsync(messageSize).Result;
 
                                     CorrelatePayloadToRequest(message);
                                 }
@@ -204,7 +172,7 @@ namespace KafkaNet
                     }
                     finally
                     {
-                        Interlocked.Decrement(ref _readerActive);
+                        Interlocked.Decrement(ref _ensureOneActiveReader);
                     }
                 }, creationOptions: TaskCreationOptions.LongRunning);
         }
@@ -241,7 +209,7 @@ namespace KafkaNet
             try
             {
                 //ensure only one thread performs this action, allow all others to pass through
-                if (Interlocked.Increment(ref _ensureOneThread) != 1) return;
+                if (Interlocked.Increment(ref _ensureOneTimeoutThread) != 1) return;
 
                 var timeouts = _requestIndex.Values.Where(x => x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _interrupt).ToList();
 
@@ -259,7 +227,7 @@ namespace KafkaNet
             }
             finally
             {
-                Interlocked.Decrement(ref _ensureOneThread);
+                Interlocked.Decrement(ref _ensureOneTimeoutThread);
             }
         }
 
@@ -270,7 +238,6 @@ namespace KafkaNet
             {
                 _interrupt = true;
                 ResponseTimeoutCheck();
-                if (_client != null) using (_client.GetStream()) { }
             }
         }
 

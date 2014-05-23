@@ -8,7 +8,7 @@ namespace KafkaNet
 {
     public static class KafkaNetConfiguration
     {
-        public static Func<Uri, int, IKafkaLog, IKafkaConnection> ConnectionFactory = (uri, timeout, log) => new KafkaConnection(uri, timeout, log);
+        public static Func<Uri, int, IKafkaLog, IKafkaConnection> ConnectionFactory = (uri, timeout, log) => new KafkaConnection(new TcpSocket(uri), timeout, log);
         public static Func<Topic, string, Partition> PartitionSelector = (topic, key) => new DefaultPartitionSelector().Select(topic, key);
         public static Func<IKafkaLog> Log = () => new DefaultTraceLog();
         public static Func<MessageCodec, byte[], byte[]> CompressFunction ;
@@ -24,7 +24,7 @@ namespace KafkaNet
     {
         public IKafkaConnection Create(Uri kafkaAddress, int responseTimeoutMs, IKafkaLog log)
         {
-            return new KafkaConnection(kafkaAddress, responseTimeoutMs, log);
+            return new KafkaConnection(new TcpSocket(kafkaAddress), responseTimeoutMs, log);
         }
     }
 }

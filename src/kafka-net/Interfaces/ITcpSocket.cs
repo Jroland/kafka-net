@@ -9,6 +9,7 @@ namespace KafkaNet
 {
     public interface ITcpSocket : IDisposable
     {
+        Uri ClientUri { get; }
         Task<byte[]> ReadAsync(int readSize);
         Task<byte[]> ReadAsync(int readSize, CancellationToken cancellationToken);
 

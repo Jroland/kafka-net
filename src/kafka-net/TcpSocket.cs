@@ -14,13 +14,13 @@ namespace KafkaNet
         private readonly object _threadLock = new object();
         private CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private TcpClient _client;
-        private string _server;
-        private int _port;
+        private Uri _serverUri;
 
-        public TcpSocket(string server, int port)
+        public Uri ClientUri { get { return _serverUri; } }
+
+        public TcpSocket(Uri serverUri)
         {
-            _server = server;
-            _port = port;
+            _serverUri = serverUri;
         }
 
         public Task<byte[]> ReadAsync(int readSize)
@@ -50,7 +50,7 @@ namespace KafkaNet
                     if (_client == null || _client.Connected == false)
                     {
                         _client = new TcpClient();
-                        _client.Connect(_server, _port);
+                        _client.Connect(_serverUri.Host, _serverUri.Port);
                     }
                 }
             }

@@ -24,7 +24,7 @@ namespace kafka_tests.Integration
         {
             var options = new KafkaOptions(new Uri(ConfigurationManager.AppSettings["IntegrationKafkaServerUrl"]));
             
-            _conn = new KafkaConnection(options.KafkaServerUri.First(), options.ResponseTimeoutMs, options.Log);
+            _conn = new KafkaConnection(new TcpSocket(options.KafkaServerUri.First()), options.ResponseTimeoutMs, options.Log);
         }
 
         [Test]
