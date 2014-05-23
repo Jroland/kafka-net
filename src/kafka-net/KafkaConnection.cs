@@ -54,6 +54,7 @@ namespace KafkaNet
             _log = log ?? new DefaultTraceLog();
             _kafkaUri = serverAddress;
             _responseTimeoutMS = responseTimeoutMs;
+            _cancellationTokenSource = new CancellationTokenSource();
             _responseTimeoutTimer = new ScheduledTimer()
                 .Do(ResponseTimeoutCheck)
                 .Every(TimeSpan.FromMilliseconds(100))
@@ -190,10 +191,21 @@ namespace KafkaNet
                             while (!this._cancellationTokenSource.IsCancellationRequested)
                             {
                                 //get message size
-                                var size = stream.ReadAsync(4).Result.ToInt32();
-                               
+                                var readTask = stream.ReadAsync(4);
+                                readTask.Wait(_cancellationTokenSource.Token);
+
+                                if (this._cancellationTokenSource.IsCancellationRequested) break;
+
+                                var size = readTask.Result.ToInt32();
+
                                 //load message and fire event with payload
-                                CorrelatePayloadToRequest(stream.ReadAsync(size).Result);
+
+                                readTask = stream.ReadAsync(size);
+                                readTask.Wait(_cancellationTokenSource.Token);
+
+                                if (this._cancellationTokenSource.IsCancellationRequested) break;
+
+                                CorrelatePayloadToRequest(readTask.Result);
                             }
                         }
                         catch (Exception ex)
