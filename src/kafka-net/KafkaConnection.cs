@@ -137,12 +137,12 @@ namespace KafkaNet
         }
         #endregion
 
-        private byte[] Read(int size, NetworkStream stream)
-        {
-            var buffer = new byte[size];
-            stream.Read(buffer, 0, size);
-            return buffer;
-        }
+        //private byte[] Read(int size, NetworkStream stream)
+        //{
+        //    var buffer = new byte[size];
+        //    stream.Read(buffer, 0, size);
+        //    return buffer;
+        //}
 
         private TcpClient GetClient()
         {
@@ -156,7 +156,7 @@ namespace KafkaNet
                         _client.Connect(_kafkaUri.Host, _kafkaUri.Port);
                     }
 
-                    if (ReadPolling == false) StartReadSteamPoller();
+                    if (ReadPolling == false) StartReadStreamPoller();
                 }
             }
             return _client;
@@ -168,46 +168,45 @@ namespace KafkaNet
             return client.GetStream();
         }
 
-        private void StartReadSteamPoller()
+        private void StartReadStreamPoller()
         {
             //This thread will poll the receive stream for data, parce a message out
             //and trigger an event with the message payload
             Task.Factory.StartNew(() =>
                 {
-                    while (_interrupt == false)
+                    try
                     {
-                        try
+                        //only allow one reader to execute, dump out all other requests
+                        if (Interlocked.Increment(ref _readerActive) > 1) return;
+
+                        while (_interrupt == false)
                         {
-                            //only allow one reader to execute
-                            if (Interlocked.Increment(ref _readerActive) > 1) return;
-
-                            var stream = GetStream();
-                            while (_interrupt == false)
+                            try
                             {
-                                while (stream.DataAvailable)
+                                var stream = GetStream();
+                                while (_interrupt == false)
                                 {
-                                    //get message size
-                                    var size = Read(4, stream).ToInt32();
+                                    //TODO add cancellation token
+                                    var messageSize = stream.ReadAsync(4).Result.ToInt32();
 
-                                    //load message and fire event with payload
-                                    CorrelatePayloadToRequest(Read(size, stream));
+                                    var message = stream.ReadAsync(messageSize).Result;
+
+                                    CorrelatePayloadToRequest(message);
                                 }
-
-                                Thread.Sleep(100);
+                            }
+                            catch (Exception ex)
+                            {
+                                //TODO being in sync with the byte order on read is important.  What happens if this exception causes us to be out of sync?
+                                //record exception and continue to scan for data.
+                                _log.ErrorFormat("Exception occured in polling read thread.  Exception={0}", ex);
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            //TODO being in sync with the byte order on read is important.  What happens if this exception causes us to be out of sync?
-                            //record exception and continue to scan for data.
-                            _log.ErrorFormat("Exception occured in polling read thread.  Exception={0}", ex);
-                        }
-                        finally
-                        {
-                            Interlocked.Decrement(ref _readerActive);
-                        }
                     }
-                });
+                    finally
+                    {
+                        Interlocked.Decrement(ref _readerActive);
+                    }
+                }, creationOptions: TaskCreationOptions.LongRunning);
         }
 
         private void CorrelatePayloadToRequest(byte[] payload)
