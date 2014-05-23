@@ -44,8 +44,8 @@ namespace KafkaNet.Protocol
         MetaData = 3,
         LeaderAndIsr = 4,
         StopReplica = 5,
-        OffsetCommit = 6,
-        OffsetFetch = 7
+        OffsetCommit = 8,
+        OffsetFetch = 9
     }
 
     public enum ErrorResponseCode
