@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using KafkaNet.Common;
+using System.Threading;
 
 namespace KafkaNet
 {
@@ -55,11 +56,21 @@ namespace KafkaNet
             return _client;
         }
 
+        
+    }
 
+    public static class NetworkStreamExtensions
+    {
+        public static Task<byte[]> ReadAsync(this NetworkStream stream, int readSize)
+        {
+            return ReadAsync(stream, readSize, CancellationToken.None);
+        }
 
-
-       
-
-       
+        public static async Task<byte[]> ReadAsync(this NetworkStream stream, int readSize, CancellationToken token)
+        {
+            var buffer = new byte[readSize];
+            await stream.ReadAsync(buffer, 0, readSize, token);
+            return buffer;
+        }
     }
 }

@@ -33,7 +33,7 @@ namespace KafkaNet.Common
         public static byte[] ToBytes(this string value)
         {
             if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
-            
+
             //UTF8 is array of bytes, no endianness
             return Encoding.Default.GetBytes(value);
         }
@@ -72,21 +72,10 @@ namespace KafkaNet.Common
         {
             return BitConverter.GetBytes(value).Reverse().ToArray();
         }
-        
+
         public static Int32 ToInt32(this byte[] value)
         {
             return BitConverter.ToInt32(value.Reverse().ToArray(), 0);
-        }
-
-        public static Task<byte[]> ReadAsync(this NetworkStream stream, int readSize)
-        {
-            return ReadAsync(stream, readSize, CancellationToken.None);
-        }
-        public static async Task<byte[]> ReadAsync(this NetworkStream stream, int readSize, CancellationToken token)
-        {
-            var buffer = new byte[readSize];
-            await stream.ReadAsync(buffer, 0, readSize, token);
-            return buffer;
         }
     }
 }
