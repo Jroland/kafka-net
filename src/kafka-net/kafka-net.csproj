@@ -42,6 +42,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Default\DefaultKafkaConnectionFactory.cs" />
     <Compile Include="Interfaces\ITcpSocket.cs" />
     <Compile Include="Model\BrokerRoute.cs" />
     <Compile Include="Common\ScheduledTimer.cs" />
