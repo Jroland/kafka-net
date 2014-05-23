@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
+using System.Net.Sockets;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace KafkaNet.Common
 {
@@ -73,6 +76,17 @@ namespace KafkaNet.Common
         public static Int32 ToInt32(this byte[] value)
         {
             return BitConverter.ToInt32(value.Reverse().ToArray(), 0);
+        }
+
+        public static Task<byte[]> ReadAsync(this NetworkStream stream, int readSize)
+        {
+            return ReadAsync(stream, readSize, CancellationToken.None);
+        }
+        public static async Task<byte[]> ReadAsync(this NetworkStream stream, int readSize, CancellationToken token)
+        {
+            var buffer = new byte[readSize];
+            await stream.ReadAsync(buffer, 0, readSize, token);
+            return buffer;
         }
     }
 }
