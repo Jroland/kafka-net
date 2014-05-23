@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace KafkaNet
 {
-    public interface ITcpSocket
+    public interface ITcpSocket : IDisposable
     {
         Task<byte[]> ReadAsync(int readSize);
         Task<byte[]> ReadAsync(int readSize, CancellationToken cancellationToken);

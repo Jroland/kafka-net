@@ -12,6 +12,7 @@ namespace KafkaNet
     public class TcpSocket : ITcpSocket
     {
         private readonly object _threadLock = new object();
+        private CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private TcpClient _client;
         private string _server;
         private int _port;
@@ -24,7 +25,7 @@ namespace KafkaNet
 
         public Task<byte[]> ReadAsync(int readSize)
         {
-            return GetClient().GetStream().ReadAsync(readSize);
+            return GetClient().GetStream().ReadAsync(readSize, _disposeToken.Token);
         }
         public Task<byte[]> ReadAsync(int readSize, System.Threading.CancellationToken cancellationToken)
         {
@@ -33,7 +34,7 @@ namespace KafkaNet
 
         public Task WriteAsync(byte[] buffer, int offset, int count)
         {
-            return GetClient().GetStream().WriteAsync(buffer, offset, count);
+            return GetClient().GetStream().WriteAsync(buffer, offset, count, _disposeToken.Token);
         }
         public Task WriteAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken)
         {
@@ -56,7 +57,14 @@ namespace KafkaNet
             return _client;
         }
 
-        
+        public void Dispose()
+        {
+            using (_client)
+            using (_disposeToken)
+            {
+                _disposeToken.Cancel();
+            }
+        }
     }
 
     public static class NetworkStreamExtensions
