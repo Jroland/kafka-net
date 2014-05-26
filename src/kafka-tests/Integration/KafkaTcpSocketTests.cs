@@ -65,7 +65,6 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        [Ignore("The cancel token does not seem to be working with the current version of TcpClient.ReadAsync")]
         public void KafkaTcpSocketShouldCancelWhileAwaitingRead()
         {
             var count = 0;
@@ -81,6 +80,7 @@ namespace kafka_tests.Integration
                     semaphore.Release();
                 });
 
+            Thread.Sleep(100);
             token.Cancel();
 
             semaphore.Wait(TimeSpan.FromSeconds(1));

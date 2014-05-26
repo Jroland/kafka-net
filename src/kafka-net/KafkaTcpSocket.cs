@@ -75,6 +75,9 @@ namespace KafkaNet
 
         public static async Task<byte[]> ReadAsync(this NetworkStream stream, int readSize, CancellationToken token)
         {
+            var cancelTask = new TaskCompletionSource<byte>();
+            token.Register(cancelTask.SetCanceled);
+
             var result = new List<byte>();
             var bytesReceived = 0;
 
@@ -82,29 +85,19 @@ namespace KafkaNet
             {
                 readSize = readSize - bytesReceived;
                 var buffer = new byte[readSize];
-                bytesReceived = await stream.ReadAsync(buffer, 0, readSize, token);
+
+                var readTask = stream.ReadAsync(buffer, 0, readSize, token);
+                var completedTask = await Task.WhenAny(cancelTask.Task, readTask);
+
+                if (completedTask == cancelTask.Task)
+                {
+                    throw new TaskCanceledException("Task cancel token was set.");
+                }
+
+                bytesReceived = readTask.Result;
                 result.AddRange(buffer.Take(bytesReceived));
             }
             return result.ToArray();
         }
-
-        //public static async Task<byte[]> ReadAsync(this NetworkStream stream, int readSize, CancellationToken token)
-        //{
-        //    var buffer = new byte[readSize];
-
-        //    while (token.IsCancellationRequested == false)
-        //    {
-        //        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(1));
-        //        var readTask = stream.ReadAsync(buffer, 0, readSize, token);
-        //        var completedTask = await Task.WhenAny(timeoutTask, readTask).ConfigureAwait(false);
-
-        //        if (completedTask != timeoutTask)
-        //        {
-        //            return buffer;
-        //        }
-        //    }
-
-        //    return new byte[] { };
-        //}
     }
 }
