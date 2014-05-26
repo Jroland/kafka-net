@@ -29,7 +29,7 @@ namespace KafkaNet
         private readonly int _responseTimeoutMS;
         private readonly IKafkaLog _log;
 
-        private ITcpSocket _client;
+        private IKafkaTcpSocket _client;
         private bool _interrupt;
         private int _ensureOneTimeoutThread;
         private int _ensureOneActiveReader;
@@ -41,7 +41,7 @@ namespace KafkaNet
         /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
         /// <param name="serverAddress">The Uri address to this kafka server.</param>
         /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received from kafka.</param>
-        public KafkaConnection(ITcpSocket client, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
+        public KafkaConnection(IKafkaTcpSocket client, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
         {
             _client = client;
             _log = log ?? new DefaultTraceLog();

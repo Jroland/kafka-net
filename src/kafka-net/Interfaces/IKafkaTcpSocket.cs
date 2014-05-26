@@ -1,13 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace KafkaNet
 {
-    public interface ITcpSocket : IDisposable
+    public interface IKafkaTcpSocket : IDisposable
     {
         Uri ClientUri { get; }
         Task<byte[]> ReadAsync(int readSize);

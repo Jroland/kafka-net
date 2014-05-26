@@ -10,7 +10,7 @@ namespace KafkaNet
     {
         public IKafkaConnection Create(Uri kafkaAddress, int responseTimeoutMs, IKafkaLog log)
         {
-            return new KafkaConnection(new TcpSocket(kafkaAddress), responseTimeoutMs, log);
+            return new KafkaConnection(new KafkaTcpSocket(kafkaAddress), responseTimeoutMs, log);
         }
     }
 }

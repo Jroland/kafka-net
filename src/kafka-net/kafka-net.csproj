@@ -43,7 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Default\DefaultKafkaConnectionFactory.cs" />
-    <Compile Include="Interfaces\ITcpSocket.cs" />
+    <Compile Include="Interfaces\IKafkaTcpSocket.cs" />
     <Compile Include="Model\BrokerRoute.cs" />
     <Compile Include="Common\ScheduledTimer.cs" />
     <Compile Include="Consumer.cs" />
@@ -76,7 +76,7 @@
     <Compile Include="Protocol\OffsetRequest.cs" />
     <Compile Include="Protocol\ProduceRequest.cs" />
     <Compile Include="Default\DefaultTraceLog.cs" />
-    <Compile Include="TcpSocket.cs" />
+    <Compile Include="KafkaTcpSocket.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

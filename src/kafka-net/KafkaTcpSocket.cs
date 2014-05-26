@@ -2,23 +2,22 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
-using KafkaNet.Common;
 using System.Threading;
 
 namespace KafkaNet
 {
-    public class TcpSocket : ITcpSocket
+    public class KafkaTcpSocket : IKafkaTcpSocket
     {
         private readonly object _threadLock = new object();
-        private CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        private readonly Uri _serverUri;
+
         private TcpClient _client;
-        private Uri _serverUri;
 
         public Uri ClientUri { get { return _serverUri; } }
 
-        public TcpSocket(Uri serverUri)
+        public KafkaTcpSocket(Uri serverUri)
         {
             _serverUri = serverUri;
         }
@@ -27,7 +26,7 @@ namespace KafkaNet
         {
             return GetClient().GetStream().ReadAsync(readSize, _disposeToken.Token);
         }
-        public Task<byte[]> ReadAsync(int readSize, System.Threading.CancellationToken cancellationToken)
+        public Task<byte[]> ReadAsync(int readSize, CancellationToken cancellationToken)
         {
             return GetClient().GetStream().ReadAsync(readSize, cancellationToken);
         }
@@ -36,7 +35,7 @@ namespace KafkaNet
         {
             return GetClient().GetStream().WriteAsync(buffer, offset, count, _disposeToken.Token);
         }
-        public Task WriteAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken)
+        public Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             return GetClient().GetStream().WriteAsync(buffer, offset, count, cancellationToken);
         }
@@ -76,9 +75,36 @@ namespace KafkaNet
 
         public static async Task<byte[]> ReadAsync(this NetworkStream stream, int readSize, CancellationToken token)
         {
-            var buffer = new byte[readSize];
-            await stream.ReadAsync(buffer, 0, readSize, token);
-            return buffer;
+            var result = new List<byte>();
+            var bytesReceived = 0;
+
+            while (bytesReceived < readSize)
+            {
+                readSize = readSize - bytesReceived;
+                var buffer = new byte[readSize];
+                bytesReceived = await stream.ReadAsync(buffer, 0, readSize, token);
+                result.AddRange(buffer.Take(bytesReceived));
+            }
+            return result.ToArray();
         }
+
+        //public static async Task<byte[]> ReadAsync(this NetworkStream stream, int readSize, CancellationToken token)
+        //{
+        //    var buffer = new byte[readSize];
+
+        //    while (token.IsCancellationRequested == false)
+        //    {
+        //        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(1));
+        //        var readTask = stream.ReadAsync(buffer, 0, readSize, token);
+        //        var completedTask = await Task.WhenAny(timeoutTask, readTask).ConfigureAwait(false);
+
+        //        if (completedTask != timeoutTask)
+        //        {
+        //            return buffer;
+        //        }
+        //    }
+
+        //    return new byte[] { };
+        //}
     }
 }
