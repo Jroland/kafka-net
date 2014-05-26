@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -81,26 +83,11 @@ namespace kafka_tests.Helpers
 
                     while (!token.IsCancellationRequested)
                     {
-                        //var timeoutTask = Task.Delay(TimeSpan.FromSeconds(15));
-                        //var amountReadTask = _stream.ReadAsync(buf, 0, buf.Length, token);
-                        //var completedTask = await Task.WhenAny(timeoutTask, amountReadTask).ConfigureAwait(false);
-
                         var bytesReceived = await _stream.ReadAsync(buffer, 0, buffer.Length, token);
                         if (bytesReceived > 0)
                         {
-                            if (OnBytesReceived != null) OnBytesReceived(buffer);
+                            if (OnBytesReceived != null) OnBytesReceived(buffer.Take(bytesReceived).ToArray());
                         }
-
-                        //if (completedTask == timeoutTask)
-                        //{
-                        //    var msg = Encoding.ASCII.GetBytes("Client timed out");
-                        //    await _stream.WriteAsync(msg, 0, msg.Length);
-                        //    break;
-                        //}
-
-                        //var amountRead = amountReadTask.Result;
-                        //if (amountRead == 0) break; //end of stream.
-                        //await _stream.WriteAsync(buffer, 0, amountRead, token).ConfigureAwait(false);
                     }
                 }
             }

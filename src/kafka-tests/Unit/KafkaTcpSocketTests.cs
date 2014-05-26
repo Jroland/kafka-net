@@ -17,7 +17,7 @@ namespace kafka_tests.Integration
     /// Note these integration tests require an actively running kafka server defined in the app.config file.
     /// </summary>
     [TestFixture]
-    [Category("Integration")]
+    [Category("unit")]
     public class KafkaTcpSocketTests
     {
         private readonly FakeTcpServer _fakeTcpServer;
@@ -46,6 +46,7 @@ namespace kafka_tests.Integration
             }
         }
 
+        #region Dispose Tests...
         [Test]
         public void KafkaTcpSocketShouldDisposeEvenWhileAwaitingRead()
         {
@@ -63,8 +64,10 @@ namespace kafka_tests.Integration
             using (test) { }
 
             semaphore.Wait(TimeSpan.FromSeconds(1));
-        }
+        } 
+        #endregion
 
+        #region Read Tests...
         [Test]
         public void KafkaTcpSocketShouldCancelWhileAwaitingRead()
         {
@@ -149,7 +152,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public void KafkaTcpSocketShouldNotLoseDataFromLargeStreamOverMulipleReads()
+        public void KafkaTcpSocketShouldNotLoseDataFromLargeStreamOverMultipleReads()
         {
             var count = 0;
             const string testMessage = "testmessage";
@@ -157,7 +160,7 @@ namespace kafka_tests.Integration
 
             var payload = new WriteByteStream();
             payload.Pack(testInteger.ToBytes(), testMessage.ToBytes());
-            
+
             int firstResponse = 0;
             string secondResponse = null;
             var test = new KafkaTcpSocket(_fakeServerUrl);
@@ -186,6 +189,21 @@ namespace kafka_tests.Integration
             TaskTest.WaitFor(() => count > 1);
             Assert.That(count, Is.EqualTo(2));
             Assert.That(secondResponse, Is.EqualTo(testMessage));
+        } 
+        #endregion
+
+        [Test]
+        public void WriteAsyncShouldSendData()
+        {
+            const int testData = 99;
+            int result = 0;
+
+            var test = new KafkaTcpSocket(_fakeServerUrl);
+            _fakeTcpServer.OnBytesReceived += data => result = data.ToInt32();
+
+            test.WriteAsync(testData.ToBytes(), 0, 4).Wait(TimeSpan.FromSeconds(1));
+            TaskTest.WaitFor(() => result > 0);
+            Assert.That(result, Is.EqualTo(testData));
         }
     }
 }
