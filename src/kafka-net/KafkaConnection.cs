@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading;
@@ -140,7 +141,8 @@ namespace KafkaNet
         private byte[] Read(int size, NetworkStream stream)
         {
             var buffer = new byte[size];
-            stream.Read(buffer, 0, size);
+            var reader = new BinaryReader(stream);
+            buffer = reader.ReadBytes(size);
             return buffer;
         }
 
