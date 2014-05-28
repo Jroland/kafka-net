@@ -130,12 +130,12 @@ namespace KafkaNet
 
             if (disposing)
             {
-                using (_topicPartitionQueryTimer)
+                _fetchResponseQueue.CompleteAdding();
+                using (_topicPartitionQueryTimer) ;
+
+                foreach (var partitionConsumer in _partitionPollingIndex.Values)
                 {
-                    foreach (var partitionConsumer in _partitionPollingIndex.Values)
-                    {
-                        partitionConsumer.Dispose();
-                    }
+                    using (partitionConsumer) {}
                 }
             }
 

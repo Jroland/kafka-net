@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Model;
@@ -20,17 +19,22 @@ namespace kafka_tests.Integration
         [SetUp]
         public void Setup()
         {
-            var options = new KafkaOptions(new Uri(ConfigurationManager.AppSettings["IntegrationKafkaServerUrl"]));
+            var brokers = ConfigurationManager.AppSettings["IntegrationKafkaServerUrl"]
+                .Split(',')
+                .Select(b => new Uri(b))
+                .ToArray();
+
+            var options = new KafkaOptions(brokers);
 
             _router = new BrokerRouter(options);
         }
 
         [Test]
         [TestCase(10, -1)]
-        //TODO ignoring these for now as the auto test running take forever with this.  
-        //[TestCase(100, -1)]
-        //[TestCase(1000, -1)]
-        //[TestCase(10000, 100)]
+        [TestCase(100, -1)]
+        [TestCase(1000, -1)]
+        [TestCase(10000, 100)]
+
         public void SendAsyncShouldHandleHighVolumeOfMessages(int amount, int maxAsync)
         {
             var tasks = new Task<List<ProduceResponse>>[amount];
@@ -138,3 +142,4 @@ namespace kafka_tests.Integration
         }
     }
 }
+
