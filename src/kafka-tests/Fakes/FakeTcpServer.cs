@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -12,11 +11,24 @@ namespace kafka_tests.Helpers
     public class FakeTcpServer : IDisposable
     {
         public delegate void BytesReceivedDelegate(byte[] data);
+        public delegate void ClientEventDelegate();
         public event BytesReceivedDelegate OnBytesReceived;
+        public event ClientEventDelegate OnClientConnected;
+        public event ClientEventDelegate OnClientDisconnected;
 
         private readonly SemaphoreSlim _serverCloseSemaphore = new SemaphoreSlim(0);
-        private NetworkStream _stream = null;
-        private int _clientCounter = 0;
+
+        private bool _interrupted = false;
+        private TcpClient _client;
+        private int _clientCounter;
+
+        public int ConnectedClients { get { return _clientCounter; } }
+
+        public FakeTcpServer() { }
+        public FakeTcpServer(int port)
+        {
+            Start(port);
+        }
 
         public async Task Start(int port)
         {
@@ -44,8 +56,8 @@ namespace kafka_tests.Helpers
 
         public Task SendDataAsync(byte[] data)
         {
-            while (_stream == null) { Thread.Sleep(100); }
-            return _stream.WriteAsync(data, 0, data.Length);
+            while (_client == null) { Thread.Sleep(100); }
+            return _client.GetStream().WriteAsync(data, 0, data.Length);
         }
 
         public Task SendDataAsync(string data)
@@ -56,53 +68,76 @@ namespace kafka_tests.Helpers
 
         public void DropConnection()
         {
-            throw new NotImplementedException();
+            if (_client != null)
+            {
+                using (_client)
+                {
+                    _client.Close();
+                }
+
+                _client = null;
+            }
         }
 
         private async Task AcceptClientsAsync(TcpListener listener, CancellationToken token)
         {
-            while (!token.IsCancellationRequested)
+            try
             {
-                var client = await listener.AcceptTcpClientAsync().ConfigureAwait(false);
-
-                HandleClientAsync(client, token);
+                await HandleClientAsync(listener, token);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("FakeTcpServer had a client exception: {0}", ex.Message);
             }
         }
 
-        private async Task HandleClientAsync(TcpClient client, CancellationToken token)
+        private async Task HandleClientAsync(TcpListener listener, CancellationToken token)
         {
-            var clientIndex = Interlocked.Increment(ref _clientCounter);
-
-            try
+            while (_interrupted == false)
             {
-                Console.WriteLine("FakeTcpServer Connected client: {0}", clientIndex);
-                using (client)
-                {
-                    var buffer = new byte[4096];
-                    _stream = client.GetStream();
+                Console.WriteLine("FakeTcpServer: Accepting clients.");
+                _client = await listener.AcceptTcpClientAsync().ConfigureAwait(false);
 
-                    while (!token.IsCancellationRequested)
+                try
+                {
+                    var clientIndex = Interlocked.Increment(ref _clientCounter);
+                    if (OnClientConnected != null) OnClientConnected();
+
+                    Console.WriteLine("FakeTcpServer: Connected client: {0}", clientIndex);
+                    using (_client)
                     {
-                        var bytesReceived = await _stream.ReadAsync(buffer, 0, buffer.Length, token);
-                        if (bytesReceived > 0)
+                        var buffer = new byte[4096];
+                        var stream = _client.GetStream();
+
+                        while (!token.IsCancellationRequested)
                         {
-                            if (OnBytesReceived != null) OnBytesReceived(buffer.Take(bytesReceived).ToArray());
+                            var bytesReceived = await stream.ReadAsync(buffer, 0, buffer.Length, token);
+                            if (bytesReceived > 0)
+                            {
+                                if (OnBytesReceived != null) OnBytesReceived(buffer.Take(bytesReceived).ToArray());
+                            }
                         }
                     }
                 }
-            }
-            finally
-            {
-                Console.WriteLine("FakeTcpServer Disconnected client: {0} ", clientIndex);
-                Interlocked.Decrement(ref _clientCounter);
+                catch (Exception ex)
+                {
+                    Console.WriteLine("FakeTcpServer: Client exception...  Exception:{0}", ex.Message);
+                }
+                finally
+                {
+                    Console.WriteLine("FakeTcpServer: Client Disconnected.");
+                    Interlocked.Decrement(ref _clientCounter);
+                    if (OnClientDisconnected != null) OnClientDisconnected();
+                }
             }
         }
 
         public void Dispose()
         {
+            _interrupted = true;
             _serverCloseSemaphore.Release();
         }
     }
 
-    
+
 }
