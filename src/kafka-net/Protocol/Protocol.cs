@@ -94,6 +94,11 @@ namespace KafkaNet.Protocol
         public InvalidPartitionException(string message) : base(message) { }
     }
 
+    public class ServerDisconnectedException : Exception
+    {
+        public ServerDisconnectedException(string message) : base(message) { }
+    }
+
     public class ServerUnreachableException : Exception
     {
         public ServerUnreachableException(string message) : base(message) { }
