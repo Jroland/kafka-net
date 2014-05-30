@@ -5,6 +5,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using KafkaNet.Common;
 
 namespace kafka_tests.Helpers
 {
@@ -18,46 +19,30 @@ namespace kafka_tests.Helpers
 
         private readonly SemaphoreSlim _serverCloseSemaphore = new SemaphoreSlim(0);
 
-        private bool _interrupted = false;
         private TcpClient _client;
-        private int _clientCounter;
+        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        private readonly ThreadWall _threadWall = new ThreadWall(ThreadWallInitialState.Blocked);
+        private readonly TcpListener _listener;
 
-        public int ConnectedClients { get { return _clientCounter; } }
+        public int ConnectionEventcount = 0;
+        public int DisconnectionEventCount = 0;
 
-        public FakeTcpServer() { }
         public FakeTcpServer(int port)
         {
-            Start(port);
+            _listener = new TcpListener(IPAddress.Any, port);
+            _listener.Start();
+
+            OnClientConnected += () => Interlocked.Increment(ref ConnectionEventcount);
+            OnClientDisconnected += () => Interlocked.Increment(ref DisconnectionEventCount);
+
+            StartHandlingClientRequestAsync();
         }
 
-        public async Task Start(int port)
+        public async Task SendDataAsync(byte[] data)
         {
-            var token = new CancellationTokenSource();
-            var listener = new TcpListener(IPAddress.Any, port);
-            try
-            {
-                listener.Start();
-
-                AcceptClientsAsync(listener, token.Token);
-
-                await _serverCloseSemaphore.WaitAsync();
-            }
-            finally
-            {
-                token.Cancel();
-                listener.Stop();
-            }
-        }
-
-        public void End()
-        {
-            _serverCloseSemaphore.Release();
-        }
-
-        public Task SendDataAsync(byte[] data)
-        {
-            while (_client == null) { Thread.Sleep(100); }
-            return _client.GetStream().WriteAsync(data, 0, data.Length);
+            await _threadWall.RequestPassageAsync();
+            Console.WriteLine("FakeTcpServer: writing {0} bytes.", data.Length);
+            await _client.GetStream().WriteAsync(data, 0, data.Length);
         }
 
         public Task SendDataAsync(string data)
@@ -79,39 +64,30 @@ namespace kafka_tests.Helpers
             }
         }
 
-        private async Task AcceptClientsAsync(TcpListener listener, CancellationToken token)
+        private async Task StartHandlingClientRequestAsync()
         {
-            try
-            {
-                await HandleClientAsync(listener, token);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("FakeTcpServer had a client exception: {0}", ex.Message);
-            }
-        }
-
-        private async Task HandleClientAsync(TcpListener listener, CancellationToken token)
-        {
-            while (_interrupted == false)
+            while (_disposeToken.IsCancellationRequested == false)
             {
                 Console.WriteLine("FakeTcpServer: Accepting clients.");
-                _client = await listener.AcceptTcpClientAsync().ConfigureAwait(false);
+                _client = await _listener.AcceptTcpClientAsync();
+
+                Console.WriteLine("FakeTcpServer: Connected client");
+                if (OnClientConnected != null) OnClientConnected();
+                _threadWall.Release();
 
                 try
                 {
-                    var clientIndex = Interlocked.Increment(ref _clientCounter);
-                    if (OnClientConnected != null) OnClientConnected();
-
-                    Console.WriteLine("FakeTcpServer: Connected client: {0}", clientIndex);
                     using (_client)
                     {
                         var buffer = new byte[4096];
                         var stream = _client.GetStream();
 
-                        while (!token.IsCancellationRequested)
+                        while (!_disposeToken.IsCancellationRequested)
                         {
-                            var bytesReceived = await stream.ReadAsync(buffer, 0, buffer.Length, token);
+                            //connect client
+                            var connectTask = stream.ReadAsync(buffer, 0, buffer.Length, _disposeToken.Token);
+                            
+                            var bytesReceived = await connectTask;
                             if (bytesReceived > 0)
                             {
                                 if (OnBytesReceived != null) OnBytesReceived(buffer.Take(bytesReceived).ToArray());
@@ -126,7 +102,7 @@ namespace kafka_tests.Helpers
                 finally
                 {
                     Console.WriteLine("FakeTcpServer: Client Disconnected.");
-                    Interlocked.Decrement(ref _clientCounter);
+                    _threadWall.Block();
                     if (OnClientDisconnected != null) OnClientDisconnected();
                 }
             }
@@ -134,8 +110,14 @@ namespace kafka_tests.Helpers
 
         public void Dispose()
         {
-            _interrupted = true;
-            _serverCloseSemaphore.Release();
+            if (_disposeToken != null) _disposeToken.Cancel();
+            _listener.Stop();
+
+            using (_disposeToken)
+            using (_serverCloseSemaphore)
+            {
+                _serverCloseSemaphore.Release();
+            }
         }
     }
 
