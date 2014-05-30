@@ -23,15 +23,15 @@ namespace KafkaNet
     {
         private const int DefaultResponseTimeoutMs = 30000;
 
-        private readonly object _threadLock = new object();
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
         private readonly IScheduledTimer _responseTimeoutTimer;
         private readonly int _responseTimeoutMS;
         private readonly IKafkaLog _log;
+        private readonly IKafkaTcpSocket _client;
+        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        private readonly SemaphoreSlim _timeoutSemaphore = new SemaphoreSlim(1, 1);
 
-        private IKafkaTcpSocket _client;
-        private bool _interrupt;
-        private int _ensureOneTimeoutThread;
+
         private int _ensureOneActiveReader;
         private int _correlationIdSeed;
 
@@ -39,8 +39,8 @@ namespace KafkaNet
         /// Initializes a new instance of the KafkaConnection class.
         /// </summary>
         /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
-        /// <param name="serverAddress">The Uri address to this kafka server.</param>
-        /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received from kafka.</param>
+        /// <param name="client">The kafka socket initialized to the kafka server.</param>
+        /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received after sending message to Kafka.</param>
         public KafkaConnection(IKafkaTcpSocket client, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
         {
             _client = client;
@@ -88,34 +88,21 @@ namespace KafkaNet
         /// <typeparam name="T">A Kafka response object return by decode function.</typeparam>
         /// <param name="request">The IKafkaRequest to send to the kafka servers.</param>
         /// <returns></returns>
-        public Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
+        public async Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
         {
             //assign unique correlationId
             request.CorrelationId = NextCorrelationId();
 
-            var tcs = new TaskCompletionSource<List<T>>();
-            var asynRequest = new AsyncRequestItem(request.CorrelationId);
-            asynRequest.ReceiveTask.Task.ContinueWith(data =>
-            {
-                try
-                {
-                    var response = request.Decode(data.Result);
-                    tcs.SetResult(response.ToList());
+            var asyncRequest = new AsyncRequestItem(request.CorrelationId);
 
-                    //TODO should we check for errors type here and throw?
-                }
-                catch (Exception ex)
-                {
-                    tcs.SetException(ex);
-                }
-            });
-
-            if (_requestIndex.TryAdd(request.CorrelationId, asynRequest) == false)
+            if (_requestIndex.TryAdd(request.CorrelationId, asyncRequest) == false)
                 throw new ApplicationException("Failed to register request for async response.");
 
-            SendAsync(request.Encode());
+            await SendAsync(request.Encode());
 
-            return tcs.Task;
+            var response = await asyncRequest.ReceiveTask.Task;
+
+            return request.Decode(response).ToList();
         }
 
         #region Equals Override...
@@ -149,18 +136,17 @@ namespace KafkaNet
                         //only allow one reader to execute, dump out all other requests
                         if (Interlocked.Increment(ref _ensureOneActiveReader) != 1) return;
 
-                        while (_interrupt == false)
+                        while (_disposeToken.Token.IsCancellationRequested == false)
                         {
                             try
                             {
-                                while (_interrupt == false)
-                                {
-                                    var messageSize = _client.ReadAsync(4).Result.ToInt32();
+                                _log.DebugFormat("Awaiting message from: {0}", KafkaUri);
+                                var messageSize = _client.ReadAsync(4, _disposeToken.Token).Result.ToInt32();
 
-                                    var message = _client.ReadAsync(messageSize).Result;
+                                _log.DebugFormat("Received message of size: {0}", messageSize);
+                                var message = _client.ReadAsync(messageSize, _disposeToken.Token).Result;
 
-                                    CorrelatePayloadToRequest(message);
-                                }
+                                CorrelatePayloadToRequest(message);
                             }
                             catch (Exception ex)
                             {
@@ -174,7 +160,7 @@ namespace KafkaNet
                     {
                         Interlocked.Decrement(ref _ensureOneActiveReader);
                     }
-                }, creationOptions: TaskCreationOptions.LongRunning);
+                }, TaskCreationOptions.LongRunning);
         }
 
         private void CorrelatePayloadToRequest(byte[] payload)
@@ -208,17 +194,18 @@ namespace KafkaNet
         {
             try
             {
-                //ensure only one thread performs this action, allow all others to pass through
-                if (Interlocked.Increment(ref _ensureOneTimeoutThread) != 1) return;
+                //only allow one response timeout checker to run at a time.
+                _timeoutSemaphore.Wait();
 
-                var timeouts = _requestIndex.Values.Where(x => x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _interrupt).ToList();
+                var timeouts = _requestIndex.Values.Where(x =>
+                    x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _disposeToken.Token.IsCancellationRequested).ToList();
 
                 foreach (var timeout in timeouts)
                 {
                     AsyncRequestItem request;
                     if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
                     {
-                        if (_interrupt) request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
+                        if (_disposeToken.Token.IsCancellationRequested) request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
 
                         request.ReceiveTask.TrySetException(new ResponseTimeoutException(
                             string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
@@ -227,7 +214,7 @@ namespace KafkaNet
             }
             finally
             {
-                Interlocked.Decrement(ref _ensureOneTimeoutThread);
+                _timeoutSemaphore.Release();
             }
         }
 
@@ -236,7 +223,7 @@ namespace KafkaNet
             using (_client)
             using (_responseTimeoutTimer)
             {
-                _interrupt = true;
+                _disposeToken.Cancel();
                 ResponseTimeoutCheck();
             }
         }
