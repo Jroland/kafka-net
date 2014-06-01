@@ -87,34 +87,21 @@ namespace KafkaNet
         /// <typeparam name="T">A Kafka response object return by decode function.</typeparam>
         /// <param name="request">The IKafkaRequest to send to the kafka servers.</param>
         /// <returns></returns>
-        public Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
+        public async Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
         {
             //assign unique correlationId
             request.CorrelationId = NextCorrelationId();
 
-            var tcs = new TaskCompletionSource<List<T>>();
-            var asynRequest = new AsyncRequestItem(request.CorrelationId);
-            asynRequest.ReceiveTask.Task.ContinueWith(data =>
-            {
-                try
-                {
-                    var response = request.Decode(data.Result);
-                    tcs.SetResult(response.ToList());
+            var asyncRequest = new AsyncRequestItem(request.CorrelationId);
 
-                    //TODO should we check for errors type here and throw?
-                }
-                catch (Exception ex)
-                {
-                    tcs.SetException(ex);
-                }
-            });
-
-            if (_requestIndex.TryAdd(request.CorrelationId, asynRequest) == false)
+            if (_requestIndex.TryAdd(request.CorrelationId, asyncRequest) == false)
                 throw new ApplicationException("Failed to register request for async response.");
 
-            SendAsync(request.Encode());
+            await SendAsync(request.Encode());
 
-            return tcs.Task;
+            var response = await asyncRequest.ReceiveTask.Task;
+
+            return request.Decode(response).ToList();
         }
 
         #region Equals Override...
