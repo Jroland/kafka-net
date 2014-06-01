@@ -20,13 +20,13 @@ namespace KafkaNet
     {
         private readonly ConsumerOptions _options;
         private readonly BlockingCollection<Message> _fetchResponseQueue;
+        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
         private readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
         private readonly IScheduledTimer _topicPartitionQueryTimer;
 
         private int _ensureOneThread;
         private Topic _topic;
-        private bool _interrupted;
 
         public Consumer(ConsumerOptions options, params OffsetPosition[] positions)
             : base(options.Router)
@@ -122,7 +122,7 @@ namespace KafkaNet
         {
             return Task.Factory.StartNew(() =>
             {
-                while (_interrupted == false)
+                while (_disposeToken.IsCancellationRequested == false)
                 {
                     try
                     {
@@ -156,7 +156,9 @@ namespace KafkaNet
                             {
                                 foreach (var message in response.Messages)
                                 {
-                                    _fetchResponseQueue.TryAdd(message);
+                                    _fetchResponseQueue.Add(message, _disposeToken.Token);
+
+                                    if (_disposeToken.IsCancellationRequested) continue;
                                 }
 
                                 _partitionOffsetIndex.AddOrUpdate(partitionId, i => response.HighWaterMark, (i, l) => response.HighWaterMark);
@@ -181,9 +183,10 @@ namespace KafkaNet
         public new void Dispose()
         {
             base.Dispose();
+            _disposeToken.Cancel();
             using (_topicPartitionQueryTimer)
             {
-                _interrupted = true;
+                
             }
         }
     }
