@@ -10,9 +10,8 @@ using KafkaNet.Protocol;
 namespace KafkaNet
 {
     /// <summary>
-    /// The TcpSocket provides an abstraction from the main driver from having to handle connection to and reconnections from a server.
-    /// The interface is limited to Read stuff from server or write stuff to server.  All connection and reconnect details are handled 
-    /// internally.
+    /// The TcpSocket provides an abstraction from the main driver from having to handle connection to and reconnections with a server.
+    /// The interface is intentionally limited to only read/write.  All connection and reconnect details are handled internally.
     /// </summary>
     public class KafkaTcpSocket : IKafkaTcpSocket
     {
