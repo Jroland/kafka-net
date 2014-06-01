@@ -6,7 +6,7 @@ namespace kafka_tests.Helpers
 {
     public static class TaskTest
     {
-        public static bool WaitFor(Func<bool> predicate, int milliSeconds = 1000)
+        public static bool WaitFor(Func<bool> predicate, int milliSeconds = 3000)
         {
             var sw = Stopwatch.StartNew();
             while (predicate() != true)

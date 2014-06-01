@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Linq;
 using System.Text;
+using System.Net.Sockets;
+using System.Threading.Tasks;
+using System.Threading;
 
 namespace KafkaNet.Common
 {
@@ -74,5 +77,7 @@ namespace KafkaNet.Common
         {
             return BitConverter.ToInt32(value.Reverse().ToArray(), 0);
         }
+
+        
     }
 }

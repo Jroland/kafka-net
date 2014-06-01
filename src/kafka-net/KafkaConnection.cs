@@ -2,7 +2,6 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
@@ -23,35 +22,36 @@ namespace KafkaNet
     {
         private const int DefaultResponseTimeoutMs = 30000;
 
-        private readonly object _threadLock = new object();
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
         private readonly IScheduledTimer _responseTimeoutTimer;
         private readonly int _responseTimeoutMS;
         private readonly IKafkaLog _log;
-        private readonly Uri _kafkaUri;
+        private readonly IKafkaTcpSocket _client;
+        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        private readonly SemaphoreSlim _timeoutSemaphore = new SemaphoreSlim(1, 1);
 
-        private TcpClient _client;
-        private bool _interrupt;
-        private int _ensureOneThread;
-        private int _readerActive;
+
+        private int _ensureOneActiveReader;
         private int _correlationIdSeed;
 
         /// <summary>
         /// Initializes a new instance of the KafkaConnection class.
         /// </summary>
         /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
-        /// <param name="serverAddress">The Uri address to this kafka server.</param>
-        /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received from kafka.</param>
-        public KafkaConnection(Uri serverAddress, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
+        /// <param name="client">The kafka socket initialized to the kafka server.</param>
+        /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received after sending message to Kafka.</param>
+        public KafkaConnection(IKafkaTcpSocket client, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
         {
+            _client = client;
             _log = log ?? new DefaultTraceLog();
-            _kafkaUri = serverAddress;
             _responseTimeoutMS = responseTimeoutMs;
             _responseTimeoutTimer = new ScheduledTimer()
                 .Do(ResponseTimeoutCheck)
                 .Every(TimeSpan.FromMilliseconds(100))
                 .StartingAt(DateTime.Now.AddMilliseconds(_responseTimeoutMS))
                 .Begin();
+
+            StartReadStreamPoller();
         }
 
         /// <summary>
@@ -59,7 +59,7 @@ namespace KafkaNet
         /// </summary>
         public bool ReadPolling
         {
-            get { return _readerActive >= 1; }
+            get { return _ensureOneActiveReader >= 1; }
         }
 
         /// <summary>
@@ -67,7 +67,7 @@ namespace KafkaNet
         /// </summary>
         public Uri KafkaUri
         {
-            get { return _kafkaUri; }
+            get { return _client.ClientUri; }
         }
 
         /// <summary>
@@ -77,7 +77,7 @@ namespace KafkaNet
         /// <returns>Task which signals the completion of the upload of data to the server.</returns>
         public Task SendAsync(byte[] payload)
         {
-            return GetStream().WriteAsync(payload, 0, payload.Length);
+            return _client.WriteAsync(payload, 0, payload.Length);
         }
 
 
@@ -115,86 +115,51 @@ namespace KafkaNet
 
         protected bool Equals(KafkaConnection other)
         {
-            return Equals(_kafkaUri, other._kafkaUri);
+            return Equals(KafkaUri, other.KafkaUri);
         }
 
         public override int GetHashCode()
         {
-            return (_kafkaUri != null ? _kafkaUri.GetHashCode() : 0);
+            return (KafkaUri != null ? KafkaUri.GetHashCode() : 0);
         }
         #endregion
 
-        private byte[] Read(int size, NetworkStream stream)
-        {
-            var buffer = new byte[size];
-            stream.Read(buffer, 0, size);
-            return buffer;
-        }
-
-        private TcpClient GetClient()
-        {
-            if (_client == null || _client.Connected == false || ReadPolling == false)
-            {
-                lock (_threadLock)
-                {
-                    if (_client == null || _client.Connected == false)
-                    {
-                        _client = new TcpClient();
-                        _client.Connect(_kafkaUri.Host, _kafkaUri.Port);
-                    }
-
-                    if (ReadPolling == false) StartReadSteamPoller();
-                }
-            }
-            return _client;
-        }
-
-        private NetworkStream GetStream()
-        {
-            var client = GetClient();
-            return client.GetStream();
-        }
-
-        private void StartReadSteamPoller()
+        private void StartReadStreamPoller()
         {
             //This thread will poll the receive stream for data, parce a message out
             //and trigger an event with the message payload
             Task.Factory.StartNew(() =>
                 {
-                    while (_interrupt == false)
+                    try
                     {
-                        try
+                        //only allow one reader to execute, dump out all other requests
+                        if (Interlocked.Increment(ref _ensureOneActiveReader) != 1) return;
+
+                        while (_disposeToken.Token.IsCancellationRequested == false)
                         {
-                            //only allow one reader to execute
-                            if (Interlocked.Increment(ref _readerActive) > 1) return;
-
-                            var stream = GetStream();
-                            while (_interrupt == false)
+                            try
                             {
-                                while (stream.DataAvailable)
-                                {
-                                    //get message size
-                                    var size = Read(4, stream).ToInt32();
+                                _log.DebugFormat("Awaiting message from: {0}", KafkaUri);
+                                var messageSize = _client.ReadAsync(4, _disposeToken.Token).Result.ToInt32();
 
-                                    //load message and fire event with payload
-                                    CorrelatePayloadToRequest(Read(size, stream));
-                                }
+                                _log.DebugFormat("Received message of size: {0}", messageSize);
+                                var message = _client.ReadAsync(messageSize, _disposeToken.Token).Result;
 
-                                Thread.Sleep(100);
+                                CorrelatePayloadToRequest(message);
+                            }
+                            catch (Exception ex)
+                            {
+                                //TODO being in sync with the byte order on read is important.  What happens if this exception causes us to be out of sync?
+                                //record exception and continue to scan for data.
+                                _log.ErrorFormat("Exception occured in polling read thread.  Exception={0}", ex);
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            //TODO being in sync with the byte order on read is important.  What happens if this exception causes us to be out of sync?
-                            //record exception and continue to scan for data.
-                            _log.ErrorFormat("Exception occured in polling read thread.  Exception={0}", ex);
-                        }
-                        finally
-                        {
-                            Interlocked.Decrement(ref _readerActive);
-                        }
                     }
-                });
+                    finally
+                    {
+                        Interlocked.Decrement(ref _ensureOneActiveReader);
+                    }
+                }, TaskCreationOptions.LongRunning);
         }
 
         private void CorrelatePayloadToRequest(byte[] payload)
@@ -228,17 +193,18 @@ namespace KafkaNet
         {
             try
             {
-                //ensure only one thread performs this action, allow all others to pass through
-                if (Interlocked.Increment(ref _ensureOneThread) != 1) return;
+                //only allow one response timeout checker to run at a time.
+                _timeoutSemaphore.Wait();
 
-                var timeouts = _requestIndex.Values.Where(x => x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _interrupt).ToList();
+                var timeouts = _requestIndex.Values.Where(x =>
+                    x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _disposeToken.Token.IsCancellationRequested).ToList();
 
                 foreach (var timeout in timeouts)
                 {
                     AsyncRequestItem request;
                     if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
                     {
-                        if (_interrupt) request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
+                        if (_disposeToken.Token.IsCancellationRequested) request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
 
                         request.ReceiveTask.TrySetException(new ResponseTimeoutException(
                             string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
@@ -247,7 +213,7 @@ namespace KafkaNet
             }
             finally
             {
-                Interlocked.Decrement(ref _ensureOneThread);
+                _timeoutSemaphore.Release();
             }
         }
 
@@ -256,9 +222,8 @@ namespace KafkaNet
             using (_client)
             using (_responseTimeoutTimer)
             {
-                _interrupt = true;
+                _disposeToken.Cancel();
                 ResponseTimeoutCheck();
-                if (_client != null) using (_client.GetStream()) { }
             }
         }
 
