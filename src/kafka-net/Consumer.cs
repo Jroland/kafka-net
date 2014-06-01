@@ -156,7 +156,7 @@ namespace KafkaNet
                             {
                                 foreach (var message in response.Messages)
                                 {
-                                    _fetchResponseQueue.TryAdd(message);
+                                    TryAddToCollectionUntilOk(message, 0);
                                 }
 
                                 _partitionOffsetIndex.AddOrUpdate(partitionId, i => response.HighWaterMark, (i, l) => response.HighWaterMark);
@@ -176,6 +176,21 @@ namespace KafkaNet
                     }
                 }
             });
+        }
+
+
+        /// <summary>
+        /// Will try to add the the blockedcollection until it actually manages to add it.  Will retry 1000 times, and then 
+        /// </summary>
+        /// <param name="message"></param>
+        /// <param name="start"></param>
+        private void TryAddToCollectionUntilOk(Message message, Int32 start)
+        {
+            if (_fetchResponseQueue.TryAdd(message))
+                return;
+            if (start > 1000)
+                throw new SystemException("Could not add to collection");
+            TryAddToCollectionUntilOk(message, start + 1);
         }
 
         public new void Dispose()
