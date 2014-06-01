@@ -1,8 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Common;
@@ -31,6 +28,30 @@ namespace kafka_tests.Unit
             _kernel = new MoqMockingKernel();
         }
 
+        #region Construct...
+        [Test]
+        public void ShouldStartReadPollingOnConstruction()
+        {
+            using (var socket = new KafkaTcpSocket(_log, new Uri("http://localhost:8999")))
+            using (var conn = new KafkaConnection(socket, log: _log))
+            {
+                TaskTest.WaitFor(() => conn.ReadPolling);
+                Assert.That(conn.ReadPolling, Is.True);
+            }
+        }
+
+        [Test]
+        public void ShouldReportServerUriOnConstruction()
+        {
+            var expectedUrl = new Uri("http://localhost:8999");
+            using (var socket = new KafkaTcpSocket(_log, expectedUrl))
+            using (var conn = new KafkaConnection(socket, log: _log))
+            {
+                Assert.That(conn.KafkaUri, Is.EqualTo(expectedUrl));
+            }
+        }
+        #endregion
+
         #region Dispose Tests...
         [Test]
         public void ShouldDisposeWithoutExceptionThrown()
@@ -41,6 +62,18 @@ namespace kafka_tests.Unit
                 var conn = new KafkaConnection(socket, log: _log);
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 using (conn) { }
+            }
+        }
+
+        [Test]
+        public void ShouldDisposeWithoutExceptionEvenWhileCallingSendAsync()
+        {
+            using (var socket = new KafkaTcpSocket(_log, new Uri("http://localhost:8999")))
+            using (var conn = new KafkaConnection(socket, log: _log))
+            {
+                var task = conn.SendAsync(new MetadataRequest());
+                task.Wait(TimeSpan.FromMilliseconds(1000));
+                Assert.That(task.IsCompleted, Is.False, "The send task should still be pending.");
             }
         }
         #endregion
