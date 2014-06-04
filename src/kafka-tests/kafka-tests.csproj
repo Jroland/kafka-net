@@ -60,13 +60,15 @@
     <Compile Include="Fakes\BrokerRouterProxy.cs" />
     <Compile Include="Fakes\FakeKafkaConnection.cs" />
     <Compile Include="Fakes\FakeTcpServer.cs" />
+    <Compile Include="Helpers\IntegrationConfig.cs" />
+    <Compile Include="Helpers\MessageHelper.cs" />
     <Compile Include="Helpers\TaskTest.cs" />
     <Compile Include="Integration\GzipProducerConsumerTests.cs" />
     <Compile Include="Unit\FakeTcpServerTests.cs" />
     <Compile Include="Unit\KafkaConnectionTests.cs" />
     <Compile Include="Unit\KafkaTcpSocketTests.cs" />
     <Compile Include="Integration\ProducerConsumerTests.cs" />
-    <Compile Include="Integration\KafkaConnectionTests.cs" />
+    <Compile Include="Integration\KafkaConnectionIntegrationTests.cs" />
     <Compile Include="RequestFactory.cs" />
     <Compile Include="Unit\BrokerRouterTests.cs" />
     <Compile Include="Unit\CommonQueriesTests.cs" />
