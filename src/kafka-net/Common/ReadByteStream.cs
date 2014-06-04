@@ -29,6 +29,11 @@ namespace KafkaNet.Common
         public long Position { get { return _stream.Position; } set { _stream.Position = 0; } }
         public bool HasData { get { return _stream.Position < _stream.Length; } }
 
+        public bool Available(int dataSize)
+        {
+            return (_stream.Length - _stream.Position) >= dataSize;
+        }
+
         public byte ReadByte()
         {
             return ReadBytes(1).First();
@@ -95,11 +100,9 @@ namespace KafkaNet.Common
 
         public byte[] ReadBytesFromStream(int size)
         {
-            var bytesLeft = Convert.ToInt32(Math.Min(size, _stream.Length - _stream.Position));
+            var buffer = new byte[size];
 
-            var buffer = new byte[bytesLeft];
-
-            _stream.Read(buffer, 0, bytesLeft);
+            _stream.Read(buffer, 0, size);
 
             return buffer;
         }
