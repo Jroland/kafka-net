@@ -2,6 +2,7 @@
 using KafkaNet;
 using KafkaNet.Protocol;
 using NUnit.Framework;
+using kafka_tests.Helpers;
 
 
 namespace kafka_tests
@@ -66,6 +67,15 @@ namespace kafka_tests
             var result = Message.EncodeMessageSet(messages);
 
             Assert.That(expected, Is.EqualTo(result));
+        }
+
+        [Test]
+        public void DecodeMessageSetShouldHandleResponseWithMaxBufferSizeHit()
+        {
+            //This message set has a truncated message bytes at the end of it
+            var result = Message.DecodeMessageSet(MessageHelper.FetchResponseMaxBytesOverflow).ToList();
+            
+            Assert.That(result.Count, Is.EqualTo(529));
         }
     }
 }

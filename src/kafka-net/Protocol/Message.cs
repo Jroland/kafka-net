@@ -29,6 +29,7 @@ namespace KafkaNet.Protocol
     /// </summary>
     public class Message
     {
+        private const int MinimumMessageSize = 12;
         private static readonly Crc32 Crc32 = new Crc32();
 
         /// <summary>
@@ -78,10 +79,22 @@ namespace KafkaNet.Protocol
         public static IEnumerable<Message> DecodeMessageSet(byte[] messageSet)
         {
             var stream = new ReadByteStream(messageSet);
+
+
             while (stream.HasData)
             {
+                //if the message set hits against our max bytes wall on the fetch we will have a 1/2 completed message downloaded.
+                //the decode should guard against this situation
+                if (stream.Available(MinimumMessageSize) == false)
+                    yield break;
+
                 var offset = stream.ReadLong();
-                foreach (var message in DecodeMessage(offset, stream.ReadIntPrefixedBytes()))
+                var messageSize = stream.ReadInt();
+
+                if (stream.Available(messageSize) == false)
+                    yield break;
+
+                foreach (var message in DecodeMessage(offset, stream.ReadBytesFromStream(messageSize)))
                 {
                     yield return message;
                 }
