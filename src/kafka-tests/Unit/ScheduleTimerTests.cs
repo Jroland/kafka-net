@@ -109,23 +109,7 @@ namespace kafka_tests
 
             Assert.That(sut.TimerObject.Interval, Is.EqualTo(1));
         }
-
-        //[Test]
-        //public void StartingWithNoIntervalShouldCallTimerObjectElapsedOnce()
-        //{
-        //    var sut = new ScheduledTimer();
-
-        //    var counter = 0;
-        //    sut.Do(() => counter++).StartingAt(DateTime.Now);
-
-        //    sut.Begin();
-
-        //    // Give the timer some time for multiple intervals
-        //    Thread.Sleep(2000);
-
-        //    Assert.That(counter, Is.EqualTo(1));
-        //}
-
+        
         [Test]
         public void SetReplicationIntervalShouldUpdateTheTimerIntervalAndAutoResetAccordingly()
         {
@@ -275,6 +259,7 @@ namespace kafka_tests
         }
 
         [Test]
+        [Ignore("Not using this feature.")]
         public void TimerShouldNotWaitWhenSet()
         {
             int count = 0;
