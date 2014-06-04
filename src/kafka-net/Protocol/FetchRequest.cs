@@ -22,6 +22,7 @@ namespace KafkaNet.Protocol
         /// Defines how many bytes should be available before returning data. A value of 0 indicate a no blocking command.
         /// </summary>
         public int MinBytes = DefaultMinBlockingByteBufferSize;
+
         public List<Fetch> Fetches { get; set; }
 
         public byte[] Encode()
@@ -102,21 +103,43 @@ namespace KafkaNet.Protocol
             MaxBytes = FetchRequest.DefaultMinBlockingByteBufferSize * 8;
         }
 
+        /// <summary>
+        /// The name of the topic.
+        /// </summary>
         public string Topic { get; set; }
-
+        /// <summary>
+        /// The id of the partition the fetch is for.
+        /// </summary>
         public int PartitionId { get; set; }
-
+        /// <summary>
+        /// The offset to begin this fetch from.
+        /// </summary>
         public long Offset { get; set; }
-
+        /// <summary>
+        /// The maximum bytes to include in the message set for this partition. This helps bound the size of the response.
+        /// </summary>
         public int MaxBytes { get; set; }
     }
 
     public class FetchResponse
     {
+        /// <summary>
+        /// The name of the topic this response entry is for.
+        /// </summary>
         public string Topic { get; set; }
+        /// <summary>
+        /// The id of the partition this response is for.
+        /// </summary>
         public int PartitionId { get; set; }
+        /// <summary>
+        /// Error code of exception that occured during the request.  Zero if no error.
+        /// </summary>
         public Int16 Error { get; set; }
+        /// <summary>
+        /// The offset at the end of the log for this partition. This can be used by the client to determine how many messages behind the end of the log they are.
+        /// </summary>
         public long HighWaterMark { get; set; }
+
         public List<Message> Messages { get; set; }
 
         public FetchResponse()
