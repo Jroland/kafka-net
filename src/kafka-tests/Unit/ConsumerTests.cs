@@ -72,7 +72,7 @@ namespace kafka_tests.Unit
         public void ConsumerWithEmptyWhitelistShouldConsumeAllPartition()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int>();
