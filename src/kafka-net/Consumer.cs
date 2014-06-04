@@ -126,6 +126,7 @@ namespace KafkaNet
                 {
                     try
                     {
+                        //get the current offset, or default to zero if not there.
                         long offset = 0;
                         _partitionOffsetIndex.AddOrUpdate(partitionId, i => offset, (i, l) => { offset = l; return l; });
 
@@ -158,7 +159,7 @@ namespace KafkaNet
                                 {
                                     _fetchResponseQueue.Add(message, _disposeToken.Token);
 
-                                    if (_disposeToken.IsCancellationRequested) continue;
+                                    if (_disposeToken.IsCancellationRequested) return;
                                 }
 
                                 _partitionOffsetIndex.AddOrUpdate(partitionId, i => response.HighWaterMark, (i, l) => response.HighWaterMark);
