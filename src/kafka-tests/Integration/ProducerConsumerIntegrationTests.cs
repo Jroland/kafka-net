@@ -24,7 +24,7 @@ namespace kafka_tests.Integration
             using (var producer = new Producer(router, maxAsync))
             {
                 var tasks = new Task<List<ProduceResponse>>[amount];
-                
+
                 for (var i = 0; i < amount; i++)
                 {
                     tasks[i] = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message { Value = Guid.NewGuid().ToString() } });
@@ -93,11 +93,11 @@ namespace kafka_tests.Integration
 
                     //ensure the produced messages arrived
                     Console.WriteLine("Message order:  {0}", string.Join(", ", sentMessages.Select(x => x.Value).ToList()));
-                    
+
                     Assert.That(sentMessages.Count, Is.EqualTo(20));
                     Assert.That(sentMessages.Select(x => x.Value).ToList(), Is.EqualTo(expected));
                     Assert.That(sentMessages.Any(x => x.Key != testId), Is.False);
-                    
+
                     //seek back to initial offset
                     consumer.SetOffsetPosition(offsets);
 
@@ -105,7 +105,7 @@ namespace kafka_tests.Integration
 
                     //ensure all produced messages arrive again
                     Console.WriteLine("Message order:  {0}", string.Join(", ", resetPositionMessages.Select(x => x.Value).ToList()));
-                    
+
                     Assert.That(resetPositionMessages.Count, Is.EqualTo(20));
                     Assert.That(resetPositionMessages.Select(x => x.Value).ToList(), Is.EqualTo(expected));
                     Assert.That(resetPositionMessages.Any(x => x.Key != testId), Is.False);
@@ -172,6 +172,39 @@ namespace kafka_tests.Integration
                         Assert.That(result.Key, Is.EqualTo(testId));
                         Assert.That(result.Value, Is.EqualTo(i.ToString()));
                     }
+                }
+            }
+        }
+
+
+        [Test]
+        public void ConsumerShouldMoveToNextAvailableOffsetWhenQueryingForNextMessage()
+        {
+            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
+            using (var producer = new Producer(router))
+            {
+                var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
+                Assert.That(offsets.Count, Is.EqualTo(2), "This test requires there to be exactly two paritions.");
+                Assert.That(offsets.Count(x => x.Offsets.Max(o => o) > 1000), Is.EqualTo(2), "Need more than 1000 messages in each topic for this test to work.");
+
+                //set offset 1000 messages back on one partition.  We should be able to get all 1000 messages over multiple calls.
+                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router),
+                     offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max() - 1000)).ToArray()))
+                {
+                    var data = new List<Message>();
+
+                    var stream = consumer.Consume();
+
+                    var takeTask = Task.Factory.StartNew(() => data.AddRange(stream.Take(2000)));
+
+                    takeTask.Wait(TimeSpan.FromSeconds(10));
+
+                    var consumerOffset = consumer.GetOffsetPosition().OrderBy(x => x.Offset).ToList();
+                    var serverOffset = offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).OrderBy(x => x.Offset).ToList();
+
+                    Assert.That(consumerOffset, Is.EqualTo(serverOffset), "The consumerOffset position should match the server offset position.");
+                    Assert.That(data.Count, Is.EqualTo(2000), "We should have received 2000 messages from the server.");
+
                 }
             }
         }

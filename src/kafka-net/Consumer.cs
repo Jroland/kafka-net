@@ -162,7 +162,8 @@ namespace KafkaNet
                                     if (_disposeToken.IsCancellationRequested) return;
                                 }
 
-                                _partitionOffsetIndex.AddOrUpdate(partitionId, i => response.HighWaterMark, (i, l) => response.HighWaterMark);
+                                var nextOffset = response.Messages.Max(x => x.Meta.Offset) + 1;
+                                _partitionOffsetIndex.AddOrUpdate(partitionId, i => nextOffset, (i, l) => nextOffset);
 
                                 // sleep is not needed if responses were received
                                 continue;
