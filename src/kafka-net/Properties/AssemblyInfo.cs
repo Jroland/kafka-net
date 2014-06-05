@@ -8,10 +8,10 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyProductAttribute("kafka-net")]
 [assembly: AssemblyCompanyAttribute("James Roland")]
 [assembly: AssemblyCopyrightAttribute("Copyright James Roland 2014")]
-[assembly: AssemblyVersionAttribute("0.8.0.20")]
-[assembly: AssemblyFileVersionAttribute("0.8.0.20")]
+[assembly: AssemblyVersionAttribute("0.8.0.23")]
+[assembly: AssemblyFileVersionAttribute("0.8.0.23")]
 namespace System {
     internal static class AssemblyVersionInformation {
-        internal const string Version = "0.8.0.20";
+        internal const string Version = "0.8.0.23";
     }
 }
