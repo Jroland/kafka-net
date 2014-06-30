@@ -67,6 +67,9 @@ Provides a higher level class which will consumer messages from a whitelist of p
 
 Status
 -----------
+[![Build status](https://ci.appveyor.com/api/projects/status/3tg02biqn5q8uijy)](https://ci.appveyor.com/project/Jroland/kafka-net)
+
+
 The current version of this project is a functioning "work in progress" as it was only started in early February.  The wire protocol is complete except for Offset Commits to the servers (as there is a bug in 0.8.0 which prevents testing of this feature).  The library is functioning in that there is a complete Producer and Consumer class thus messages can pass to and from a Kafka server.  
 
 ##### The major items that needs work are:
