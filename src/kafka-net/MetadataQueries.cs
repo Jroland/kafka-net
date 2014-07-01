@@ -8,13 +8,12 @@ namespace KafkaNet
 {
     /// <summary>
     /// This class provides a set of common queries that are useful for both the Consumer and Producer classes.  
-    /// Both those classes derive from this base class simply to expose these metadata query methods.
     /// </summary>
-    public class CommonQueries : IDisposable
+    public class MetadataQueries : IMetadataQueries
     {
         private readonly IBrokerRouter _brokerRouter;
 
-        public CommonQueries(IBrokerRouter brokerRouter)
+        public MetadataQueries(IBrokerRouter brokerRouter)
         {
             _brokerRouter = brokerRouter;
         }
@@ -70,7 +69,6 @@ namespace KafkaNet
 
             return response.First();
         }
-
 
         public void Dispose()
         {

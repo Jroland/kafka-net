@@ -16,7 +16,7 @@ namespace KafkaNet
     /// TODO: provide automatic offset saving when the feature is available in 0.8.2
     /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
     /// </summary>
-    public class Consumer : CommonQueries
+    public class Consumer : IMetadataQueries, IDisposable
     {
         private readonly ConsumerOptions _options;
         private readonly BlockingCollection<Message> _fetchResponseQueue;
@@ -24,20 +24,21 @@ namespace KafkaNet
         private readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
         private readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
         private readonly IScheduledTimer _topicPartitionQueryTimer;
+        private readonly IMetadataQueries _metadataQueries;
 
         private int _ensureOneThread;
         private Topic _topic;
 
         public Consumer(ConsumerOptions options, params OffsetPosition[] positions)
-            : base(options.Router)
         {
             _options = options;
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
+            _metadataQueries = new MetadataQueries(_options.Router);
 
             //this timer will periodically look for new partitions and automatically add them to the consuming queue
             //using the same whitelist logic
             _topicPartitionQueryTimer = new ScheduledTimer()
-                .Do(RefreshTopicPartition)
+                .Do(RefreshTopicPartitions)
                 .Every(TimeSpan.FromMilliseconds(_options.TopicPartitionQueryTimeMs))
                 .StartingAt(DateTime.Now);
 
@@ -55,6 +56,7 @@ namespace KafkaNet
         /// <returns>Blocking enumberable of messages from Kafka.</returns>
         public IEnumerable<Message> Consume(CancellationToken? cancellationToken = null)
         {
+            _options.Log.DebugFormat("Consumer: Beginning consumption of topic: {0}", _options.Topic);
             _topicPartitionQueryTimer.Begin();
 
             return _fetchResponseQueue.GetConsumingEnumerable(cancellationToken ?? new CancellationToken(false));
@@ -83,12 +85,13 @@ namespace KafkaNet
             return _partitionOffsetIndex.Select(x => new OffsetPosition { PartitionId = x.Key, Offset = x.Value }).ToList();
         }
 
-        private void RefreshTopicPartition()
+        private void RefreshTopicPartitions() 
         {
             try
             {
                 if (Interlocked.Increment(ref _ensureOneThread) == 1)
                 {
+                    _options.Log.DebugFormat("Consumer: Refreshing partitions for topic: {0}", _options.Topic);
                     var topic = _options.Router.GetTopicMetadata(_options.Topic);
                     if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
                     _topic = topic.First();
@@ -116,22 +119,23 @@ namespace KafkaNet
             }
         }
 
-        
-
         private Task ConsumeTopicPartitionAsync(string topic, int partitionId)
         {
             return Task.Factory.StartNew(() =>
             {
-                while (_disposeToken.IsCancellationRequested == false)
+                try
                 {
-                    try
+                    _options.Log.DebugFormat("Consumer: Creating polling task for topic: {0} on parition: {1}", topic, partitionId);
+                    while (_disposeToken.IsCancellationRequested == false)
                     {
-                        //get the current offset, or default to zero if not there.
-                        long offset = 0;
-                        _partitionOffsetIndex.AddOrUpdate(partitionId, i => offset, (i, l) => { offset = l; return l; });
+                        try
+                        {
+                            //get the current offset, or default to zero if not there.
+                            long offset = 0;
+                            _partitionOffsetIndex.AddOrUpdate(partitionId, i => offset, (i, currentOffset) => { offset = currentOffset; return currentOffset; });
 
-                        //build fetch for each item in the batchSize
-                        var fetches = new List<Fetch>
+                            //build a fetch request for partition at offset
+                            var fetches = new List<Fetch>
                                     {
                                         new Fetch
                                             {
@@ -141,55 +145,71 @@ namespace KafkaNet
                                             }
                                     };
 
-                        var fetchRequest = new FetchRequest
-                            {
-                                Fetches = fetches
-                            };
-
-                        //make request and post to queue
-                        var route = _options.Router.SelectBrokerRoute(topic, partitionId);
-                        var responses = route.Connection.SendAsync(fetchRequest).Result;
-
-                        if (responses.Count > 0)
-                        {
-                            var response = responses.FirstOrDefault(); //we only asked for one response
-                            if (response != null && response.Messages.Count > 0)
-                            {
-                                foreach (var message in response.Messages)
+                            var fetchRequest = new FetchRequest
                                 {
-                                    _fetchResponseQueue.Add(message, _disposeToken.Token);
+                                    Fetches = fetches
+                                };
 
-                                    if (_disposeToken.IsCancellationRequested) return;
+                            //make request and post to queue
+                            var route = _options.Router.SelectBrokerRoute(topic, partitionId);
+                            var responses = route.Connection.SendAsync(fetchRequest).Result;
+
+                            if (responses.Count > 0)
+                            {
+                                var response = responses.FirstOrDefault(); //we only asked for one response
+                                if (response != null && response.Messages.Count > 0)
+                                {
+                                    foreach (var message in response.Messages)
+                                    {
+                                        _fetchResponseQueue.Add(message, _disposeToken.Token);
+
+                                        if (_disposeToken.IsCancellationRequested) return;
+                                    }
+
+                                    var nextOffset = response.Messages.Max(x => x.Meta.Offset) + 1;
+                                    _partitionOffsetIndex.AddOrUpdate(partitionId, i => nextOffset, (i, l) => nextOffset);
+
+                                    // sleep is not needed if responses were received
+                                    continue;
                                 }
-
-                                var nextOffset = response.Messages.Max(x => x.Meta.Offset) + 1;
-                                _partitionOffsetIndex.AddOrUpdate(partitionId, i => nextOffset, (i, l) => nextOffset);
-
-                                // sleep is not needed if responses were received
-                                continue;
                             }
-                        }
 
-                        //no message received from server wait a while before we try another long poll
-                        //TODO : allow this delay to be configurable
-                        Thread.Sleep(100);
+                            //no message received from server wait a while before we try another long poll
+                            //TODO : allow this delay to be configurable
+                            Thread.Sleep(100);
+                        }
+                        catch (Exception ex)
+                        {
+                            _options.Log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        _options.Log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
-                    }
+                }
+                finally
+                {
+                    _options.Log.DebugFormat("Consumer: Disabling polling task for topic: {0} on parition: {1}", topic, partitionId);
+                    Task tempTask;
+                    _partitionPollingIndex.TryRemove(partitionId, out tempTask);
                 }
             });
         }
 
-        public new void Dispose()
+        public Topic GetTopic(string topic)
         {
-            base.Dispose();
+            return _metadataQueries.GetTopic(topic);
+        }
+
+        public Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
+        {
+            return _metadataQueries.GetTopicOffsetAsync(topic, maxOffsets, time);
+        }
+
+        public void Dispose()
+        {
+            _options.Log.DebugFormat("Consumer: Disposing...");
             _disposeToken.Cancel();
             using (_topicPartitionQueryTimer)
-            {
-                
-            }
+            using (_metadataQueries)
+            { }
         }
     }
 }

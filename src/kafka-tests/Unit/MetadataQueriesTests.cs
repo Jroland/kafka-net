@@ -13,7 +13,7 @@ namespace kafka_tests.Unit
 {
     [TestFixture]
     [Category("Unit")]
-    public class CommonQueriesTest
+    public class MetadataQueriesTest
     {
         private MoqMockingKernel _kernel;
 
@@ -29,7 +29,7 @@ namespace kafka_tests.Unit
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
-            var common = new CommonQueries(router);
+            var common = new MetadataQueries(router);
 
             var result = common.GetTopicOffsetAsync(BrokerRouterProxy.TestTopic).Result;
             Assert.That(routerProxy.BrokerConn0.OffsetRequestCallCount, Is.EqualTo(1));
@@ -42,7 +42,7 @@ namespace kafka_tests.Unit
             var routerProxy = new BrokerRouterProxy(_kernel);
             routerProxy.BrokerConn0.OffsetResponseFunction = () => { throw new ApplicationException("test 99"); };
             var router = routerProxy.Create();
-            var common = new CommonQueries(router);
+            var common = new MetadataQueries(router);
 
             common.GetTopicOffsetAsync(BrokerRouterProxy.TestTopic).ContinueWith(t =>
             {
@@ -58,7 +58,7 @@ namespace kafka_tests.Unit
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
-            var common = new CommonQueries(router);
+            var common = new MetadataQueries(router);
 
             var result = common.GetTopic(BrokerRouterProxy.TestTopic);
             Assert.That(result.Name, Is.EqualTo(BrokerRouterProxy.TestTopic));
@@ -70,7 +70,7 @@ namespace kafka_tests.Unit
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
-            var common = new CommonQueries(router);
+            var common = new MetadataQueries(router);
 
             common.GetTopic("MissingTopic");
         }
@@ -81,7 +81,7 @@ namespace kafka_tests.Unit
         public void EnsureCommonQueriesDisposesRouter()
         {
             var router = _kernel.GetMock<IBrokerRouter>();
-            var common = new CommonQueries(router.Object);
+            var common = new MetadataQueries(router.Object);
             using (common) { }
             router.Verify(x => x.Dispose(), Times.Once());
         }
