@@ -180,6 +180,7 @@ namespace kafka_tests.Integration
         [Test]
         public void ConsumerShouldMoveToNextAvailableOffsetWhenQueryingForNextMessage()
         {
+        	SendAsyncShouldHandleHighVolumeOfMessages(1000, -1);
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
             using (var producer = new Producer(router))
             {
