@@ -10,7 +10,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("TP")]
 [assembly: AssemblyProduct("kafka-tests")]
-[assembly: AssemblyCopyright("Copyright © TP 2014")]
+[assembly: AssemblyCopyright("Copyright © James Roland 2014")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
