@@ -16,6 +16,6 @@
     <tags>C# Apache Kafka</tags>
   </metadata>
   <files>
-    <file src="lib\*" target="lib\net45" />
+    <file src="bin\*" target="lib\net45" />
   </files>
 </package>
