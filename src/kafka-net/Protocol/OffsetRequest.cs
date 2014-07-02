@@ -5,6 +5,9 @@ using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
+	/// <summary>
+	/// A funky Protocol for requesting the starting offset of each segment for the requested partition 
+	/// </summary>
     public class OffsetRequest : BaseRequest, IKafkaRequest<OffsetResponse>
     {
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Offset; } }

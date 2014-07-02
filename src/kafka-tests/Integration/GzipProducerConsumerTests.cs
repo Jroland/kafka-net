@@ -54,9 +54,10 @@ namespace kafka_tests.Integration
 
             var response = conn.Connection.SendAsync(request).Result;
             Assert.That(response.First().Error, Is.EqualTo(0));
+            
+            EnsureGzipCanDecompressMessageFromKafka();
         }
 
-        [Test]
         public void EnsureGzipCanDecompressMessageFromKafka()
         {
             var producer = new Producer(_router);
@@ -72,6 +73,9 @@ namespace kafka_tests.Integration
             {
                 Assert.That(results[i].Value, Is.EqualTo(i.ToString()));
             }
+            
+            using (producer){}
+            using (consumer){}
         }
     }
 }
