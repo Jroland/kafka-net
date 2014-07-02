@@ -5,7 +5,7 @@ using NUnit.Framework;
 using kafka_tests.Helpers;
 
 
-namespace kafka_tests
+namespace kafka_tests.Unit
 {
     [TestFixture]
     [Category("Unit")]

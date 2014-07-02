@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using KafkaNet.Common;
 using NUnit.Framework;
 
-namespace kafka_tests
+namespace kafka_tests.Unit
 {
     [TestFixture]
     [Category("Unit")]
