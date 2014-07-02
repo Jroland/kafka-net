@@ -71,7 +71,7 @@
     <Compile Include="Integration\KafkaConnectionIntegrationTests.cs" />
     <Compile Include="RequestFactory.cs" />
     <Compile Include="Unit\BrokerRouterTests.cs" />
-    <Compile Include="Unit\CommonQueriesTests.cs" />
+    <Compile Include="Unit\MetadataQueriesTests.cs" />
     <Compile Include="Unit\ConsumerTests.cs" />
     <Compile Include="Unit\DefaultPartitionSelectorTests.cs" />
     <Compile Include="Unit\ProducerTests.cs" />

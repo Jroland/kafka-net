@@ -44,13 +44,14 @@
   <ItemGroup>
     <Compile Include="Common\ThreadWall.cs" />
     <Compile Include="Default\DefaultKafkaConnectionFactory.cs" />
+    <Compile Include="Interfaces\IMetadataQueries.cs" />
     <Compile Include="Interfaces\IKafkaTcpSocket.cs" />
     <Compile Include="Model\BrokerRoute.cs" />
     <Compile Include="Common\ScheduledTimer.cs" />
     <Compile Include="Consumer.cs" />
     <Compile Include="Interfaces\IKafkaConnection.cs" />
     <Compile Include="Interfaces\IBrokerRouter.cs" />
-    <Compile Include="CommonQueries.cs" />
+    <Compile Include="MetadataQueries.cs" />
     <Compile Include="Model\ConsumerOptions.cs" />
     <Compile Include="Default\DefaultPartitionSelector.cs" />
     <Compile Include="Interfaces\IKafkaLog.cs" />
@@ -79,6 +80,9 @@
     <Compile Include="Protocol\ProduceRequest.cs" />
     <Compile Include="Default\DefaultTraceLog.cs" />
     <Compile Include="KafkaTcpSocket.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="kafka-net.nuspec" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

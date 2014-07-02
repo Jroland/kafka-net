@@ -13,11 +13,12 @@ namespace KafkaNet
     /// <summary>
     /// Provides a simplified high level API for producing messages on a topic.
     /// </summary>
-    public class Producer : CommonQueries
+    public class Producer : IMetadataQueries, IDisposable
     {
         private readonly IBrokerRouter _router;
         private readonly SemaphoreSlim _sendSemaphore;
         private readonly int _maximumAsyncQueue;
+        private readonly IMetadataQueries _metadataQueries;
 
         /// <summary>
         /// Get the current count of active async calls
@@ -39,9 +40,9 @@ namespace KafkaNet
         /// attempted to send to Kafka before a timeout exception is thrown.
         /// </remarks>
         public Producer(IBrokerRouter brokerRouter, int maximumAsyncQueue = -1)
-            : base(brokerRouter)
         {
             _router = brokerRouter;
+            _metadataQueries = new MetadataQueries(_router);
             _maximumAsyncQueue = maximumAsyncQueue == -1 ? int.MaxValue : maximumAsyncQueue;
             _sendSemaphore = new SemaphoreSlim(_maximumAsyncQueue, _maximumAsyncQueue);
         }
@@ -96,6 +97,24 @@ namespace KafkaNet
             finally
             {
                 _sendSemaphore.Release();
+            }
+        }
+
+        public Topic GetTopic(string topic)
+        {
+            return _metadataQueries.GetTopic(topic);
+        }
+
+        public Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
+        {
+            return _metadataQueries.GetTopicOffsetAsync(topic, maxOffsets, time);
+
+        }
+        public void Dispose()
+        {
+            using(_metadataQueries)
+            {
+
             }
         }
     }

@@ -13,147 +13,149 @@ using kafka_tests.Helpers;
 
 namespace kafka_tests.Unit
 {
-	[TestFixture]
-	[Category("Unit")]
-	public class ConsumerTests
-	{
-		private MoqMockingKernel _kernel;
-		static object lockObj = new object();
+    [TestFixture]
+    [Category("Unit")]
+    public class ConsumerTests
+    {
+       
+        [Test]
+        public void CancellationShouldInterruptConsumption()
+        {
+            var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
 
-		[SetUp]
-		public void Setup()
-		{
-			_kernel = new MoqMockingKernel();
-		}
+            var router = routerProxy.Create();
 
-		[Test]
-		public void CancellationShouldInterruptConsumption()
-		{
-			var routerProxy = new BrokerRouterProxy(_kernel);
-			routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
-			
-			var router = routerProxy.Create();
-			
-			var options = CreateOptions(router);
-			
-			var consumer = new Consumer(options);
-			
-			var tokenSrc = new CancellationTokenSource();
-			
-			var consumeTask = Task.Run(() => consumer.Consume(tokenSrc.Token).FirstOrDefault());
+            var options = CreateOptions(router);
 
-			//wait until the fake broker is running and requesting fetches
-			Assert.True(TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 10));
-			tokenSrc.Cancel();
-			
-			Assert.That(
-				Assert.Throws<AggregateException>(consumeTask.Wait).InnerException,
-				Is.TypeOf<OperationCanceledException>());
-			
-			consumer.Dispose();
-		}
+            using (var consumer = new Consumer(options))
+            {
+                var tokenSrc = new CancellationTokenSource();
 
-		[Test]
-		public void ConsumerWhitelistShouldOnlyConsumeSpecifiedPartition()
-		{
-			var routerProxy = new BrokerRouterProxy(_kernel);
-			routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
-			var router = routerProxy.Create();
-			var options = CreateOptions(router);
-			options.PartitionWhitelist = new List<int> { 0 };
-			var consumer = new Consumer(options);
+                var consumeTask = Task.Run(() => consumer.Consume(tokenSrc.Token).FirstOrDefault());
 
-			var tokenSrc = new CancellationTokenSource();
-			
-			var test = consumer.Consume(tokenSrc.Token).Take(1);
-			TaskTest.WaitFor(() => consumer.ConsumerTaskCount > 0);
-			
-			Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
-			Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.EqualTo(0));
-			
-			consumer.Dispose();
-		}
+                //wait until the fake broker is running and requesting fetches
+                TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 10);
 
-		[Test]
-		public void ConsumerWithEmptyWhitelistShouldConsumeAllPartition()
-		{
-			var routerProxy = new BrokerRouterProxy(_kernel);
-			
-			var router = routerProxy.Create();
-			var options = CreateOptions(router);
-			options.PartitionWhitelist = new List<int>();
-			
-			var consumer = new Consumer(options);
-			
-			var test = consumer.Consume().Take(1);
-			
-			
-			Assert.True(TaskTest.WaitFor(() => consumer.ConsumerTaskCount <= 1));
-			Assert.True(TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0));
-			Assert.True(TaskTest.WaitFor(() => routerProxy.BrokerConn1.FetchRequestCallCount > 0));
+                tokenSrc.Cancel();
 
-			Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn0 not sent FetchRequest");
-			Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn1 not sent FetchRequest");
-			
-			consumer.Dispose();
-		}
+                Assert.That(
+                    Assert.Throws<AggregateException>(consumeTask.Wait).InnerException,
+                    Is.TypeOf<OperationCanceledException>());
+            }
+        }
 
-		[Test]
-		public void ConsumerShouldCreateTaskForEachBroker()
-		{
-			var routerProxy = new BrokerRouterProxy(_kernel);
-			routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
-			var router = routerProxy.Create();
-			var options = CreateOptions(router);
-			options.PartitionWhitelist = new List<int>();
-			var consumer = new Consumer(options);
+        [Test]
+        public void ConsumerWhitelistShouldOnlyConsumeSpecifiedPartition()
+        {
+            var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            var router = routerProxy.Create();
+            var options = CreateOptions(router);
+            options.PartitionWhitelist = new List<int> { 0 };
+            using (var consumer = new Consumer(options))
+            {
+                var test = consumer.Consume();
 
-			var test = consumer.Consume().Take(1);
-			TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
+                TaskTest.WaitFor(() => consumer.ConsumerTaskCount > 0);
+                TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0);
 
-			Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
-			
-			consumer.Dispose();
-		}
+                Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(1), "Consumer should only create one consuming thread for partition 0.");
+                Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
+                Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.EqualTo(0));
+            }
+        }
+
+        [Test]
+        public void ConsumerWithEmptyWhitelistShouldConsumeAllPartition()
+        {
+            var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
+
+            var router = routerProxy.Create();
+            var options = CreateOptions(router);
+            options.PartitionWhitelist = new List<int>();
+
+            using (var consumer = new Consumer(options))
+            {
+                var test = consumer.Consume();
+
+                TaskTest.WaitFor(() => consumer.ConsumerTaskCount > 0);
+                TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0);
+                TaskTest.WaitFor(() => routerProxy.BrokerConn1.FetchRequestCallCount > 0);
+
+                Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2), "Consumer should create one consuming thread for each partition.");
+                Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn0 not sent FetchRequest");
+                Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn1 not sent FetchRequest");
+            }
+        }
+
+        [Test]
+        public void ConsumerShouldCreateTaskForEachBroker()
+        {
+            var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            var router = routerProxy.Create();
+            var options = CreateOptions(router);
+            options.PartitionWhitelist = new List<int>();
+            using (var consumer = new Consumer(options))
+            {
+                var test = consumer.Consume();
+                TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
+
+                Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
+            }
+        }
 
 
-		[Test]
-		public void ConsumerShouldReturnOffset()
-		{
-			var routerProxy = new BrokerRouterProxy(_kernel);
-			routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
-			var router = routerProxy.Create();
-			var options = CreateOptions(router);
-			options.PartitionWhitelist = new List<int>();
-			var consumer = new Consumer(options);
+        [Test]
+        public void ConsumerShouldReturnOffset()
+        {
+            var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            var router = routerProxy.Create();
+            var options = CreateOptions(router);
+            options.PartitionWhitelist = new List<int>();
+            using (var consumer = new Consumer(options))
+            {
+                var test = consumer.Consume();
+                TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
 
-			var test = consumer.Consume().Take(1);
-			TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
-			
-			Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
-			
-			consumer.Dispose();
-		}
+                Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
+            }
+        }
+        
+        [Test]
+        public void EnsureConsumerDisposesRouter()
+        {
+            var router = new MoqMockingKernel().GetMock<IBrokerRouter>();
+            var consumer = new Consumer(CreateOptions(router.Object));
+            using (consumer) { }
+            router.Verify(x => x.Dispose(), Times.Once());
+        }
 
+        [Test]
+        public void EnsureConsumerDisposesAllTasks()
+        {
+            var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            var router = routerProxy.Create();
+            var options = CreateOptions(router);
+            options.PartitionWhitelist = new List<int>();
 
+            var consumer = new Consumer(options);
+            using (consumer)
+            {
+                var test = consumer.Consume();
+                TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
+            }
 
+            TaskTest.WaitFor(() => consumer.ConsumerTaskCount <= 0);
+            Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(0));
+        }
 
-		[Test]
-		public void EnsureConsumerDisposesRouter()
-		{
-			lock(lockObj){
-				var router = _kernel.GetMock<IBrokerRouter>();
-				var consumer = new Consumer(CreateOptions(router.Object));
-				using (consumer) { }
-				router.Verify(x => x.Dispose(), Times.Once());
-			}
-		}
-
-		private ConsumerOptions CreateOptions(IBrokerRouter router)
-		{
-			lock(new object()){
-				return new ConsumerOptions(BrokerRouterProxy.TestTopic, router);
-			}
-		}
-	}
+        private ConsumerOptions CreateOptions(IBrokerRouter router)
+        {
+            return new ConsumerOptions(BrokerRouterProxy.TestTopic, router);
+        }
+    }
 }
