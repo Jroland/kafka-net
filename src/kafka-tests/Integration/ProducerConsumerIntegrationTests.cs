@@ -28,6 +28,7 @@ namespace kafka_tests.Integration
                 for (var i = 0; i < amount; i++)
                 {
                     tasks[i] = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message { Value = Guid.NewGuid().ToString() } });
+                    tasks[i].Wait();	// although the List<ProduceResponse> is returned, the items in the list is not populated unless we wait. 
                 }
 
                 var results = tasks.SelectMany(x => x.Result).ToList();

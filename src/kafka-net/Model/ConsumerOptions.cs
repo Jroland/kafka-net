@@ -29,6 +29,10 @@ namespace KafkaNet.Model
         /// The size of the internal buffer queue which stores messages from Kafka.
         /// </summary>
         public int ConsumerBufferSize { get; set; }
+		/// <summary>
+		/// The interval (ms) for the consumer to sleep before try fetch next message if previous fetch received no message. 
+		/// </summary>
+        public int BackoffInterval { get; set; }
 
         public ConsumerOptions(string topic, IBrokerRouter router)
         {
@@ -38,6 +42,7 @@ namespace KafkaNet.Model
             Log = new DefaultTraceLog();
             TopicPartitionQueryTimeMs = (int)TimeSpan.FromMinutes(15).TotalMilliseconds;
             ConsumerBufferSize = 50;
+            BackoffInterval = 100;
         }
     }
 }
