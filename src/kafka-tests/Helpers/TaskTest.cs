@@ -11,8 +11,9 @@ namespace kafka_tests.Helpers
             var sw = Stopwatch.StartNew();
             while (predicate() != true)
             {
-                if (sw.ElapsedMilliseconds > milliSeconds)
+            	if (sw.ElapsedMilliseconds > milliSeconds){
                     return false;
+            	}
                 Thread.Sleep(500);
             }
             return true;

@@ -43,14 +43,14 @@ namespace kafka_tests.Unit
 			var consumeTask = Task.Run(() => consumer.Consume(tokenSrc.Token).FirstOrDefault());
 
 			//wait until the fake broker is running and requesting fetches
-			TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 10);
+			Assert.True(TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 10));
 			tokenSrc.Cancel();
 			
 			Assert.That(
 				Assert.Throws<AggregateException>(consumeTask.Wait).InnerException,
 				Is.TypeOf<OperationCanceledException>());
-			using (consumer){}
 			
+			consumer.Dispose();
 		}
 
 		[Test]
@@ -63,12 +63,15 @@ namespace kafka_tests.Unit
 			options.PartitionWhitelist = new List<int> { 0 };
 			var consumer = new Consumer(options);
 
+			var tokenSrc = new CancellationTokenSource();
 			
-			var test = consumer.Consume().Take(1);
+			var test = consumer.Consume(tokenSrc.Token).Take(1);
 			TaskTest.WaitFor(() => consumer.ConsumerTaskCount > 0);
 			
 			Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
 			Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.EqualTo(0));
+			
+			consumer.Dispose();
 		}
 
 		[Test]
@@ -85,12 +88,14 @@ namespace kafka_tests.Unit
 			var test = consumer.Consume().Take(1);
 			
 			
-			TaskTest.WaitFor(() => consumer.ConsumerTaskCount <= 1);
-			TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0);
-			TaskTest.WaitFor(() => routerProxy.BrokerConn1.FetchRequestCallCount > 0);
+			Assert.True(TaskTest.WaitFor(() => consumer.ConsumerTaskCount <= 1));
+			Assert.True(TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0));
+			//Assert.True(TaskTest.WaitFor(() => routerProxy.BrokerConn1.FetchRequestCallCount > 0));
 
 			Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn0 not sent FetchRequest");
 			Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn1 not sent FetchRequest");
+			
+			consumer.Dispose();
 		}
 
 		[Test]
@@ -107,6 +112,8 @@ namespace kafka_tests.Unit
 			TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
 
 			Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
+			
+			consumer.Dispose();
 		}
 
 
@@ -124,6 +131,8 @@ namespace kafka_tests.Unit
 			TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
 			
 			Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
+			
+			consumer.Dispose();
 		}
 
 
