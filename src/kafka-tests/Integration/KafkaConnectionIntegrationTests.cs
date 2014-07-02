@@ -79,7 +79,8 @@ namespace kafka_tests.Integration
 			var result2 = _conn.SendAsync(new MetadataRequest());
 			var result3 = _conn.SendAsync(RequestFactory.CreateOffsetRequest(IntegrationConfig.IntegrationTopic));
 			var result4 = _conn.SendAsync(RequestFactory.CreateFetchRequest(IntegrationConfig.IntegrationTopic, 0));
-
+			var result5 = _conn.SendAsync(RequestFactory.CreateOffsetFetchRequest(IntegrationConfig.IntegrationTopic, 0));
+			
 			Assert.That(result1.Result.Count, Is.EqualTo(1));
 			Assert.That(result1.Result.First().Topic == IntegrationConfig.IntegrationTopic, Is.True, "ProduceRequest did not return expected topic.");
 
@@ -93,6 +94,9 @@ namespace kafka_tests.Integration
 			Assert.That(result4.Result.Count, Is.EqualTo(1));
 			Assert.That(result4.Result.First().Topic == IntegrationConfig.IntegrationTopic, Is.True, "FetchRequest did not return expected topic.");
 
+			Assert.That(result5.Result.Count, Is.EqualTo(1));
+			Assert.That(result5.Result.First().topicName == IntegrationConfig.IntegrationTopic, Is.True, "OffsetFetchRequest did not return expected topic.");
+			
 		}
 	}
 }
