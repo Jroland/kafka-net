@@ -90,7 +90,7 @@ namespace kafka_tests.Unit
 			
 			Assert.True(TaskTest.WaitFor(() => consumer.ConsumerTaskCount <= 1));
 			Assert.True(TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0));
-			//Assert.True(TaskTest.WaitFor(() => routerProxy.BrokerConn1.FetchRequestCallCount > 0));
+			Assert.True(TaskTest.WaitFor(() => routerProxy.BrokerConn1.FetchRequestCallCount > 0));
 
 			Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn0 not sent FetchRequest");
 			Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn1 not sent FetchRequest");
