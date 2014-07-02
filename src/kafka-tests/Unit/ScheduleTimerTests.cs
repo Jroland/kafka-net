@@ -124,7 +124,7 @@ namespace kafka_tests.Unit
 
             Thread.Sleep(550);
 
-            Assert.That(counter, Is.EqualTo(5));
+            Assert.That(counter, Is.GreaterThanOrEqualTo(5));
         }
 
         [Test]
