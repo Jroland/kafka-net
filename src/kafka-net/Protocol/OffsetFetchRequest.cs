@@ -80,7 +80,6 @@ namespace KafkaNet.Protocol
 		
 		protected IEnumerable<OffsetFetchResponse> DecodeOffsetFetchResponse(byte[] data){
 			var stream = new ReadByteStream(data);
-			Console.WriteLine("******* READ FROM OFFSET FETCH RESPONSE: " + data.ToString());
 			var correlationId = stream.ReadInt();
 
 			var topicCount = stream.ReadInt();
@@ -112,5 +111,10 @@ namespace KafkaNet.Protocol
 		public Int64 offset;
 		public string metaData;
 		public Int16 errorCode;
+		public override string ToString()
+		{
+			return string.Format("[OffsetFetchResponse TopicName={0}, PartitionID={1}, Offset={2}, MetaData={3}, ErrorCode={4}]", topicName, partitionID, offset, metaData, errorCode);
+		}
+
 	}
 }

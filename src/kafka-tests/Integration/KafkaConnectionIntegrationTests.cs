@@ -96,7 +96,6 @@ namespace kafka_tests.Integration
 
 			Assert.That(result5.Result.Count, Is.EqualTo(1));
 			Assert.That(result5.Result.First().topicName == IntegrationConfig.IntegrationTopic, Is.True, "OffsetFetchRequest did not return expected topic.");
-			
 		}
 	}
 }

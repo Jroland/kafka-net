@@ -152,7 +152,6 @@ namespace KafkaNet
 
                     if (completedTask == cancelTask.Task)
                     {
-                    	Console.WriteLine("************** TASK CANCEL HERE ***********");
                         throw new TaskCanceledException("Task cancel token was set.");
                     }
 
