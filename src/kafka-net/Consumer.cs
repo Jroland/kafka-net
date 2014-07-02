@@ -175,8 +175,7 @@ namespace KafkaNet
                             }
 
                             //no message received from server wait a while before we try another long poll
-                            //TODO : allow this delay to be configurable
-                            Thread.Sleep(100);
+                            Thread.Sleep(_options.BackoffInterval);
                         }
                         catch (Exception ex)
                         {
