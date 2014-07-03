@@ -5,6 +5,10 @@ using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
+    /// <summary>
+    /// Class that represents the api call to commit a specific set of offsets for a given topic.  The offset is saved under the 
+    /// arbitrary ConsumerGroup name provided by the call.
+    /// </summary>
     public class OffsetCommitRequest : BaseRequest, IKafkaRequest<OffsetCommitResponse>
     {
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetCommit; } }
@@ -41,7 +45,7 @@ namespace KafkaNet.Protocol
                 {
                     foreach (var commit in partition)
                     {
-                        message.Pack(partition.Key.ToBytes(), commit.Offset.ToBytes(), commit.Metadata.ToInt16SizedBytes());
+                        message.Pack(partition.Key.ToBytes(), commit.Offset.ToBytes(), commit.TimeStamp.ToBytes(), commit.Metadata.ToInt16SizedBytes());
                     }
                 }
             }
@@ -93,15 +97,34 @@ namespace KafkaNet.Protocol
         /// </summary>
         public long Offset { get; set; }
         /// <summary>
+        /// If the time stamp field is set to -1, then the broker sets the time stamp to the receive time before committing the offset.
+        /// </summary>
+        public long TimeStamp { get; set; }
+        /// <summary>
         /// Descriptive metadata about this commit.
         /// </summary>
         public string Metadata { get; set; }
+
+        public OffsetCommit()
+        {
+            TimeStamp = -1;
+        }
+    
     }
 
     public class OffsetCommitResponse
     {
-        public string Topic { get; set; }
-        public int PartitionId { get; set; }
-        public Int16 Error { get; set; }
+        /// <summary>
+        /// The name of the topic this response entry is for.
+        /// </summary>
+        public string Topic;
+        /// <summary>
+        /// The id of the partition this response is for.
+        /// </summary>
+        public Int32 PartitionId;
+        /// <summary>
+        /// Error code of exception that occured during the request.  Zero if no error.
+        /// </summary>
+        public Int16 Error;
     }
 }

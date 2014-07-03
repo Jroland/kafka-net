@@ -179,9 +179,9 @@ namespace KafkaNet
                         }
                         catch (Exception ex)
                         {
-                            _options.Log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
+                        	_options.Log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
                         }
-                    }
+                	}
                 }
                 finally
                 {
