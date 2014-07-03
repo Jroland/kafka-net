@@ -116,15 +116,15 @@ namespace kafka_tests
             var sut = new ScheduledTimer();
 
             var counter = 0;
-            sut.Do(() => Interlocked.Increment(ref  counter)).Every(TimeSpan.FromMilliseconds(100));
+            sut.Do(() => Interlocked.Increment(ref  counter)).Every(TimeSpan.FromMilliseconds(200));
 
-            Assert.That(sut.TimerObject.Interval, Is.EqualTo(100));
+            Assert.That(sut.TimerObject.Interval, Is.EqualTo(200));
 
             sut.Begin();
 
-            Thread.Sleep(550);
+            Thread.Sleep(1100);
 
-            Assert.That(counter, Is.EqualTo(5));
+            Assert.That(counter, Is.EqualTo(6));
         }
 
         [Test]
