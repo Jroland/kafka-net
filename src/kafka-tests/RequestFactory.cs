@@ -54,20 +54,21 @@ namespace kafka_tests
                         })
             };
         }
-        
-        public static OffsetFetchRequest CreateOffsetFetchRequest(string topic, int partid = 0)
+
+        public static OffsetFetchRequest CreateOffsetFetchRequest(string topic, int partitionId = 0)
         {
-        	return new OffsetFetchRequest("DefaultGroup")
-        	{
-        		Topics = new List<Offset>(new[] 
+            return new OffsetFetchRequest
+            {
+                ConsumerGroup = "DefaultGroup",
+                Topics = new List<OffsetFetch>(new[] 
         		                          {
-        		                          	new Offset
+        		                          	new OffsetFetch
         		                          	{
         		                          		Topic = topic,
-        		                          		PartitionId = partid
+        		                          		PartitionId = partitionId
         		                          	}
         		                          })
-        	};
+            };
         }
     }
 }

@@ -15,12 +15,7 @@ namespace KafkaNet.Protocol
     {
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetFetch; } }
         public string ConsumerGroup { get; set; }
-        public List<Offset> Topics { get; set; }
-
-        public OffsetFetchRequest(string consumerGroup)
-        {
-            ConsumerGroup = consumerGroup;
-        }
+        public List<OffsetFetch> Topics { get; set; }
 
         public byte[] Encode()
         {
@@ -30,7 +25,7 @@ namespace KafkaNet.Protocol
         protected byte[] EncodeOffsetFetchRequest(OffsetFetchRequest request)
         {
             var message = new WriteByteStream();
-            if (request.Topics == null) request.Topics = new List<Offset>();
+            if (request.Topics == null) request.Topics = new List<OffsetFetch>();
 
             message.Pack(EncodeHeader(request));
 
@@ -89,6 +84,18 @@ namespace KafkaNet.Protocol
             }
         }
 
+    }
+
+    public class OffsetFetch
+    {
+        /// <summary>
+        /// The topic the offset came from.
+        /// </summary>
+        public string Topic { get; set; }
+        /// <summary>
+        /// The partition the offset came from.
+        /// </summary>
+        public int PartitionId { get; set; }
     }
 
     public class OffsetFetchResponse
