@@ -7,7 +7,7 @@ using NUnit.Framework;
 namespace kafka_tests
 {
     [TestFixture]
-    [Category("Unit")]
+    [Category("Local")]
     public class ScheduledTimerFixture
     {
         [Test]
