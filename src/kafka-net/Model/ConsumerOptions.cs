@@ -5,6 +5,9 @@ namespace KafkaNet.Model
 {
     public class ConsumerOptions
     {
+        private const int DefaultMaxConsumerBufferSize = 50;
+        private const int DefaultBackoffIntervalMS = 100;
+
         /// <summary>
         /// The topic to consume messages from.
         /// </summary>
@@ -29,6 +32,10 @@ namespace KafkaNet.Model
         /// The size of the internal buffer queue which stores messages from Kafka.
         /// </summary>
         public int ConsumerBufferSize { get; set; }
+        /// <summary>
+        /// The interval (ms) for the consumer to sleep before try fetch next message if previous fetch received no message. 
+        /// </summary>
+        public int BackoffInterval { get; set; }
 
         public ConsumerOptions(string topic, IBrokerRouter router)
         {
@@ -37,7 +44,8 @@ namespace KafkaNet.Model
             PartitionWhitelist = new List<int>();
             Log = new DefaultTraceLog();
             TopicPartitionQueryTimeMs = (int)TimeSpan.FromMinutes(15).TotalMilliseconds;
-            ConsumerBufferSize = 50;
+            ConsumerBufferSize = DefaultMaxConsumerBufferSize;
+            BackoffInterval = DefaultBackoffIntervalMS;
         }
     }
 }

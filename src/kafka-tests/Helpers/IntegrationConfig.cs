@@ -11,6 +11,7 @@ namespace kafka_tests.Helpers
     {
         public static string IntegrationCompressionTopic = "IntegrationCompressionTopic";
         public static string IntegrationTopic = "IntegrationTopic";
+        public static string IntegrationConsumer = "IntegrationConsumer";
         public static Uri IntegrationUri
         {
             get

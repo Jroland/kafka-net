@@ -1,40 +1,37 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+
 using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
     /// <summary>
-    /// Class that represents the api call to commit a specific set of offsets for a given topic.  The offset is saved under the 
-    /// arbitrary ConsumerGroup name provided by the call.
+    /// Class that represents both the request and the response from a kafka server of requesting a stored offset value
+    /// for a given consumer group.  Essentially this part of the api allows a user to save/load a given offset position
+    /// under any abritrary name.
     /// </summary>
-    public class OffsetCommitRequest : BaseRequest, IKafkaRequest<OffsetCommitResponse>
+    public class OffsetFetchRequest : BaseRequest, IKafkaRequest<OffsetFetchResponse>
     {
-        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetCommit; } }
+        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetFetch; } }
         public string ConsumerGroup { get; set; }
-        public List<OffsetCommit> OffsetCommits { get; set; }
+        public List<OffsetFetch> Topics { get; set; }
 
         public byte[] Encode()
         {
-            return EncodeOffsetCommitRequest(this);
+            return EncodeOffsetFetchRequest(this);
         }
 
-        public IEnumerable<OffsetCommitResponse> Decode(byte[] payload)
-        {
-            return DecodeOffsetCommitResponse(payload);
-        }
-
-        private byte[] EncodeOffsetCommitRequest(OffsetCommitRequest request)
+        protected byte[] EncodeOffsetFetchRequest(OffsetFetchRequest request)
         {
             var message = new WriteByteStream();
-            if (request.OffsetCommits == null) request.OffsetCommits = new List<OffsetCommit>();
+            if (request.Topics == null) request.Topics = new List<OffsetFetch>();
 
             message.Pack(EncodeHeader(request));
-            message.Pack(request.ConsumerGroup.ToInt16SizedBytes());
 
-            var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
-            message.Pack(topicGroups.Count.ToBytes());
+            var topicGroups = request.Topics.GroupBy(x => x.Topic).ToList();
+
+            message.Pack(ConsumerGroup.ToInt16SizedBytes(), topicGroups.Count.ToBytes());
 
             foreach (var topicGroup in topicGroups)
             {
@@ -43,9 +40,9 @@ namespace KafkaNet.Protocol
 
                 foreach (var partition in partitions)
                 {
-                    foreach (var commit in partition)
+                    foreach (var offset in partition)
                     {
-                        message.Pack(partition.Key.ToBytes(), commit.Offset.ToBytes(), commit.TimeStamp.ToBytes(), commit.Metadata.ToInt16SizedBytes());
+                        message.Pack(offset.PartitionId.ToBytes());
                     }
                 }
             }
@@ -55,10 +52,15 @@ namespace KafkaNet.Protocol
             return message.Payload();
         }
 
-        private IEnumerable<OffsetCommitResponse> DecodeOffsetCommitResponse(byte[] data)
+        public IEnumerable<OffsetFetchResponse> Decode(byte[] payload)
+        {
+            return DecodeOffsetFetchResponse(payload);
+        }
+
+
+        protected IEnumerable<OffsetFetchResponse> DecodeOffsetFetchResponse(byte[] data)
         {
             var stream = new ReadByteStream(data);
-
             var correlationId = stream.ReadInt();
 
             var topicCount = stream.ReadInt();
@@ -69,20 +71,22 @@ namespace KafkaNet.Protocol
                 var partitionCount = stream.ReadInt();
                 for (int j = 0; j < partitionCount; j++)
                 {
-                    var response = new OffsetCommitResponse()
+                    var response = new OffsetFetchResponse()
                     {
                         Topic = topic,
                         PartitionId = stream.ReadInt(),
+                        Offset = stream.ReadLong(),
+                        MetaData = stream.ReadInt16String(),
                         Error = stream.ReadInt16()
                     };
-
                     yield return response;
                 }
             }
         }
+
     }
 
-    public class OffsetCommit
+    public class OffsetFetch
     {
         /// <summary>
         /// The topic the offset came from.
@@ -92,27 +96,9 @@ namespace KafkaNet.Protocol
         /// The partition the offset came from.
         /// </summary>
         public int PartitionId { get; set; }
-        /// <summary>
-        /// The offset number to commit as completed.
-        /// </summary>
-        public long Offset { get; set; }
-        /// <summary>
-        /// If the time stamp field is set to -1, then the broker sets the time stamp to the receive time before committing the offset.
-        /// </summary>
-        public long TimeStamp { get; set; }
-        /// <summary>
-        /// Descriptive metadata about this commit.
-        /// </summary>
-        public string Metadata { get; set; }
-
-        public OffsetCommit()
-        {
-            TimeStamp = -1;
-        }
-    
     }
 
-    public class OffsetCommitResponse
+    public class OffsetFetchResponse
     {
         /// <summary>
         /// The name of the topic this response entry is for.
@@ -123,8 +109,22 @@ namespace KafkaNet.Protocol
         /// </summary>
         public Int32 PartitionId;
         /// <summary>
+        /// The offset position saved to the server.
+        /// </summary>
+        public Int64 Offset;
+        /// <summary>
+        /// Any arbitrary metadata stored during a CommitRequest.
+        /// </summary>
+        public string MetaData;
+        /// <summary>
         /// Error code of exception that occured during the request.  Zero if no error.
         /// </summary>
         public Int16 Error;
+
+        public override string ToString()
+        {
+            return string.Format("[OffsetFetchResponse TopicName={0}, PartitionID={1}, Offset={2}, MetaData={3}, ErrorCode={4}]", Topic, PartitionId, Offset, MetaData, Error);
+        }
+
     }
 }
