@@ -20,8 +20,6 @@ namespace KafkaNet
     /// </summary>
     public class KafkaConnection : IKafkaConnection
     {
-        private const int DefaultResponseTimeoutMs = 30000;
-
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
         private readonly IScheduledTimer _responseTimeoutTimer;
         private readonly int _responseTimeoutMS;
@@ -40,10 +38,10 @@ namespace KafkaNet
         /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
         /// <param name="client">The kafka socket initialized to the kafka server.</param>
         /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received after sending message to Kafka.</param>
-        public KafkaConnection(IKafkaTcpSocket client, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
+        public KafkaConnection(IKafkaTcpSocket client, int responseTimeoutMs, IKafkaLog log)
         {
             _client = client;
-            _log = log ?? new DefaultTraceLog();
+            _log = log;
             _responseTimeoutMS = responseTimeoutMs;
             _responseTimeoutTimer = new ScheduledTimer()
                 .Do(ResponseTimeoutCheck)

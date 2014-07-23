@@ -16,8 +16,10 @@ namespace KafkaNet
     /// TODO: provide automatic offset saving when the feature is available in 0.8.2
     /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
     /// </summary>
-    public class Consumer : IMetadataQueries, IDisposable
+    public class Consumer : IMetadataQueries, IConsumer
     {
+        private readonly IBrokerRouter _brokerRouter;
+        private readonly IKafkaLog _log;
         private readonly ConsumerOptions _options;
         private readonly BlockingCollection<Message> _fetchResponseQueue;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
@@ -29,11 +31,13 @@ namespace KafkaNet
         private int _ensureOneThread;
         private Topic _topic;
 
-        public Consumer(ConsumerOptions options, params OffsetPosition[] positions)
+        public Consumer(IBrokerRouter brokerRouter, IKafkaLog log, ConsumerOptions options, params OffsetPosition[] positions)
         {
+            _brokerRouter = brokerRouter;
+            _log = log;
             _options = options;
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
-            _metadataQueries = new MetadataQueries(_options.Router);
+            _metadataQueries = new MetadataQueries(brokerRouter);
 
             //this timer will periodically look for new partitions and automatically add them to the consuming queue
             //using the same whitelist logic
@@ -56,7 +60,7 @@ namespace KafkaNet
         /// <returns>Blocking enumberable of messages from Kafka.</returns>
         public IEnumerable<Message> Consume(CancellationToken? cancellationToken = null)
         {
-            _options.Log.DebugFormat("Consumer: Beginning consumption of topic: {0}", _options.Topic);
+            _log.DebugFormat("Consumer: Beginning consumption of topic: {0}", _options.Topic);
             _topicPartitionQueryTimer.Begin();
 
             return _fetchResponseQueue.GetConsumingEnumerable(cancellationToken ?? new CancellationToken(false));
@@ -91,8 +95,8 @@ namespace KafkaNet
             {
                 if (Interlocked.Increment(ref _ensureOneThread) == 1)
                 {
-                    _options.Log.DebugFormat("Consumer: Refreshing partitions for topic: {0}", _options.Topic);
-                    var topic = _options.Router.GetTopicMetadata(_options.Topic);
+                    _log.DebugFormat("Consumer: Refreshing partitions for topic: {0}", _options.Topic);
+                    var topic = _brokerRouter.GetTopicMetadata(_options.Topic);
                     if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
                     _topic = topic.First();
 
@@ -111,7 +115,7 @@ namespace KafkaNet
             }
             catch (Exception ex)
             {
-                _options.Log.ErrorFormat("Exception occured trying to setup consumer for topic:{0}.  Exception={1}", _options.Topic, ex);
+                _log.ErrorFormat("Exception occured trying to setup consumer for topic:{0}.  Exception={1}", _options.Topic, ex);
             }
             finally
             {
@@ -125,7 +129,7 @@ namespace KafkaNet
             {
                 try
                 {
-                    _options.Log.DebugFormat("Consumer: Creating polling task for topic: {0} on parition: {1}", topic, partitionId);
+                    _log.DebugFormat("Consumer: Creating polling task for topic: {0} on parition: {1}", topic, partitionId);
                     while (_disposeToken.IsCancellationRequested == false)
                     {
                         try
@@ -151,7 +155,7 @@ namespace KafkaNet
                                 };
 
                             //make request and post to queue
-                            var route = _options.Router.SelectBrokerRoute(topic, partitionId);
+                            var route = _brokerRouter.SelectBrokerRoute(topic, partitionId);
                             var responses = route.Connection.SendAsync(fetchRequest).Result;
 
                             if (responses.Count > 0)
@@ -179,13 +183,13 @@ namespace KafkaNet
                         }
                         catch (Exception ex)
                         {
-                        	_options.Log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
+                        	_log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
                         }
                 	}
                 }
                 finally
                 {
-                    _options.Log.DebugFormat("Consumer: Disabling polling task for topic: {0} on parition: {1}", topic, partitionId);
+                    _log.DebugFormat("Consumer: Disabling polling task for topic: {0} on parition: {1}", topic, partitionId);
                     Task tempTask;
                     _partitionPollingIndex.TryRemove(partitionId, out tempTask);
                 }
@@ -204,7 +208,7 @@ namespace KafkaNet
 
         public void Dispose()
         {
-            _options.Log.DebugFormat("Consumer: Disposing...");
+            _log.DebugFormat("Consumer: Disposing...");
             _disposeToken.Cancel();
             using (_topicPartitionQueryTimer)
             using (_metadataQueries)

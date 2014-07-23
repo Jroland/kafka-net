@@ -20,8 +20,10 @@ namespace kafka_tests.Integration
         [TestCase(1000, -1)]
         public void SendAsyncShouldHandleHighVolumeOfMessages(int amount, int maxAsync)
         {
-            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
-            using (var producer = new Producer(router, maxAsync))
+            var log = new DefaultTraceLog();
+            var options = new KafkaOptions {Hosts = new[] {IntegrationConfig.IntegrationUri}, QueueSize = maxAsync};
+            using (var router = new BrokerRouter(options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
+            using (var producer = new Producer(router, options))
             {
                 var tasks = new Task<List<ProduceResponse>>[amount];
 
@@ -43,13 +45,15 @@ namespace kafka_tests.Integration
             var expected = new List<string> { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19" };
             var testId = Guid.NewGuid().ToString();
 
-            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
-            using (var producer = new Producer(router))
+            var log = new DefaultTraceLog();
+            var options = new KafkaOptions {Hosts = new[] {IntegrationConfig.IntegrationUri}};
+            using (var router = new BrokerRouter(options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
+            using (var producer = new Producer(router, options))
             {
 
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
 
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router),
+                using (var consumer = new Consumer(router, log, new ConsumerOptions(IntegrationConfig.IntegrationTopic),
                     offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
 
@@ -76,13 +80,15 @@ namespace kafka_tests.Integration
             var expected = new List<string> { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19" };
             var testId = Guid.NewGuid().ToString();
 
-            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
-            using (var producer = new Producer(router))
+            var log = new DefaultTraceLog();
+            var options = new KafkaOptions {Hosts = new[] {IntegrationConfig.IntegrationUri}};
+            using (var router = new BrokerRouter(options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
+            using (var producer = new Producer(router, options))
             {
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result
                     .Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray();
 
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router), offsets))
+                using (var consumer = new Consumer(router, log, new ConsumerOptions(IntegrationConfig.IntegrationTopic), offsets))
                 {
                     for (int i = 0; i < 20; i++)
                     {
@@ -116,14 +122,16 @@ namespace kafka_tests.Integration
         [Test]
         public void ConsumerShouldBeAbleToGetCurrentOffsetInformation()
         {
-            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
-            using (var producer = new Producer(router))
+            var log = new DefaultTraceLog();
+            var options = new KafkaOptions {Hosts = new[] {IntegrationConfig.IntegrationUri}};
+            using (var router = new BrokerRouter(options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
+            using (var producer = new Producer(router, options))
             {
 
                 var startOffsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result
                     .Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray();
 
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router), startOffsets))
+                using (var consumer = new Consumer(router, log, new ConsumerOptions(IntegrationConfig.IntegrationTopic), startOffsets))
                 {
 
                     for (int i = 0; i < 20; i++)
@@ -151,13 +159,15 @@ namespace kafka_tests.Integration
         {
             var testId = Guid.NewGuid().ToString();
 
-            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
-            using (var producer = new Producer(router))
+            var log = new DefaultTraceLog();
+            var options = new KafkaOptions {Hosts = new[] {IntegrationConfig.IntegrationUri}};
+            using (var router = new BrokerRouter(options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
+            using (var producer = new Producer(router, options))
             {
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
 
                 //create consumer with buffer size of 1 (should block upstream)
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router) { ConsumerBufferSize = 1 },
+                using (var consumer = new Consumer(router, log, new ConsumerOptions(IntegrationConfig.IntegrationTopic) { ConsumerBufferSize = 1 },
                     offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
 
@@ -180,15 +190,17 @@ namespace kafka_tests.Integration
         [Test]
         public void ConsumerShouldMoveToNextAvailableOffsetWhenQueryingForNextMessage()
         {
-            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
-            using (var producer = new Producer(router))
+            var log = new DefaultTraceLog();
+            var options = new KafkaOptions {Hosts = new[] {IntegrationConfig.IntegrationUri}};
+            using (var router = new BrokerRouter(options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
+            using (var producer = new Producer(router, options))
             {
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
                 Assert.That(offsets.Count, Is.EqualTo(2), "This test requires there to be exactly two paritions.");
                 Assert.That(offsets.Count(x => x.Offsets.Max(o => o) > 1000), Is.EqualTo(2), "Need more than 1000 messages in each topic for this test to work.");
 
                 //set offset 1000 messages back on one partition.  We should be able to get all 1000 messages over multiple calls.
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router),
+                using (var consumer = new Consumer(router, log, new ConsumerOptions(IntegrationConfig.IntegrationTopic),
                      offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max() - 1000)).ToArray()))
                 {
                     var data = new List<Message>();

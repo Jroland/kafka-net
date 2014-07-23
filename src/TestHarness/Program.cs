@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
-using KafkaNet;
+using KafkaNet.Configuration;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
-using System.Collections.Generic;
 
 namespace TestHarness
 {
@@ -11,17 +10,15 @@ namespace TestHarness
     {
         static void Main(string[] args)
         {
-            var options = new KafkaOptions(new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092"))
+            var bus = BusFactory.Create(new KafkaOptions
                 {
-                    Log = new ConsoleLog()
-                };
-            var router = new BrokerRouter(options);
-            var client = new Producer(router);
+                    Hosts = new[] {new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092")}
+                }, x => { });
+
 
             Task.Factory.StartNew(() =>
                 {
-                    var consumer = new Consumer(new ConsumerOptions("TestHarness", router));
-                    foreach (var data in consumer.Consume())
+                    foreach (var data in bus.Consume("TestHarness"))
                     {
                         Console.WriteLine("Response: P{0},O{1} : {2}", data.Meta.PartitionId, data.Meta.Offset, data.Value);
                     }
@@ -33,13 +30,11 @@ namespace TestHarness
             {
                 var message = Console.ReadLine();
                 if (message == "quit") break;
-                client.SendMessageAsync("TestHarness", new[] {new Message {Value = message}});
+                bus.SendMessageAsync("TestHarness", new[] {new Message {Value = message}});
             }
 
-            using (client)
-            using (router)
+            using (bus)
             {
-
             }
         }
     }

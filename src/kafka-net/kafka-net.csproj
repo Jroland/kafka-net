@@ -43,9 +43,23 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Common\ThreadWall.cs" />
+    <Compile Include="Configuration\Bus.cs" />
+    <Compile Include="Configuration\BusFactory.cs" />
+    <Compile Include="Configuration\DefaultContainer.cs" />
+    <Compile Include="Configuration\DefaultServiceRegistrator.cs" />
+    <Compile Include="Interfaces\IBus.cs" />
+    <Compile Include="Configuration\IContainer.cs" />
+    <Compile Include="ConsumerFactory.cs" />
+    <Compile Include="Interfaces\IConsumer.cs" />
+    <Compile Include="Interfaces\IConsumerFactory.cs" />
+    <Compile Include="Interfaces\IKafkaOptions.cs" />
+    <Compile Include="Configuration\IServiceProvider.cs" />
+    <Compile Include="Configuration\IServiceRegistrator.cs" />
+    <Compile Include="Configuration\ServiceImplementationNotFound.cs" />
     <Compile Include="Default\DefaultKafkaConnectionFactory.cs" />
     <Compile Include="Interfaces\IMetadataQueries.cs" />
     <Compile Include="Interfaces\IKafkaTcpSocket.cs" />
+    <Compile Include="Interfaces\IProducer.cs" />
     <Compile Include="Model\BrokerRoute.cs" />
     <Compile Include="Common\ScheduledTimer.cs" />
     <Compile Include="Consumer.cs" />
@@ -85,9 +99,7 @@
   <ItemGroup>
     <None Include="kafka-net.nuspec" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="lib\net45\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

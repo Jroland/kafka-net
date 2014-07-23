@@ -21,9 +21,9 @@ namespace kafka_tests.Integration
         [SetUp]
         public void Setup()
         {
-            var options = new KafkaOptions(IntegrationConfig.IntegrationUri);
+            var options = new KafkaOptions { Hosts = new [] {IntegrationConfig.IntegrationUri}};
             
-            _conn = new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), options.KafkaServerUri.First()), options.ResponseTimeoutMs, options.Log);
+            _conn = new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), options.Hosts.First()), (int)options.Timeout.TotalMilliseconds, new DefaultTraceLog());
         }
         
         [Test]

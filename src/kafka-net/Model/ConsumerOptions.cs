@@ -17,14 +17,6 @@ namespace KafkaNet.Model
         /// </summary>
         public List<int> PartitionWhitelist { get; set; }
         /// <summary>
-        /// Log object to record operational messages.
-        /// </summary>
-        public IKafkaLog Log { get; set; }
-        /// <summary>
-        /// The broker router used to provide connection to each partition server.
-        /// </summary>
-        public IBrokerRouter Router { get; set; }
-        /// <summary>
         /// The time in milliseconds between queries to look for any new partitions being created.
         /// </summary>
         public int TopicPartitionQueryTimeMs { get; set; }
@@ -37,12 +29,10 @@ namespace KafkaNet.Model
         /// </summary>
         public int BackoffInterval { get; set; }
 
-        public ConsumerOptions(string topic, IBrokerRouter router)
+        public ConsumerOptions(string topic)
         {
             Topic = topic;
-            Router = router;
             PartitionWhitelist = new List<int>();
-            Log = new DefaultTraceLog();
             TopicPartitionQueryTimeMs = (int)TimeSpan.FromMinutes(15).TotalMilliseconds;
             ConsumerBufferSize = DefaultMaxConsumerBufferSize;
             BackoffInterval = DefaultBackoffIntervalMS;

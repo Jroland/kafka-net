@@ -13,11 +13,12 @@ namespace kafka_tests.Integration
     [Category("Integration")]
     public class GzipProducerConsumerTests
     {
-        private readonly KafkaOptions _options = new KafkaOptions(IntegrationConfig.IntegrationUri);
+        private readonly KafkaOptions _options = new KafkaOptions { Hosts = new [] {IntegrationConfig.IntegrationUri} };
 
-       private KafkaConnection GetKafkaConnection()
+        private KafkaConnection GetKafkaConnection()
         {
-            return new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), _options.KafkaServerUri.First()), _options.ResponseTimeoutMs, _options.Log);
+            var log = new DefaultTraceLog();
+            return new KafkaConnection(new KafkaTcpSocket(log, _options.Hosts.First()), (int)_options.Timeout.TotalMilliseconds, log);
         }
 
         [Test]
@@ -29,7 +30,8 @@ namespace kafka_tests.Integration
                 conn.SendAsync(new MetadataRequest { Topics = new List<string>(new[] { IntegrationConfig.IntegrationCompressionTopic }) }).Wait(TimeSpan.FromSeconds(10));
             }
 
-            using (var router = new BrokerRouter(_options))
+            var log = new DefaultTraceLog();
+            using (var router = new BrokerRouter(_options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
             {
                 var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationCompressionTopic, 0);
 
@@ -62,12 +64,13 @@ namespace kafka_tests.Integration
         [Test]
         public void EnsureGzipCanDecompressMessageFromKafka()
         {
-            var router = new BrokerRouter(_options);
-            var producer = new Producer(router);
+            var log = new DefaultTraceLog();
+            var router = new BrokerRouter(_options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log));
+            var producer = new Producer(router, _options);
 
             var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationCompressionTopic).Result;
 
-            var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationCompressionTopic, router),
+            var consumer = new Consumer(router, log, new ConsumerOptions(IntegrationConfig.IntegrationCompressionTopic),
                 offsets.Select(x => new OffsetPosition(x.PartitionId, 0)).ToArray());
 
             var results = consumer.Consume().Take(3).ToList();

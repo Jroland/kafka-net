@@ -2,7 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using KafkaNet.Model;
+using KafkaNet.Configuration;
 using KafkaNet.Protocol;
 
 namespace KafkaNet
@@ -20,17 +20,23 @@ namespace KafkaNet
     public class BrokerRouter : IBrokerRouter
     {
         private readonly object _threadLock = new object();
-        private readonly KafkaOptions _kafkaOptions;
+        private readonly IKafkaOptions options;
+        private readonly IKafkaLog log;
+        private readonly IPartitionSelector partitionSelector;
+        private readonly IKafkaConnectionFactory connectionFactory;
         private readonly ConcurrentDictionary<int, IKafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, IKafkaConnection>();
         private readonly ConcurrentDictionary<string, Topic> _topicIndex = new ConcurrentDictionary<string, Topic>();
         private readonly List<IKafkaConnection> _defaultConnections = new List<IKafkaConnection>();
 
-        public BrokerRouter(KafkaOptions kafkaOptions)
+        public BrokerRouter(IKafkaOptions options, IKafkaLog log, IPartitionSelector partitionSelector, IKafkaConnectionFactory connectionFactory)
         {
-            _kafkaOptions = kafkaOptions;
+            this.options = options;
+            this.log = log;
+            this.partitionSelector = partitionSelector;
+            this.connectionFactory = connectionFactory;
             _defaultConnections
-                .AddRange(kafkaOptions.KafkaServerUri.Distinct()
-                .Select(uri => _kafkaOptions.KafkaConnectionFactory.Create(uri, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log)));
+                .AddRange(options.Hosts.Distinct()
+                .Select(uri => connectionFactory.Create(uri, options.Timeout)));
         }
 
         /// <summary>
@@ -76,7 +82,7 @@ namespace KafkaNet
             if (cachedTopic == null)
                 throw new InvalidTopicMetadataException(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
 
-            var partition = _kafkaOptions.PartitionSelector.Select(cachedTopic, key);
+            var partition = partitionSelector.Select(cachedTopic, key);
 
             return GetCachedRoute(cachedTopic.Name, partition);
         }
@@ -119,7 +125,7 @@ namespace KafkaNet
         {
             lock (_threadLock)
             {
-                _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
+                log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
 
                 //use the initial default connections to retrieve metadata
                 if (_defaultConnections.Count > 0)
@@ -216,14 +222,14 @@ namespace KafkaNet
                 }
                 catch (Exception ex)
                 {
-                    _kafkaOptions.Log.WarnFormat("Failed to contact Kafka server={0}.  Trying next default server.  Exception={1}", conn.KafkaUri, ex);
+                    log.WarnFormat("Failed to contact Kafka server={0}.  Trying next default server.  Exception={1}", conn.KafkaUri, ex);
                 }
             }
 
             throw new ServerUnreachableException(
                     string.Format(
                         "Unable to query for metadata from any of the default Kafka servers.  At least one provided server must be available.  Server list: {0}",
-                        string.Join(", ", _kafkaOptions.KafkaServerUri.Select(x => x.ToString()))));
+                        string.Join(", ", options.Hosts.Select(x => x.ToString()))));
         }
 
         private void UpdateInternalMetadataCache(MetadataResponse metadata)
@@ -232,16 +238,13 @@ namespace KafkaNet
             {
                 var localBroker = broker;
                 _brokerConnectionIndex.AddOrUpdate(broker.BrokerId,
-                    i =>
-                    {
-                        return _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log);
-                    },
+                    i => connectionFactory.Create(localBroker.Address, options.Timeout),
                     (i, connection) =>
                     {
                         //if a connection changes for a broker close old connection and create a new one
                         if (connection.KafkaUri == localBroker.Address) return connection;
-                        _kafkaOptions.Log.WarnFormat("Broker:{0} Uri changed from:{1} to {2}", localBroker.BrokerId, connection.KafkaUri, localBroker.Address);
-                        using (connection) { return _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log); }
+                        log.WarnFormat("Broker:{0} Uri changed from:{1} to {2}", localBroker.BrokerId, connection.KafkaUri, localBroker.Address);
+                        using (connection) { return connectionFactory.Create(localBroker.Address, options.Timeout); }
                     });
             }
 

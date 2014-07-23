@@ -1,4 +1,5 @@
 ﻿using KafkaNet;
+using KafkaNet.Model;
 using KafkaNet.Protocol;
 using Moq;
 using Ninject.MockingKernel.Moq;
@@ -18,6 +19,7 @@ namespace kafka_tests.Unit
         private Mock<IKafkaConnection> _connMock1;
         private Mock<IKafkaConnectionFactory> _factoryMock;
         private Mock<IPartitionSelector> _partitionSelectorMock;
+        private Mock<IKafkaLog> _logMock;
 
         [SetUp]
         public void Setup()
@@ -26,19 +28,19 @@ namespace kafka_tests.Unit
 
             //setup mock IKafkaConnection
             _partitionSelectorMock = _kernel.GetMock<IPartitionSelector>();
+            _logMock = _kernel.GetMock<IKafkaLog>();
             _connMock1 = _kernel.GetMock<IKafkaConnection>();
             _factoryMock = _kernel.GetMock<IKafkaConnectionFactory>();
-            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _connMock1.Object);
+            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 1), It.IsAny<TimeSpan>())).Returns(() => _connMock1.Object);
         }
 
         [Test]
         public void BrokerRouterCanConstruct()
         {
-            var result = new BrokerRouter(new KafkaNet.Model.KafkaOptions
+            var result = new BrokerRouter(new KafkaOptions
             {
-                KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
-                KafkaConnectionFactory = _factoryMock.Object
-            });
+                Hosts = new List<Uri> { new Uri("http://localhost:1") },
+            }, _logMock.Object, _partitionSelectorMock.Object, _factoryMock.Object);
 
             Assert.That(result, Is.Not.Null);
         }
@@ -46,17 +48,16 @@ namespace kafka_tests.Unit
         [Test]
         public void BrokerRouterUsesFactoryToAddNewBrokers()
         {
-            var router = new BrokerRouter(new KafkaNet.Model.KafkaOptions
+            var router = new BrokerRouter(new KafkaOptions
             {
-                KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
-                KafkaConnectionFactory = _factoryMock.Object
-            });
+                Hosts = new List<Uri> { new Uri("http://localhost:1") },
+            }, _logMock.Object, _partitionSelectorMock.Object, _factoryMock.Object);
 
             _connMock1.Setup(x => x.SendAsync(It.IsAny<IKafkaRequest<MetadataResponse>>()))
                       .Returns(() => Task.Factory.StartNew(() => new List<MetadataResponse> { CreateMetaResponse() }));
 
             var topics = router.GetTopicMetadata(TestTopic);
-            _factoryMock.Verify(x => x.Create(It.Is<Uri>(uri => uri.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>()), Times.Once());
+            _factoryMock.Verify(x => x.Create(It.Is<Uri>(uri => uri.Port == 2), It.IsAny<TimeSpan>()), Times.Once());
         }
 
         #region MetadataRequest Tests...
