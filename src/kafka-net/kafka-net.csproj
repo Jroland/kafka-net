@@ -55,7 +55,7 @@
     <Compile Include="Interfaces\IKafkaOptions.cs" />
     <Compile Include="Configuration\IServiceProvider.cs" />
     <Compile Include="Configuration\IServiceRegistrator.cs" />
-    <Compile Include="Configuration\ServiceImplementationNotFound.cs" />
+    <Compile Include="Configuration\ServiceNotFound.cs" />
     <Compile Include="Default\DefaultKafkaConnectionFactory.cs" />
     <Compile Include="Interfaces\IMetadataQueries.cs" />
     <Compile Include="Interfaces\IKafkaTcpSocket.cs" />

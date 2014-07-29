@@ -10,7 +10,7 @@ namespace TestHarness
     {
         static void Main(string[] args)
         {
-            var bus = BusFactory.Create(new KafkaOptions
+            var bus = new BusFactory().Create(new KafkaOptions
                 {
                     Hosts = new[] {new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092")}
                 }, x => { });

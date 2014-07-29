@@ -2,14 +2,24 @@
 
 namespace KafkaNet.Configuration
 {
-    public static class BusFactory
+    public class BusFactory
     {
-        public static IBus Create(IKafkaOptions settings, Action<IServiceRegistrator> configure)
+        private readonly IContainer container;
+
+        public BusFactory(IContainer container)
         {
-            var container = new DefaultContainer();
-            DefaultServiceRegistrator.Register(container);
-            container.Register(settings);
+            this.container = container;
+        }
+
+        public BusFactory() : this(new DefaultContainer())
+        {
+        }
+
+        public IBus Create(IKafkaOptions settings, Action<IServiceRegistrator> configure)
+        {
             configure(container);
+            container.Register(_ => settings);
+            DefaultServiceRegistrator.Register(container);
             return container.Resolve<IBus>();
         }
     }
