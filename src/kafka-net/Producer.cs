@@ -12,7 +12,7 @@ namespace KafkaNet
     /// <summary>
     /// Provides a simplified high level API for producing messages on a topic.
     /// </summary>
-    public class Producer : IMetadataQueries, IProducer
+    public class Producer : IProducer
     {
         private readonly IBrokerRouter _router;
         private readonly SemaphoreSlim _sendSemaphore;

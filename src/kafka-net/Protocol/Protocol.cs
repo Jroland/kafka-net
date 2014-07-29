@@ -80,6 +80,10 @@ namespace KafkaNet.Protocol
     }
 
     #region Exceptions...
+    public class InvalidConfigurationException : Exception
+    {
+        public InvalidConfigurationException(string message) : base(message) { }
+    }
     public class FailCrcCheckException : Exception
     {
         public FailCrcCheckException(string message) : base(message) { }

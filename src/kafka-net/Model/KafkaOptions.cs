@@ -12,7 +12,7 @@ namespace KafkaNet.Model
             QueueSize = int.MaxValue;
         }
 
-        public IEnumerable<Uri> Hosts { get; set; }
+        public ICollection<Uri> Hosts { get; set; }
         public TimeSpan Timeout { get; set; }
         public int QueueSize { get; set; }
     }

@@ -5,7 +5,7 @@ namespace KafkaNet
 {
     public interface IKafkaOptions
     {
-        IEnumerable<Uri> Hosts { get; }
+        ICollection<Uri> Hosts { get; }
         TimeSpan Timeout { get; }
         int QueueSize { get; }
     }

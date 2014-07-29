@@ -34,6 +34,8 @@ namespace KafkaNet
             this.log = log;
             this.partitionSelector = partitionSelector;
             this.connectionFactory = connectionFactory;
+
+            if (options.Hosts == null || options.Hosts.Count <= 0) throw new InvalidConfigurationException("No hosts specified in the options parameter.  The BrokerRouter requires at least one host.");
             _defaultConnections
                 .AddRange(options.Hosts.Distinct()
                 .Select(uri => connectionFactory.Create(uri, options.Timeout)));
