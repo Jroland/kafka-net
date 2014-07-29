@@ -1,9 +1,8 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using KafkaNet.Model;
+using KafkaNet.Configuration;
 using KafkaNet.Protocol;
 using System.Threading;
 
@@ -13,7 +12,7 @@ namespace KafkaNet
     /// <summary>
     /// Provides a simplified high level API for producing messages on a topic.
     /// </summary>
-    public class Producer : IMetadataQueries, IDisposable
+    public class Producer : IMetadataQueries, IProducer
     {
         private readonly IBrokerRouter _router;
         private readonly SemaphoreSlim _sendSemaphore;
@@ -30,6 +29,7 @@ namespace KafkaNet
         /// </summary>
         /// <param name="brokerRouter">The router used to direct produced messages to the correct partition.</param>
         /// <param name="maximumAsyncQueue">The maximum async calls allowed before blocking new requests.  -1 indicates unlimited.</param>
+        /// <param name="options"></param>
         /// <remarks>
         /// The maximumAsyncQueue parameter provides a mechanism for blocking an async request return if the amount of requests queue is 
         /// over a certain limit.  This is usefull if a client is trying to push a large stream of documents through the producer and
@@ -39,11 +39,11 @@ namespace KafkaNet
         /// messages sitting in the async queue then a message may spend its entire timeout cycle waiting in this queue and never getting
         /// attempted to send to Kafka before a timeout exception is thrown.
         /// </remarks>
-        public Producer(IBrokerRouter brokerRouter, int maximumAsyncQueue = -1)
+        public Producer(IBrokerRouter brokerRouter, IKafkaOptions options)
         {
             _router = brokerRouter;
             _metadataQueries = new MetadataQueries(_router);
-            _maximumAsyncQueue = maximumAsyncQueue == -1 ? int.MaxValue : maximumAsyncQueue;
+            _maximumAsyncQueue = options.QueueSize;
             _sendSemaphore = new SemaphoreSlim(_maximumAsyncQueue, _maximumAsyncQueue);
         }
 

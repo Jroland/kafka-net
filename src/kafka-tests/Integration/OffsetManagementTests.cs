@@ -13,7 +13,7 @@ namespace kafka_tests.Integration
     [Category("Integration")]
     public class OffsetManagementTests
     {
-        private readonly KafkaOptions Options = new KafkaOptions(IntegrationConfig.IntegrationUri);
+        private readonly KafkaOptions Options = new KafkaOptions { Hosts = new [] {IntegrationConfig.IntegrationUri}};
 
         [SetUp]
         public void Setup()
@@ -28,7 +28,8 @@ namespace kafka_tests.Integration
             //Note that if there is no offset associated with a topic-partition under that consumer group the broker does not set an error code 
             //(since it is not really an error), but returns empty metadata and sets the offset field to -1.
             const int partitionId = 0;
-            using (var router = new BrokerRouter(Options))
+            var log = new DefaultTraceLog();
+            using (var router = new BrokerRouter(Options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
             {
                 var request = CreateOffsetFetchRequest(Guid.NewGuid().ToString(), partitionId);
 
@@ -46,7 +47,8 @@ namespace kafka_tests.Integration
         public void OffsetCommitShouldStoreAndReturnSuccess()
         {
             const int partitionId = 0;
-            using (var router = new BrokerRouter(Options))
+            var log = new DefaultTraceLog();
+            using (var router = new BrokerRouter(Options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
             {
                 var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
 
@@ -64,9 +66,9 @@ namespace kafka_tests.Integration
             const int partitionId = 0;
             const long offset = 99;
 
-            using (var router = new BrokerRouter(Options))
+            var log = new DefaultTraceLog();
+            using (var router = new BrokerRouter(Options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
             {
-
                 var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var commit = CreateOffsetCommitRequest(IntegrationConfig.IntegrationConsumer, partitionId, offset);
@@ -92,7 +94,8 @@ namespace kafka_tests.Integration
             const long offset = 101;
             const string metadata = "metadata";
 
-            using (var router = new BrokerRouter(Options))
+            var log = new DefaultTraceLog();
+            using (var router = new BrokerRouter(Options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
             {
                 var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
 
@@ -116,7 +119,8 @@ namespace kafka_tests.Integration
         [Ignore("Not supported currently in 8.1.1?")]
         public void ConsumerMetadataRequestShouldReturnWithoutError()
         {
-            using (var router = new BrokerRouter(Options))
+            var log = new DefaultTraceLog();
+            using (var router = new BrokerRouter(Options, log, new DefaultPartitionSelector(), new DefaultKafkaConnectionFactory(log)))
             {
                 var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic);
 

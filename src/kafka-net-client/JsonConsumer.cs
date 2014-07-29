@@ -9,13 +9,11 @@ namespace KafkaNet.Client
 {
     public class JsonConsumer<T> : IDisposable
     {
-        private readonly ConsumerOptions _options;
         private readonly Consumer _consumer;
 
-        public JsonConsumer(ConsumerOptions options)
+        public JsonConsumer(IBrokerRouter brokerRouter, IKafkaLog log, ConsumerOptions options)
         {
-            _options = options;
-            _consumer = new Consumer(options);
+            _consumer = new Consumer(brokerRouter, log, options);
         }
 
         public IEnumerable<Message<T>> Consume()

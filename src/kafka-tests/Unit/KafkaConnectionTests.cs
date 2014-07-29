@@ -33,7 +33,7 @@ namespace kafka_tests.Unit
         public void ShouldStartReadPollingOnConstruction()
         {
             using (var socket = new KafkaTcpSocket(_log, new Uri("http://localhost:8999")))
-            using (var conn = new KafkaConnection(socket, log: _log))
+            using (var conn = new KafkaConnection(socket, 10000, _log))
             {
                 TaskTest.WaitFor(() => conn.ReadPolling);
                 Assert.That(conn.ReadPolling, Is.True);
@@ -45,7 +45,7 @@ namespace kafka_tests.Unit
         {
             var expectedUrl = new Uri("http://localhost:8999");
             using (var socket = new KafkaTcpSocket(_log, expectedUrl))
-            using (var conn = new KafkaConnection(socket, log: _log))
+            using (var conn = new KafkaConnection(socket, 10000, _log))
             {
                 Assert.That(conn.KafkaUri, Is.EqualTo(expectedUrl));
             }
@@ -59,7 +59,7 @@ namespace kafka_tests.Unit
             using (var server = new FakeTcpServer(8999))
             using (var socket = new KafkaTcpSocket(_log, new Uri("http://localhost:8999")))
             {
-                var conn = new KafkaConnection(socket, log: _log);
+                var conn = new KafkaConnection(socket, 10000, _log);
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 using (conn) { }
             }
@@ -69,7 +69,7 @@ namespace kafka_tests.Unit
         public void ShouldDisposeWithoutExceptionEvenWhileCallingSendAsync()
         {
             using (var socket = new KafkaTcpSocket(_log, new Uri("http://localhost:8999")))
-            using (var conn = new KafkaConnection(socket, log: _log))
+            using (var conn = new KafkaConnection(socket, 10000, _log))
             {
                 var task = conn.SendAsync(new MetadataRequest());
                 task.Wait(TimeSpan.FromMilliseconds(1000));
@@ -86,7 +86,7 @@ namespace kafka_tests.Unit
 
             using (var server = new FakeTcpServer(8999))
             using (var socket = new KafkaTcpSocket(mockLog.Object, new Uri("http://localhost:8999")))
-            using (var conn = new KafkaConnection(socket, log: mockLog.Object))
+            using (var conn = new KafkaConnection(socket, 10000, mockLog.Object))
             {
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
@@ -112,7 +112,7 @@ namespace kafka_tests.Unit
 
             using (var server = new FakeTcpServer(8999))
             using (var socket = new KafkaTcpSocket(mockLog.Object, new Uri("http://localhost:8999")))
-            using (var conn = new KafkaConnection(socket, log: mockLog.Object))
+            using (var conn = new KafkaConnection(socket, 10000, mockLog.Object))
             {
                 //send correlation message
                 server.SendDataAsync(CreateCorrelationMessage(correlationId)).Wait(TimeSpan.FromSeconds(1));

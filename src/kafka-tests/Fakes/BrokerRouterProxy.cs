@@ -31,6 +31,7 @@ namespace kafka_tests
         public Func<MetadataResponse> MetadataResponse = () => DefaultMetadataResponse();
 
         public IPartitionSelector PartitionSelector = new DefaultPartitionSelector();
+        public IKafkaLog KafkaLog = new DefaultTraceLog();
 
         public BrokerRouterProxy(MoqMockingKernel kernel)
         {
@@ -50,18 +51,16 @@ namespace kafka_tests
             _fakeConn1.FetchResponseFunction = () => { Thread.Sleep(500); return null; };
             
             _factoryMock = _kernel.GetMock<IKafkaConnectionFactory>();
-            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _fakeConn0);
-            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _fakeConn1);
+            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 1), It.IsAny<TimeSpan>())).Returns(() => _fakeConn0);
+            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 2), It.IsAny<TimeSpan>())).Returns(() => _fakeConn1);
         }
 
         public IBrokerRouter Create()
         {
-            return new BrokerRouter(new KafkaNet.Model.KafkaOptions
+            return new BrokerRouter(new KafkaOptions
             {
-                KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },
-                KafkaConnectionFactory = _factoryMock.Object,
-                PartitionSelector = PartitionSelector
-            });
+                Hosts = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },
+            }, KafkaLog, PartitionSelector, _factoryMock.Object);
         }
 
         public static MetadataResponse DefaultMetadataResponse()

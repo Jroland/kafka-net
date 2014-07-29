@@ -1,6 +1,4 @@
-﻿using System.Collections.Generic;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
+﻿using KafkaNet.Protocol;
 
 namespace KafkaNet
 {

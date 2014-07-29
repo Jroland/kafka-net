@@ -22,13 +22,14 @@ namespace kafka_tests.Unit
         public void CancellationShouldInterruptConsumption()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = () => new FetchResponse();
 
             var router = routerProxy.Create();
 
-            var options = CreateOptions(router);
 
-            using (var consumer = new Consumer(options))
+            var options = CreateOptions();
+
+            using (var consumer = new Consumer(router, new DefaultTraceLog(), options))
             {
                 var tokenSrc = new CancellationTokenSource();
 
@@ -49,11 +50,11 @@ namespace kafka_tests.Unit
         public void ConsumerWhitelistShouldOnlyConsumeSpecifiedPartition()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = () => new FetchResponse();
             var router = routerProxy.Create();
-            var options = CreateOptions(router);
+            var options = CreateOptions();
             options.PartitionWhitelist = new List<int> { 0 };
-            using (var consumer = new Consumer(options))
+            using (var consumer = new Consumer(router, new DefaultTraceLog(), options))
             {
                 var test = consumer.Consume();
 
@@ -72,10 +73,10 @@ namespace kafka_tests.Unit
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
 
             var router = routerProxy.Create();
-            var options = CreateOptions(router);
+            var options = CreateOptions();
             options.PartitionWhitelist = new List<int>();
 
-            using (var consumer = new Consumer(options))
+            using (var consumer = new Consumer(router, new DefaultTraceLog(), options))
             {
                 var test = consumer.Consume();
 
@@ -93,11 +94,11 @@ namespace kafka_tests.Unit
         public void ConsumerShouldCreateTaskForEachBroker()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = () => new FetchResponse();
             var router = routerProxy.Create();
-            var options = CreateOptions(router);
+            var options = CreateOptions();
             options.PartitionWhitelist = new List<int>();
-            using (var consumer = new Consumer(options))
+            using (var consumer = new Consumer(router, new DefaultTraceLog(), options))
             {
                 var test = consumer.Consume();
                 TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
@@ -111,11 +112,11 @@ namespace kafka_tests.Unit
         public void ConsumerShouldReturnOffset()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = () => new FetchResponse();
             var router = routerProxy.Create();
-            var options = CreateOptions(router);
+            var options = CreateOptions();
             options.PartitionWhitelist = new List<int>();
-            using (var consumer = new Consumer(options))
+            using (var consumer = new Consumer(router, new DefaultTraceLog(), options))
             {
                 var test = consumer.Consume();
                 TaskTest.WaitFor(() => consumer.ConsumerTaskCount >= 2);
@@ -128,7 +129,7 @@ namespace kafka_tests.Unit
         public void EnsureConsumerDisposesRouter()
         {
             var router = new MoqMockingKernel().GetMock<IBrokerRouter>();
-            var consumer = new Consumer(CreateOptions(router.Object));
+            var consumer = new Consumer(router.Object, new DefaultTraceLog(), CreateOptions());
             using (consumer) { }
             router.Verify(x => x.Dispose(), Times.Once());
         }
@@ -137,12 +138,12 @@ namespace kafka_tests.Unit
         public void EnsureConsumerDisposesAllTasks()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = () => new FetchResponse();
             var router = routerProxy.Create();
-            var options = CreateOptions(router);
+            var options = CreateOptions();
             options.PartitionWhitelist = new List<int>();
 
-            var consumer = new Consumer(options);
+            var consumer = new Consumer(router, new DefaultTraceLog(), options);
             using (consumer)
             {
                 var test = consumer.Consume();
@@ -153,9 +154,9 @@ namespace kafka_tests.Unit
             Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(0));
         }
 
-        private ConsumerOptions CreateOptions(IBrokerRouter router)
+        private ConsumerOptions CreateOptions()
         {
-            return new ConsumerOptions(BrokerRouterProxy.TestTopic, router);
+            return new ConsumerOptions(BrokerRouterProxy.TestTopic);
         }
     }
 }

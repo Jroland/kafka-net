@@ -1,16 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace KafkaNet
 {
     public class DefaultKafkaConnectionFactory : IKafkaConnectionFactory
     {
-        public IKafkaConnection Create(Uri kafkaAddress, int responseTimeoutMs, IKafkaLog log)
+        private readonly IKafkaLog kafkaLog;
+        
+        public DefaultKafkaConnectionFactory(IKafkaLog kafkaLog)
         {
-            return new KafkaConnection(new KafkaTcpSocket(log, kafkaAddress), responseTimeoutMs, log);
+            this.kafkaLog = kafkaLog;
+        }
+
+        public IKafkaConnection Create(Uri kafkaAddress, TimeSpan timeout)
+        {
+            return new KafkaConnection(new KafkaTcpSocket(kafkaLog, kafkaAddress), (int)timeout.TotalMilliseconds, kafkaLog);
         }
     }
 }
