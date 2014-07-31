@@ -132,11 +132,12 @@ namespace KafkaNet
 
         private async Task<byte[]> EnsureReadAsync(int readSize, CancellationToken token)
         {
+            var registration = new CancellationTokenRegistration();
             try
             {
                 await _readSemaphore.WaitAsync();
                 var cancelTask = new TaskCompletionSource<byte>();
-                token.Register(cancelTask.SetCanceled);
+                registration = token.Register(cancelTask.SetCanceled);
 
                 var result = new List<byte>();
                 var bytesReceived = 0;
@@ -174,6 +175,7 @@ namespace KafkaNet
             }
             finally
             {
+                registration.Dispose();
                 _readSemaphore.Release();
             }
         }
@@ -229,7 +231,7 @@ namespace KafkaNet
         public void Dispose()
         {
             _disposeToken.Cancel();
-
+            _disposeToken.Dispose();
             using (_client)
             {
                 

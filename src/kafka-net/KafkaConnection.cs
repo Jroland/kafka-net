@@ -223,6 +223,7 @@ namespace KafkaNet
             using (_responseTimeoutTimer)
             {
                 _disposeToken.Cancel();
+                _disposeToken.Dispose();
                 ResponseTimeoutCheck();
             }
         }

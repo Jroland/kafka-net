@@ -206,6 +206,7 @@ namespace KafkaNet
         {
             _options.Log.DebugFormat("Consumer: Disposing...");
             _disposeToken.Cancel();
+            _disposeToken.Dispose();
             using (_topicPartitionQueryTimer)
             using (_metadataQueries)
             { }
