@@ -17,12 +17,12 @@ namespace kafka_tests.Helpers
         public event ClientEventDelegate OnClientConnected;
         public event ClientEventDelegate OnClientDisconnected;
 
-        private readonly SemaphoreSlim _serverCloseSemaphore = new SemaphoreSlim(0);
-
         private TcpClient _client;
-        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly ThreadWall _threadWall = new ThreadWall(ThreadWallInitialState.Blocked);
         private readonly TcpListener _listener;
+        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+
+        private Task _clientConnectionHandlerTask = null;
 
         public int ConnectionEventcount = 0;
         public int DisconnectionEventCount = 0;
@@ -35,7 +35,7 @@ namespace kafka_tests.Helpers
             OnClientConnected += () => Interlocked.Increment(ref ConnectionEventcount);
             OnClientDisconnected += () => Interlocked.Increment(ref DisconnectionEventCount);
 
-            StartHandlingClientRequestAsync();
+            _clientConnectionHandlerTask = StartHandlingClientRequestAsync();
         }
 
         public async Task SendDataAsync(byte[] data)
@@ -86,7 +86,7 @@ namespace kafka_tests.Helpers
                         {
                             //connect client
                             var connectTask = stream.ReadAsync(buffer, 0, buffer.Length, _disposeToken.Token);
-                            
+
                             var bytesReceived = await connectTask;
                             if (bytesReceived > 0)
                             {
@@ -111,12 +111,15 @@ namespace kafka_tests.Helpers
         public void Dispose()
         {
             if (_disposeToken != null) _disposeToken.Cancel();
+
             _listener.Stop();
 
             using (_disposeToken)
-            using (_serverCloseSemaphore)
             {
-                _serverCloseSemaphore.Release();
+                if (_clientConnectionHandlerTask != null)
+                {
+                    _clientConnectionHandlerTask.Wait(TimeSpan.FromSeconds(5));
+                }
             }
         }
     }
