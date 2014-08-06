@@ -18,11 +18,11 @@ namespace kafka_tests.Helpers
         public event ClientEventDelegate OnClientDisconnected;
 
         private TcpClient _client;
-        private readonly ThreadWall _threadWall = new ThreadWall(ThreadWallInitialState.Blocked);
+        private readonly ThreadWall _threadWall = new ThreadWall(ThreadWallState.Blocked);
         private readonly TcpListener _listener;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
 
-        private Task _clientConnectionHandlerTask = null;
+        private readonly Task _clientConnectionHandlerTask = null;
 
         public int ConnectionEventcount = 0;
         public int DisconnectionEventCount = 0;
@@ -112,14 +112,14 @@ namespace kafka_tests.Helpers
         {
             if (_disposeToken != null) _disposeToken.Cancel();
 
-            _listener.Stop();
-
             using (_disposeToken)
             {
                 if (_clientConnectionHandlerTask != null)
                 {
                     _clientConnectionHandlerTask.Wait(TimeSpan.FromSeconds(5));
                 }
+
+                _listener.Stop();
             }
         }
     }
