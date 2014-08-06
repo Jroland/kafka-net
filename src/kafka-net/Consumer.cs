@@ -26,6 +26,7 @@ namespace KafkaNet
         private readonly IScheduledTimer _topicPartitionQueryTimer;
         private readonly IMetadataQueries _metadataQueries;
 
+        private int _disposeCount;
         private int _ensureOneThread;
         private Topic _topic;
 
@@ -204,6 +205,8 @@ namespace KafkaNet
 
         public void Dispose()
         {
+            if (Interlocked.Increment(ref _disposeCount) != 1) return;
+
             _options.Log.DebugFormat("Consumer: Disposing...");
             _disposeToken.Cancel();
             _topicPartitionQueryTimer.End();
