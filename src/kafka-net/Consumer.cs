@@ -26,6 +26,7 @@ namespace KafkaNet
         private readonly IScheduledTimer _topicPartitionQueryTimer;
         private readonly IMetadataQueries _metadataQueries;
 
+        private int _disposeCount;
         private int _ensureOneThread;
         private Topic _topic;
 
@@ -85,7 +86,7 @@ namespace KafkaNet
             return _partitionOffsetIndex.Select(x => new OffsetPosition { PartitionId = x.Key, Offset = x.Value }).ToList();
         }
 
-        private void RefreshTopicPartitions() 
+        private void RefreshTopicPartitions()
         {
             try
             {
@@ -96,7 +97,7 @@ namespace KafkaNet
                     if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
                     _topic = topic.First();
 
-                    //create one thread per partitions, if they are in the white list.
+                    //create one thread per partition, if they are in the white list.
                     foreach (var partition in _topic.Partitions)
                     {
                         var partitionId = partition.PartitionId;
@@ -179,9 +180,9 @@ namespace KafkaNet
                         }
                         catch (Exception ex)
                         {
-                        	_options.Log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
+                            _options.Log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
                         }
-                	}
+                    }
                 }
                 finally
                 {
@@ -204,10 +205,21 @@ namespace KafkaNet
 
         public void Dispose()
         {
+            if (Interlocked.Increment(ref _disposeCount) != 1) return;
+
             _options.Log.DebugFormat("Consumer: Disposing...");
             _disposeToken.Cancel();
+            _topicPartitionQueryTimer.End();
+
+            //wait for all threads to unwind
+            foreach (var task in _partitionPollingIndex.Values.Where(task => task != null))
+            {
+                task.Wait(TimeSpan.FromSeconds(5));
+            }
+
             using (_topicPartitionQueryTimer)
             using (_metadataQueries)
+            using (_disposeToken)
             { }
         }
     }

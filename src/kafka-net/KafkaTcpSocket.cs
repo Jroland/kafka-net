@@ -21,14 +21,16 @@ namespace KafkaNet
         private const int DefaultReconnectionTimeout = 500;
         private const int DefaultReconnectionTimeoutMultiplier = 2;
 
-        private readonly SemaphoreSlim _readSemaphore = new SemaphoreSlim(1,1);
-        private readonly ThreadWall _threadWall = new ThreadWall(ThreadWallInitialState.Blocked);
+        private readonly SemaphoreSlim _singleReaderSemaphore = new SemaphoreSlim(1, 1);
+        private readonly ThreadWall _getConnectedClientThreadWall = new ThreadWall(ThreadWallState.Blocked);
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly IKafkaLog _log;
         private readonly Uri _serverUri;
-        
+
         private TcpClient _client;
         private int _ensureOneThread;
+        private int _disposeCount;
+        private Task _clientConnectingTask = null;
 
         /// <summary>
         /// Construct socket and open connection to a specified server.
@@ -41,6 +43,8 @@ namespace KafkaNet
             _log = log;
             _serverUri = serverUri;
             Task.Delay(TimeSpan.FromMilliseconds(delayConnectAttemptMS)).ContinueWith(x => TriggerReconnection());
+
+
         }
 
         #region Interface Implementation...
@@ -108,10 +112,12 @@ namespace KafkaNet
 
         private Task<TcpClient> GetClientAsync()
         {
-            return _threadWall.RequestPassageAsync().ContinueWith(t =>
+            return _getConnectedClientThreadWall.RequestPassageAsync().ContinueWith(t =>
                 {
-                    if (_client == null) 
+                    if (_client == null)
+                    {
                         throw new ServerUnreachableException(string.Format("Connection to {0} was not established.", _serverUri));
+                    }
                     return _client;
                 });
         }
@@ -132,11 +138,14 @@ namespace KafkaNet
 
         private async Task<byte[]> EnsureReadAsync(int readSize, CancellationToken token)
         {
+            var cancelTaskToken = new CancellationTokenRegistration();
             try
             {
-                await _readSemaphore.WaitAsync();
+                await _singleReaderSemaphore.WaitAsync(token);
+
+                //note we use a parallel cancel token here because ReadAsync does not seem to cancel when token is set.  .Net issue?
                 var cancelTask = new TaskCompletionSource<byte>();
-                token.Register(cancelTask.SetCanceled);
+                cancelTaskToken = token.Register(cancelTask.SetCanceled);
 
                 var result = new List<byte>();
                 var bytesReceived = 0;
@@ -170,11 +179,13 @@ namespace KafkaNet
             catch
             {
                 if (_disposeToken.IsCancellationRequested) throw new ObjectDisposedException("Object is disposing.");
+                //TODO add exception test here to see if an exception made us lose a connection Issue #17
                 throw;
             }
             finally
             {
-                _readSemaphore.Release();
+                using (cancelTaskToken) { }
+                _singleReaderSemaphore.Release();
             }
         }
 
@@ -183,12 +194,14 @@ namespace KafkaNet
             //only allow one thread to trigger a reconnection, all other requests should be ignored.
             if (Interlocked.Increment(ref _ensureOneThread) == 1)
             {
-                _threadWall.Block();
-                ReEstablishConnection().ContinueWith(x =>
-                {
-                    Interlocked.Decrement(ref _ensureOneThread);
-                    _threadWall.Release();
-                });
+                //block downstream from getting a socket client until reconnected
+                _getConnectedClientThreadWall.Block();
+                _clientConnectingTask = ReEstablishConnectionAsync()
+                    .ContinueWith(x =>
+                    {
+                        Interlocked.Decrement(ref _ensureOneThread);
+                        _getConnectedClientThreadWall.Release();
+                    });
             }
             else
             {
@@ -196,14 +209,14 @@ namespace KafkaNet
             }
         }
 
-        private async Task<TcpClient> ReEstablishConnection()
+        private async Task<TcpClient> ReEstablishConnectionAsync()
         {
             var attempts = 1;
             var reconnectionDelay = DefaultReconnectionTimeout;
             _log.WarnFormat("No connection to:{0}.  Attempting to re-connect...", ClientUri);
 
             //clean up existing client
-            using (_client) { }
+            using (_client) { _client = null; }
 
             while (_disposeToken.IsCancellationRequested == false)
             {
@@ -219,8 +232,9 @@ namespace KafkaNet
                 {
                     reconnectionDelay = reconnectionDelay * DefaultReconnectionTimeoutMultiplier;
                     _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", ClientUri, reconnectionDelay);
-                    Task.Delay(TimeSpan.FromMilliseconds(reconnectionDelay)).Wait();
                 }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(reconnectionDelay), _disposeToken.Token);
             }
 
             return _client;
@@ -228,11 +242,16 @@ namespace KafkaNet
 
         public void Dispose()
         {
-            _disposeToken.Cancel();
-
+            if (Interlocked.Increment(ref _disposeCount) != 1) return;
+            if (_disposeToken != null) _disposeToken.Cancel();
+            
+            using (_disposeToken)
             using (_client)
             {
-                
+                if (_clientConnectingTask != null)
+                {
+                    _clientConnectingTask.Wait(TimeSpan.FromSeconds(5));
+                }
             }
         }
     }

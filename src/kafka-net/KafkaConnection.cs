@@ -30,7 +30,8 @@ namespace KafkaNet
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly SemaphoreSlim _timeoutSemaphore = new SemaphoreSlim(1, 1);
 
-
+        private int _disposeCount = 0;
+        private Task _connectionReadPollingTask = null;
         private int _ensureOneActiveReader;
         private int _correlationIdSeed;
 
@@ -128,24 +129,30 @@ namespace KafkaNet
         {
             //This thread will poll the receive stream for data, parce a message out
             //and trigger an event with the message payload
-            Task.Factory.StartNew(() =>
+            _connectionReadPollingTask = Task.Factory.StartNew(async () =>
                 {
                     try
                     {
                         //only allow one reader to execute, dump out all other requests
                         if (Interlocked.Increment(ref _ensureOneActiveReader) != 1) return;
-
-                        while (_disposeToken.Token.IsCancellationRequested == false)
+                        
+                        while (_disposeToken.IsCancellationRequested == false)
                         {
                             try
                             {
                                 _log.DebugFormat("Awaiting message from: {0}", KafkaUri);
-                                var messageSize = _client.ReadAsync(4, _disposeToken.Token).Result.ToInt32();
+                                var messageSizeResult = await _client.ReadAsync(4, _disposeToken.Token);
+                                var messageSize = messageSizeResult.ToInt32();
 
                                 _log.DebugFormat("Received message of size: {0} From: {1}", messageSize, KafkaUri);
-                                var message = _client.ReadAsync(messageSize, _disposeToken.Token).Result;
+                                var message = await _client.ReadAsync(messageSize, _disposeToken.Token);
 
                                 CorrelatePayloadToRequest(message);
+                            }
+                            catch (TaskCanceledException ex)
+                            {
+                                //ignore task canceled expections if we are disposing
+                                if (_disposeToken.IsCancellationRequested == false) throw;
                             }
                             catch (Exception ex)
                             {
@@ -158,6 +165,7 @@ namespace KafkaNet
                     finally
                     {
                         Interlocked.Decrement(ref _ensureOneActiveReader);
+                        _log.DebugFormat("Closed down connection to: {0}", _client.ClientUri);
                     }
                 }, TaskCreationOptions.LongRunning);
         }
@@ -197,14 +205,14 @@ namespace KafkaNet
                 _timeoutSemaphore.Wait();
 
                 var timeouts = _requestIndex.Values.Where(x =>
-                    x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _disposeToken.Token.IsCancellationRequested).ToList();
+                    x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _disposeToken.IsCancellationRequested).ToList();
 
                 foreach (var timeout in timeouts)
                 {
                     AsyncRequestItem request;
                     if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
                     {
-                        if (_disposeToken.Token.IsCancellationRequested) request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
+                        if (_disposeToken.IsCancellationRequested) request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
 
                         request.ReceiveTask.TrySetException(new ResponseTimeoutException(
                             string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
@@ -219,11 +227,23 @@ namespace KafkaNet
 
         public void Dispose()
         {
+            //skip multiple calls to dispose
+            if (Interlocked.Increment(ref _disposeCount) != 1) return; 
+            
+            _responseTimeoutTimer.End();
+            
+            _disposeToken.Cancel();
+            if (_connectionReadPollingTask != null) _connectionReadPollingTask.Wait(TimeSpan.FromSeconds(1));
+            
+            using(_disposeToken)
+            {
+                ResponseTimeoutCheck();
+            }
+
             using (_client)
             using (_responseTimeoutTimer)
             {
-                _disposeToken.Cancel();
-                ResponseTimeoutCheck();
+
             }
         }
 

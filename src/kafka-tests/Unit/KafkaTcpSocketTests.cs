@@ -10,7 +10,7 @@ using NUnit.Framework;
 using kafka_tests.Helpers;
 using System.Collections.Generic;
 
-namespace kafka_tests.Integration
+namespace kafka_tests.Unit
 {
     /// <summary>
     /// Note these integration tests require an actively running kafka server defined in the app.config file.
@@ -19,6 +19,7 @@ namespace kafka_tests.Integration
     [Category("unit")]
     public class KafkaTcpSocketTests
     {
+        private const int FakeServerPort = 8999;
         private readonly Uri _fakeServerUrl;
         private readonly Uri _badServerUrl;
 
@@ -86,7 +87,7 @@ namespace kafka_tests.Integration
         [Test]
         public void KafkaTcpSocketShouldDisposeEvenWhileAwaitingReadAndThrowException()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
@@ -122,7 +123,7 @@ namespace kafka_tests.Integration
         [Test]
         public void ReadShouldCancelWhileAwaitingResponse()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 var count = 0;
                 var semaphore = new SemaphoreSlim(0);
@@ -148,7 +149,7 @@ namespace kafka_tests.Integration
         [Test]
         public void ReadShouldBlockUntilAllBytesRequestedAreReceived()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 var count = 0;
 
@@ -185,7 +186,7 @@ namespace kafka_tests.Integration
         [Test]
         public void ReadShouldBeAbleToReceiveMoreThanOnce()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 const int firstMessage = 99;
                 const string secondMessage = "testmessage";
@@ -209,7 +210,7 @@ namespace kafka_tests.Integration
         [Test]
         public void ReadShouldNotLoseDataFromStreamOverMultipleReads()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 const int firstMessage = 99;
                 const string secondMessage = "testmessage";
@@ -233,7 +234,7 @@ namespace kafka_tests.Integration
         [Test]
         public void ReadShouldThrowServerDisconnectedExceptionWhenDisconnected()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 var socket = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
@@ -257,7 +258,7 @@ namespace kafka_tests.Integration
         [Test]
         public void ReadShouldReconnectAfterLosingConnection()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 var disconnects = 0;
                 var connects = 0;
@@ -306,7 +307,7 @@ namespace kafka_tests.Integration
         [Test]
         public void ReadShouldStackReadRequestsAndReturnOneAtATime()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 var messages = new[]{"test1", "test2", "test3", "test4"};
                 var expectedLength = "test1".Length;
@@ -334,7 +335,7 @@ namespace kafka_tests.Integration
         [Test]
         public void WriteAsyncShouldSendData()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 const int testData = 99;
                 int result = 0;
@@ -351,7 +352,7 @@ namespace kafka_tests.Integration
         [Test]
         public void WriteAsyncShouldAllowMoreThanOneWrite()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(FakeServerPort))
             {
                 const int testData = 99;
                 var results = new List<byte>();
