@@ -149,16 +149,15 @@ namespace KafkaNet
 
                                 CorrelatePayloadToRequest(message);
                             }
-                            catch (OperationCanceledException ex)
-                            {
-                                //ignore task canceled expections if we are disposing
-                                if (_disposeToken.IsCancellationRequested == false) throw;
-                            }
                             catch (Exception ex)
                             {
-                                //TODO being in sync with the byte order on read is important.  What happens if this exception causes us to be out of sync?
-                                //record exception and continue to scan for data.
-                                _log.ErrorFormat("Exception occured in polling read thread.  Exception={0}", ex);
+                                //don't record the exception if we are disposing
+                                if (_disposeToken.IsCancellationRequested == false)
+                                {
+                                    //TODO being in sync with the byte order on read is important.  What happens if this exception causes us to be out of sync?
+                                    //record exception and continue to scan for data.
+                                    _log.ErrorFormat("Exception occured in polling read thread.  Exception={0}", ex);
+                                }
                             }
                         }
                     }
@@ -189,7 +188,7 @@ namespace KafkaNet
             var id = Interlocked.Increment(ref _correlationIdSeed);
             if (id > int.MaxValue - 100) //somewhere close to max reset.
             {
-                Interlocked.Add(ref _correlationIdSeed, -1 * id);
+                Interlocked.Exchange(ref _correlationIdSeed, 0);
             }
             return id;
         }
@@ -212,10 +211,15 @@ namespace KafkaNet
                     AsyncRequestItem request;
                     if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
                     {
-                        if (_disposeToken.IsCancellationRequested) request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
-
-                        request.ReceiveTask.TrySetException(new ResponseTimeoutException(
-                            string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
+                        if (_disposeToken.IsCancellationRequested)
+                        {
+                            request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
+                        }
+                        else
+                        {
+                            request.ReceiveTask.TrySetException(new ResponseTimeoutException(
+                                string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
+                        }
                     }
                 }
             }
@@ -233,6 +237,7 @@ namespace KafkaNet
             _responseTimeoutTimer.End();
             
             _disposeToken.Cancel();
+
             if (_connectionReadPollingTask != null) _connectionReadPollingTask.Wait(TimeSpan.FromSeconds(1));
             
             using(_disposeToken)
