@@ -143,10 +143,6 @@ namespace KafkaNet
             {
                 await _singleReaderSemaphore.WaitAsync(token);
 
-                //note we use a parallel cancel token here because ReadAsync does not seem to cancel when token is set.  .Net issue?
-                var cancelTask = new TaskCompletionSource<byte>();
-                cancelTaskToken = token.Register(cancelTask.SetCanceled);
-
                 var result = new List<byte>();
                 var bytesReceived = 0;
 
@@ -156,15 +152,9 @@ namespace KafkaNet
                     var buffer = new byte[readSize];
 
                     var client = await GetClientAsync();
-                    var readTask = client.GetStream().ReadAsync(buffer, 0, readSize, token);
-                    var completedTask = await Task.WhenAny(cancelTask.Task, readTask);
 
-                    if (completedTask == cancelTask.Task)
-                    {
-                        throw new TaskCanceledException("Task cancel token was set.");
-                    }
+                    bytesReceived = await client.GetStream().ReadAsync(buffer, 0, readSize, token).WithCancellation(token);
 
-                    bytesReceived = readTask.Result;
                     if (bytesReceived <= 0)
                     {
                         TriggerReconnection();

@@ -149,7 +149,7 @@ namespace KafkaNet
 
                                 CorrelatePayloadToRequest(message);
                             }
-                            catch (TaskCanceledException ex)
+                            catch (OperationCanceledException ex)
                             {
                                 //ignore task canceled expections if we are disposing
                                 if (_disposeToken.IsCancellationRequested == false) throw;
