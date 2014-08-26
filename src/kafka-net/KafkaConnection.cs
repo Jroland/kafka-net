@@ -78,7 +78,7 @@ namespace KafkaNet
         /// <returns>Task which signals the completion of the upload of data to the server.</returns>
         public Task SendAsync(byte[] payload)
         {
-            return _client.WriteAsync(payload, 0, payload.Length);
+            return _client.WriteAsync(payload);
         }
 
 

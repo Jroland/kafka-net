@@ -107,7 +107,7 @@ namespace kafka_tests.Unit
         {
             var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
-            var taskResult = test.WriteAsync(4.ToBytes(), 0, 4);
+            var taskResult = test.WriteAsync(4.ToBytes());
 
             using (test) { } //allow the sockets to set
 
@@ -343,7 +343,7 @@ namespace kafka_tests.Unit
                 var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
                 server.OnBytesReceived += data => result = data.ToInt32();
 
-                test.WriteAsync(testData.ToBytes(), 0, 4).Wait(TimeSpan.FromSeconds(1));
+                test.WriteAsync(testData.ToBytes()).Wait(TimeSpan.FromSeconds(1));
                 TaskTest.WaitFor(() => result > 0);
                 Assert.That(result, Is.EqualTo(testData));
             }

@@ -81,32 +81,19 @@ namespace KafkaNet
         /// <returns>Returns Task handle to the write operation.</returns>
         public Task WriteAsync(byte[] buffer)
         {
-            return WriteAsync(buffer, 0, buffer.Length, _disposeToken.Token);
+            return WriteAsync(buffer, _disposeToken.Token);
         }
 
+       
         /// <summary>
         /// Write the buffer data to the server.
         /// </summary>
         /// <param name="buffer">The buffer data to send.</param>
-        /// <param name="offset">The offset to start the read from the buffer.</param>
-        /// <param name="count">The length of data to read off the buffer.</param>
-        /// <returns>Returns Task handle to the write operation.</returns>
-        public Task WriteAsync(byte[] buffer, int offset, int count)
-        {
-            return WriteAsync(buffer, offset, count, _disposeToken.Token);
-        }
-
-        /// <summary>
-        /// Write the buffer data to the server.
-        /// </summary>
-        /// <param name="buffer">The buffer data to send.</param>
-        /// <param name="offset">The offset to start the read from the buffer.</param>
-        /// <param name="count">The length of data to read off the buffer.</param>
         /// <param name="cancellationToken">A cancellation token which will cancel the request.</param>
         /// <returns>Returns Task handle to the write operation.</returns>
-        public Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        public Task WriteAsync(byte[] buffer, CancellationToken cancellationToken)
         {
-            return EnsureWriteAsync(buffer, offset, count, cancellationToken);
+            return EnsureWriteAsync(buffer, 0, buffer.Length, cancellationToken);
         }
         #endregion
 
