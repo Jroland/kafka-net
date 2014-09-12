@@ -35,7 +35,7 @@ namespace KafkaNet.Common
             if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
 
             //UTF8 is array of bytes, no endianness
-            return Encoding.Default.GetBytes(value);
+            return Encoding.UTF8.GetBytes(value);
         }
 
         public static byte[] ToBytes(this Int16 value)

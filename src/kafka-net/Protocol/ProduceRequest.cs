@@ -101,7 +101,7 @@ namespace KafkaNet.Protocol
             var compressedMessage = new Message
                 {
                     Attribute = (byte) (0x00 | (ProtocolConstants.AttributeCodeMask & (byte) MessageCodec.CodecGzip)),
-                    Value = Encoding.Default.GetString(gZipBytes)
+                    Value = Encoding.UTF8.GetString(gZipBytes)
                 };
 
                 return new[] { compressedMessage };
