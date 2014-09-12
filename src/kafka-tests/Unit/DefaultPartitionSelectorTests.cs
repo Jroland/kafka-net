@@ -101,6 +101,27 @@ namespace kafka_tests.Unit
         }
 
         [Test]
+        public void RoundRobinShouldEvenlyDistributeAcrossManyPartitions()
+        {
+            const int TotalPartitions = 100;
+            var selector = new DefaultPartitionSelector();
+            var partitions = new List<Partition>();
+            for (int i = 0; i < TotalPartitions; i++)
+            {
+                partitions.Add(new Partition { LeaderId = i, PartitionId = i });
+            }
+            var topic = new Topic { Name = "a", Partitions = partitions };
+
+            var bag = new ConcurrentBag<Partition>();
+            Parallel.For(0, TotalPartitions * 3, x => bag.Add(selector.Select(topic, null)));
+
+            var eachPartitionHasThree = bag.GroupBy(x => x.PartitionId).Count();
+                
+            Assert.That(eachPartitionHasThree, Is.EqualTo(TotalPartitions), "Each partition should have received three selections.");
+        }
+
+
+        [Test]
         public void KeyHashShouldSelectEachPartitionType()
         {
             var selector = new DefaultPartitionSelector();

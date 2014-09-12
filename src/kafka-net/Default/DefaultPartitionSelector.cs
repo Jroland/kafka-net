@@ -8,25 +8,25 @@ namespace KafkaNet
 {
     public class DefaultPartitionSelector : IPartitionSelector
     {
-        private readonly ConcurrentDictionary<string, Partition> _roundRobinTracker = new ConcurrentDictionary<string, Partition>();
+        private readonly ConcurrentDictionary<string, int> _roundRobinTracker = new ConcurrentDictionary<string, int>();
         public Partition Select(Topic topic, string key)
         {
             if (topic == null) throw new ArgumentNullException("topic");
             if (topic.Partitions.Count <= 0) throw new ApplicationException(string.Format("Topic ({0}) has no partitions.", topic.Name));
-            
-            //use round robing
+
+            //use round robin
             var partitions = topic.Partitions;
             if (key == null)
             {
-                return _roundRobinTracker.AddOrUpdate(topic.Name, x => partitions.First(), (s, i) =>
+                //use round robin
+                var paritionIndex = _roundRobinTracker.AddOrUpdate(topic.Name, p => 0, (s, i) =>
                     {
-                        var index = partitions.FindIndex(0, p => p.Equals(i));
-                        if (index == -1) return partitions.First();
-                        if (++index >= partitions.Count) return partitions.First();
-                        return partitions[index];
+                        return ((i + 1) % partitions.Count);
                     });
+
+                return partitions[paritionIndex];
             }
-            
+
             //use key hash
             var partitionId = Math.Abs(key.GetHashCode()) % partitions.Count;
             var partition = partitions.FirstOrDefault(x => x.PartitionId == partitionId);
