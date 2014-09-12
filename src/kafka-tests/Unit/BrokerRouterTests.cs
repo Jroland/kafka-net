@@ -1,4 +1,5 @@
 ﻿using KafkaNet;
+using KafkaNet.Common;
 using KafkaNet.Protocol;
 using Moq;
 using Ninject.MockingKernel.Moq;
@@ -180,8 +181,9 @@ namespace kafka_tests.Unit
         [Test]
         [TestCase(null)]
         [TestCase("withkey")]
-        public void SelectPartitionShouldUsePartitionSelector(string key)
+        public void SelectPartitionShouldUsePartitionSelector(string testCase)
         {
+            var key = testCase.ToIntSizedBytes();
             var routerProxy = new BrokerRouterProxy(_kernel);
 
             _partitionSelectorMock.Setup(x => x.Select(It.IsAny<Topic>(), key))

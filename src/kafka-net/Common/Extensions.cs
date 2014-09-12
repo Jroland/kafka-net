@@ -30,6 +30,22 @@ namespace KafkaNet.Common
                         .ToArray();
         }
 
+        public static byte[] ToIntPrefixedBytes(this byte[] value)
+        {
+            if (value == null) return (-1).ToBytes();
+
+			return value.Length.ToBytes()
+						.Concat(value)
+						.ToArray();
+		}
+
+        public static string ToUTF8String(this byte[] value)
+        {
+            if (value == null) return string.Empty;
+
+            return Encoding.UTF8.GetString(value);
+        }
+        
         public static byte[] ToBytes(this string value)
         {
             if (string.IsNullOrEmpty(value)) return (-1).ToBytes();

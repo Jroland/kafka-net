@@ -14,7 +14,7 @@ namespace kafka_tests
                             new Payload
                                 {
                                     Topic = topic,
-                                    Messages = new List<Message>(new[] {new Message {Value = message}})
+                                    Messages = new List<Message>(new[] {new Message(message)})
                                 }
                         })
                 };

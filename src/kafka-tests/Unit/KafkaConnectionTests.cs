@@ -121,8 +121,8 @@ namespace kafka_tests.Unit
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
 
-                //should log an exception and keep going
-                mockLog.Verify(x => x.WarnFormat(It.IsAny<string>(), correlationId));
+                //should log a warning and keep going
+                mockLog.Verify(x => x.WarnFormat(It.IsAny<string>(), It.Is<int>(o => o == correlationId)));
             }
         }
         #endregion
@@ -166,7 +166,7 @@ namespace kafka_tests.Unit
 
                 Task.WhenAll(tasks);
 
-                TaskTest.WaitFor(() => tasks.Any(t => t.IsFaulted ));
+                TaskTest.WaitFor(() => tasks.Any(t => t.IsFaulted));
                 foreach (var task in tasks)
                 {
                     Assert.That(task.IsFaulted, Is.True);

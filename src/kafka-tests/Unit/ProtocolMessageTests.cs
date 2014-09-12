@@ -15,11 +15,7 @@ namespace kafka_tests.Unit
         [ExpectedException(typeof(FailCrcCheckException))]
         public void DecodeMessageShouldThrowWhenCrcFails()
         {
-            var testMessage = new Message
-            {
-                Key = "test",
-                Value = "kafka test message."
-            };
+            var testMessage = new Message(value: "kafka test message.", key: "test");
 
             var encoded = Message.EncodeMessage(testMessage);
             encoded[0] += 1;
@@ -33,11 +29,7 @@ namespace kafka_tests.Unit
         [TestCase(null, null)]
         public void EnsureMessageEncodeAndDecodeAreCompatible(string key, string value)
         {
-            var testMessage = new Message
-                {
-                    Key = key,
-                    Value = value
-                };
+            var testMessage = new Message(key: key, value: value);
 
             var encoded = Message.EncodeMessage(testMessage);
             var result = Message.DecodeMessage(0, encoded).First();
@@ -59,9 +51,9 @@ namespace kafka_tests.Unit
 
             var messages = new[]
                 {
-                    new Message {Value = "0", Key = "1"},
-                    new Message {Value = "1", Key = "1"},
-                    new Message {Value = "2", Key = "1"}
+                    new Message("0", "1"),
+                    new Message("1", "1"),
+                    new Message("2", "1")
                 };
 
             var result = Message.EncodeMessageSet(messages);
@@ -74,7 +66,7 @@ namespace kafka_tests.Unit
         {
             //This message set has a truncated message bytes at the end of it
             var result = Message.DecodeMessageSet(MessageHelper.FetchResponseMaxBytesOverflow).ToList();
-            
+
             Assert.That(result.Count, Is.EqualTo(529));
         }
     }
