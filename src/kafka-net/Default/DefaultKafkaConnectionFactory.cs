@@ -36,7 +36,7 @@ namespace KafkaNet
 
             if (addresses.Length > 0)
             {
-                Array.ForEach(addresses, address => log.DebugFormat("Found address {0} for {1}", addresses, hostname));
+                Array.ForEach(addresses, address => log.DebugFormat("Found address {0} for {1}", address, hostname));
 
                 var selectedAddress = addresses.FirstOrDefault(item => item.AddressFamily == AddressFamily.InterNetwork) ?? addresses.First();
 
