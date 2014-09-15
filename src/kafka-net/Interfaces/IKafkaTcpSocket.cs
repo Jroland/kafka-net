@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using KafkaNet.Model;
 
 namespace KafkaNet
 {
     public interface IKafkaTcpSocket : IDisposable
     {
         /// <summary>
-        /// The Uri to the connected server.
+        /// The IP endpoint to the server.
         /// </summary>
-        Uri ClientUri { get; }
+        KafkaEndpoint Endpoint { get; }
 
         /// <summary>
         /// Read a certain byte array size return only when all bytes received.

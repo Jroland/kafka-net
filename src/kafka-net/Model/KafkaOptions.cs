@@ -32,9 +32,9 @@ namespace KafkaNet.Model
         public KafkaOptions(params Uri[] kafkaServerUri)
         {
             KafkaServerUri = kafkaServerUri.ToList();
-            KafkaConnectionFactory = new DefaultKafkaConnectionFactory();
             PartitionSelector = new DefaultPartitionSelector();
             Log = new DefaultTraceLog();
+            KafkaConnectionFactory = new DefaultKafkaConnectionFactory();
             ResponseTimeoutMs = DefaultResponseTimeout;
         }
     }

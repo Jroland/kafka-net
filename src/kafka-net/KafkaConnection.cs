@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
+using KafkaNet.Model;
 using KafkaNet.Protocol;
 
 namespace KafkaNet
@@ -64,13 +65,10 @@ namespace KafkaNet
         }
 
         /// <summary>
-        /// Uri connection to kafka server.
+        /// Provides the unique ip/port endpoint for this connection
         /// </summary>
-        public Uri KafkaUri
-        {
-            get { return _client.ClientUri; }
-        }
-
+        public KafkaEndpoint Endpoint { get { return _client.Endpoint; } }
+        
         /// <summary>
         /// Send raw byte[] payload to the kafka server with a task indicating upload is complete.
         /// </summary>
@@ -116,12 +114,12 @@ namespace KafkaNet
 
         protected bool Equals(KafkaConnection other)
         {
-            return Equals(KafkaUri, other.KafkaUri);
+            return Equals(_client.Endpoint, other.Endpoint);
         }
 
         public override int GetHashCode()
         {
-            return (KafkaUri != null ? KafkaUri.GetHashCode() : 0);
+            return (_client.Endpoint != null ? _client.Endpoint.GetHashCode() : 0);
         }
         #endregion
 
@@ -140,17 +138,17 @@ namespace KafkaNet
                         {
                             try
                             {
-                                _log.DebugFormat("Awaiting message from: {0}", KafkaUri);
+                                _log.DebugFormat("Awaiting message from: {0}", _client.Endpoint);
                                 var messageSizeResult = await _client.ReadAsync(4, _disposeToken.Token);
                                 var messageSize = messageSizeResult.ToInt32();
 
-                                _log.DebugFormat("Received message of size: {0} From: {1}", messageSize, KafkaUri);
+                                _log.DebugFormat("Received message of size: {0} From: {1}", messageSize, _client.Endpoint);
                                 var message = await _client.ReadAsync(messageSize, _disposeToken.Token);
 
                                 CorrelatePayloadToRequest(message);
                             }
                             catch (Exception ex)
-                            {
+                            { 
                                 //don't record the exception if we are disposing
                                 if (_disposeToken.IsCancellationRequested == false)
                                 {
@@ -164,8 +162,8 @@ namespace KafkaNet
                     finally
                     {
                         Interlocked.Decrement(ref _ensureOneActiveReader);
-                        _log.DebugFormat("Closed down connection to: {0}", _client.ClientUri);
-                    }
+                        _log.DebugFormat("Closed down connection to: {0}", _client.Endpoint);
+                    }   
                 }, TaskCreationOptions.LongRunning);
         }
 
