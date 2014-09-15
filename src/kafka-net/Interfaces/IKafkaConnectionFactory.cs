@@ -5,7 +5,7 @@ namespace KafkaNet
 {
     public interface IKafkaConnectionFactory
     {
-        IKafkaConnection Create(Uri kafkaAddress, int responseTimeoutMs, IKafkaLog log);
+        IKafkaConnection Create(KafkaEndpoint endpoint, int responseTimeoutMs, IKafkaLog log);
         KafkaEndpoint Resolve(Uri kafkaAddress, IKafkaLog log);
     }
 }

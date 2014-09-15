@@ -32,7 +32,7 @@ namespace KafkaNet
             //TODO a potential exception could be thrown here, on failed resolve of uri.
             foreach (var endpoint in _kafkaOptions.KafkaServerEndpoints)
             {
-                var conn = _kafkaOptions.KafkaConnectionFactory.Create(endpoint.ServeUri, _kafkaOptions.ResponseTimeoutMs,_kafkaOptions.Log);
+                var conn = _kafkaOptions.KafkaConnectionFactory.Create(endpoint, _kafkaOptions.ResponseTimeoutMs,_kafkaOptions.Log);
                 _defaultConnectionIndex.AddOrUpdate(endpoint, e => conn, (e, c) => conn);
             }
         }
@@ -249,7 +249,7 @@ namespace KafkaNet
                 }
                 else
                 {
-                    connection = _kafkaOptions.KafkaConnectionFactory.Create(broker.Broker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log);
+                    connection = _kafkaOptions.KafkaConnectionFactory.Create(broker.Endpoint, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log);
                     UpsertConnectionToBrokerConnectionIndex(broker.Broker.BrokerId, connection);
                 }
             }

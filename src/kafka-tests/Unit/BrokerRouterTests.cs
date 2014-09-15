@@ -1,5 +1,8 @@
-﻿using KafkaNet;
+﻿using System.Net;
+using System.Runtime.Remoting.Messaging;
+using KafkaNet;
 using KafkaNet.Common;
+using KafkaNet.Model;
 using KafkaNet.Protocol;
 using Moq;
 using Ninject.MockingKernel.Moq;
@@ -16,9 +19,9 @@ namespace kafka_tests.Unit
     {
         private const string TestTopic = "UnitTest";
         private MoqMockingKernel _kernel;
-        private Mock<IKafkaConnection> _connMock1;
-        private Mock<IKafkaConnectionFactory> _factoryMock;
-        private Mock<IPartitionSelector> _partitionSelectorMock;
+        private Mock<IKafkaConnection> _mockKafkaConnection1;
+        private Mock<IKafkaConnectionFactory> _mockKafkaConnectionFactory;
+        private Mock<IPartitionSelector> _mockPartitionSelector;
 
         [SetUp]
         public void Setup()
@@ -26,10 +29,16 @@ namespace kafka_tests.Unit
             _kernel = new MoqMockingKernel();
 
             //setup mock IKafkaConnection
-            _partitionSelectorMock = _kernel.GetMock<IPartitionSelector>();
-            _connMock1 = _kernel.GetMock<IKafkaConnection>();
-            _factoryMock = _kernel.GetMock<IKafkaConnectionFactory>();
-            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _connMock1.Object);
+            _mockPartitionSelector = _kernel.GetMock<IPartitionSelector>();
+            _mockKafkaConnection1 = _kernel.GetMock<IKafkaConnection>();
+            _mockKafkaConnectionFactory = _kernel.GetMock<IKafkaConnectionFactory>();
+            _mockKafkaConnectionFactory.Setup(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _mockKafkaConnection1.Object);
+            _mockKafkaConnectionFactory.Setup(x => x.Resolve(It.IsAny<Uri>(), It.IsAny<IKafkaLog>()))
+                .Returns<Uri, IKafkaLog>((uri, log) => new KafkaEndpoint
+                {
+                    Endpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), uri.Port),
+                    ServeUri = uri
+                });
         }
 
         [Test]
@@ -38,7 +47,7 @@ namespace kafka_tests.Unit
             var result = new BrokerRouter(new KafkaNet.Model.KafkaOptions
             {
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
-                KafkaConnectionFactory = _factoryMock.Object
+                KafkaConnectionFactory = _mockKafkaConnectionFactory.Object
             });
 
             Assert.That(result, Is.Not.Null);
@@ -50,14 +59,14 @@ namespace kafka_tests.Unit
             var router = new BrokerRouter(new KafkaNet.Model.KafkaOptions
             {
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
-                KafkaConnectionFactory = _factoryMock.Object
+                KafkaConnectionFactory = _mockKafkaConnectionFactory.Object
             });
 
-            _connMock1.Setup(x => x.SendAsync(It.IsAny<IKafkaRequest<MetadataResponse>>()))
+            _mockKafkaConnection1.Setup(x => x.SendAsync(It.IsAny<IKafkaRequest<MetadataResponse>>()))
                       .Returns(() => Task.Factory.StartNew(() => new List<MetadataResponse> { CreateMetaResponse() }));
 
             var topics = router.GetTopicMetadata(TestTopic);
-            _factoryMock.Verify(x => x.Create(It.Is<Uri>(uri => uri.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>()), Times.Once());
+            _mockKafkaConnectionFactory.Verify(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>()), Times.Once());
         }
 
         #region MetadataRequest Tests...
@@ -186,7 +195,7 @@ namespace kafka_tests.Unit
             var key = testCase.ToIntSizedBytes();
             var routerProxy = new BrokerRouterProxy(_kernel);
 
-            _partitionSelectorMock.Setup(x => x.Select(It.IsAny<Topic>(), key))
+            _mockPartitionSelector.Setup(x => x.Select(It.IsAny<Topic>(), key))
                                   .Returns(() => new Partition
                                   {
                                       ErrorCode = 0,
@@ -196,11 +205,11 @@ namespace kafka_tests.Unit
                                       Replicas = new List<int> { 1 },
                                   });
 
-            routerProxy.PartitionSelector = _partitionSelectorMock.Object;
+            routerProxy.PartitionSelector = _mockPartitionSelector.Object;
 
             var result = routerProxy.Create().SelectBrokerRoute(TestTopic, key);
 
-            _partitionSelectorMock.Verify(f => f.Select(It.Is<Topic>(x => x.Name == TestTopic), key), Times.Once());
+            _mockPartitionSelector.Verify(f => f.Select(It.Is<Topic>(x => x.Name == TestTopic), key), Times.Once());
         }
 
         [Test]

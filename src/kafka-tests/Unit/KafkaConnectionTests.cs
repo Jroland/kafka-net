@@ -118,7 +118,7 @@ namespace kafka_tests.Unit
             using (var conn = new KafkaConnection(socket, log: mockLog.Object))
             {
                 //send correlation message
-                server.SendDataAsync(CreateCorrelationMessage(correlationId)).Wait(TimeSpan.FromSeconds(1));
+                server.SendDataAsync(CreateCorrelationMessage(correlationId)).Wait(TimeSpan.FromSeconds(5));
 
                 //wait for connection
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
