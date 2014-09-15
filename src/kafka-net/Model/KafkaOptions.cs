@@ -13,6 +13,16 @@ namespace KafkaNet.Model
         /// </summary>
         public List<Uri> KafkaServerUri { get; set; }
         /// <summary>
+        /// List of resolved endpoints generated from the KafkaServerUri.
+        /// </summary>
+        public IEnumerable<KafkaEndpoint> KafkaServerEndpoints
+        {
+            get
+            {
+                return KafkaServerUri.Select(uri => KafkaConnectionFactory.Resolve(uri, Log));
+            }
+        }
+        /// <summary>
         /// Provides a factory for creating new kafka connections.
         /// </summary>
         public IKafkaConnectionFactory KafkaConnectionFactory { get; set; }

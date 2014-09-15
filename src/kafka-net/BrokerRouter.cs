@@ -21,16 +21,20 @@ namespace KafkaNet
     {
         private readonly object _threadLock = new object();
         private readonly KafkaOptions _kafkaOptions;
+        private readonly ConcurrentDictionary<KafkaEndpoint, IKafkaConnection> _defaultConnectionIndex = new ConcurrentDictionary<KafkaEndpoint, IKafkaConnection>();
         private readonly ConcurrentDictionary<int, IKafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, IKafkaConnection>();
         private readonly ConcurrentDictionary<string, Topic> _topicIndex = new ConcurrentDictionary<string, Topic>();
-        private readonly List<IKafkaConnection> _defaultConnections = new List<IKafkaConnection>();
 
         public BrokerRouter(KafkaOptions kafkaOptions)
         {
             _kafkaOptions = kafkaOptions;
-            _defaultConnections
-                .AddRange(kafkaOptions.KafkaServerUri.Distinct()
-                .Select(uri => _kafkaOptions.KafkaConnectionFactory.Create(uri, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log)));
+
+            //TODO a potential exception could be thrown here, on failed resolve of uri.
+            foreach (var endpoint in _kafkaOptions.KafkaServerEndpoints)
+            {
+                var conn = _kafkaOptions.KafkaConnectionFactory.Create(endpoint.ServeUri, _kafkaOptions.ResponseTimeoutMs,_kafkaOptions.Log);
+                _defaultConnectionIndex.AddOrUpdate(endpoint, e => conn, (e, c) => conn);
+            }
         }
 
         /// <summary>
@@ -122,13 +126,12 @@ namespace KafkaNet
                 _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
 
                 //use the initial default connections to retrieve metadata
-                if (_defaultConnections.Count > 0)
+                if (_defaultConnectionIndex.Count > 0)
                 {
-                    CycleConnectionsForTopicMetadata(_defaultConnections, topics);
+                    CycleConnectionsForTopicMetadata(_defaultConnectionIndex.Values, topics);
                     if (_brokerConnectionIndex.Values.Count > 0)
                     {
-                        _defaultConnections.ForEach(x => { using (x) { } });
-                        _defaultConnections.Clear();
+                        _defaultConnectionIndex.Clear();
                     }
                     return;
                 }
@@ -228,22 +231,27 @@ namespace KafkaNet
 
         private void UpdateInternalMetadataCache(MetadataResponse metadata)
         {
-            foreach (var broker in metadata.Brokers)
+
+            //resolve each broker
+            var brokerEndpoints = metadata.Brokers.Select(broker => new
             {
-                var localBroker = broker;
-                _brokerConnectionIndex.AddOrUpdate(broker.BrokerId,
-                    i =>
-                    {
-                        return _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log);
-                    },
-                    (i, connection) =>
-                    {
-                        //if a connection changes for a broker close old connection and create a new one
-                        var localBrokerEndpoint = _kafkaOptions.KafkaConnectionFactory.Resolve(localBroker.Address, _kafkaOptions.Log);
-                        if (connection.Endpoint.Equals(localBrokerEndpoint)) return connection;
-                        _kafkaOptions.Log.WarnFormat("Broker:{0} Uri changed from:{1} to {2}", localBroker.BrokerId, connection.Endpoint, localBrokerEndpoint);
-                        using (connection) { return _kafkaOptions.KafkaConnectionFactory.Create(localBroker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log); }
-                    });
+                Broker = broker,
+                Endpoint = _kafkaOptions.KafkaConnectionFactory.Resolve(broker.Address, _kafkaOptions.Log)
+            });
+
+            foreach (var broker in brokerEndpoints)
+            {
+                //if the connection is in our default connection index already, remove it and assign it to the broker index.
+                IKafkaConnection connection;
+                if (_defaultConnectionIndex.TryRemove(broker.Endpoint, out connection))
+                {
+                    UpsertConnectionToBrokerConnectionIndex(broker.Broker.BrokerId, connection);
+                }
+                else
+                {
+                    connection = _kafkaOptions.KafkaConnectionFactory.Create(broker.Broker.Address, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log);
+                    UpsertConnectionToBrokerConnectionIndex(broker.Broker.BrokerId, connection);
+                }
             }
 
             foreach (var topic in metadata.Topics)
@@ -253,9 +261,26 @@ namespace KafkaNet
             }
         }
 
+        private void UpsertConnectionToBrokerConnectionIndex(int brokerId, IKafkaConnection newConnection)
+        {
+            //associate the connection with the broker id, and add or update the reference
+            _brokerConnectionIndex.AddOrUpdate(brokerId,
+                    i => newConnection,
+                    (i, existingConnection) =>
+                    {
+                        //if a connection changes for a broker close old connection and create a new one
+                        if (existingConnection.Endpoint.Equals(newConnection.Endpoint)) return existingConnection;
+                        _kafkaOptions.Log.WarnFormat("Broker:{0} Uri changed from:{1} to {2}", brokerId, existingConnection.Endpoint, newConnection.Endpoint);
+                        using (existingConnection)
+                        {
+                            return newConnection;
+                        }
+                    });
+        }
+
         public void Dispose()
         {
-            _defaultConnections.ForEach(conn => { using (conn) { } });
+            _defaultConnectionIndex.Values.ToList().ForEach(conn => { using (conn) { } });
             _brokerConnectionIndex.Values.ToList().ForEach(conn => { using (conn) { } });
         }
     }
