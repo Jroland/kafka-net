@@ -37,7 +37,7 @@ namespace kafka_tests.Unit
             {
                 var messages = new List<Message>
                 {
-                    new Message{Value = "1"}, new Message{Value = "2"}
+                    new Message("1"), new Message("2")
                 };
 
                 var response = producer.SendMessageAsync("UnitTest", messages).Result;
@@ -59,7 +59,7 @@ namespace kafka_tests.Unit
             {
                 var messages = new List<Message>
                 {
-                    new Message{Value = "1"}, new Message{Value = "2"}
+                    new Message("1"), new Message("2")
                 };
 
                 producer.SendMessageAsync("UnitTest", messages).ContinueWith(t =>
@@ -87,7 +87,7 @@ namespace kafka_tests.Unit
             {
                 var messages = new List<Message>
                 {
-                    new Message{Value = "1"}, new Message{Value = "2"}
+                    new Message("1"), new Message("2")
                 };
 
                 Task.Factory.StartNew(() =>
@@ -120,7 +120,7 @@ namespace kafka_tests.Unit
             {
                 var messages = new List<Message>
                 {
-                    new Message{Value = "1"}, new Message{Value = "2"}
+                    new Message("1"), new Message("2")
                 };
 
                 //this will produce an exception, but message 1 succeeded and message 2 did not.  

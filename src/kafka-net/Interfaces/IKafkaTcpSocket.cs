@@ -1,15 +1,16 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using KafkaNet.Model;
 
 namespace KafkaNet
 {
     public interface IKafkaTcpSocket : IDisposable
     {
         /// <summary>
-        /// The Uri to the connected server.
+        /// The IP endpoint to the server.
         /// </summary>
-        Uri ClientUri { get; }
+        KafkaEndpoint Endpoint { get; }
 
         /// <summary>
         /// Read a certain byte array size return only when all bytes received.
@@ -37,19 +38,8 @@ namespace KafkaNet
         /// Write the buffer data to the server.
         /// </summary>
         /// <param name="buffer">The buffer data to send.</param>
-        /// <param name="offset">The offset to start the read from the buffer.</param>
-        /// <param name="count">The length of data to read off the buffer.</param>
-        /// <returns>Returns Task handle to the write operation.</returns>
-        Task WriteAsync(byte[] buffer, int offset, int count);
-
-        /// <summary>
-        /// Write the buffer data to the server.
-        /// </summary>
-        /// <param name="buffer">The buffer data to send.</param>
-        /// <param name="offset">The offset to start the read from the buffer.</param>
-        /// <param name="count">The length of data to read off the buffer.</param>
         /// <param name="cancellationToken">A cancellation token which will cancel the request.</param>
         /// <returns>Returns Task handle to the write operation.</returns>
-        Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken);
+        Task WriteAsync(byte[] buffer, CancellationToken cancellationToken);
     }
 }

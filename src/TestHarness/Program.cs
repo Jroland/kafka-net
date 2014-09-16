@@ -33,7 +33,7 @@ namespace TestHarness
             {
                 var message = Console.ReadLine();
                 if (message == "quit") break;
-                client.SendMessageAsync("TestHarness", new[] {new Message {Value = message}});
+                client.SendMessageAsync("TestHarness", new[] { new Message(message) });
             }
 
             using (client)

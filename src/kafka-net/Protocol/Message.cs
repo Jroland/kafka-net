@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Text;
 using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
@@ -47,11 +44,29 @@ namespace KafkaNet.Protocol
         /// <summary>
         /// Key value used for routing message to partitions.
         /// </summary>
-        public string Key { get; set; }
+        public byte[] Key { get; set; }
         /// <summary>
         /// The message body contents.  Can contain compress message set.
         /// </summary>
-        public string Value { get; set; }
+        public byte[] Value { get; set; }
+
+        /// <summary>
+        /// Construct an empty message.
+        /// </summary>
+        public Message() { }
+
+        /// <summary>
+        /// Convenience constructor will encode both the key and message to byte streams.
+        /// Most of the time a message will be string based.
+        /// </summary>
+        /// <param name="key">The key value for the message.  Can be null.</param>
+        /// <param name="value">The main content data of this message.</param>
+        public Message(string value, string key = null)
+        {
+            Key = key == null ? null : key.ToBytes();
+            Value = value.ToBytes();
+        }
+
 
         /// <summary>
         /// Encodes a collection of messages into one byte[].  Encoded in order of list.
@@ -116,8 +131,8 @@ namespace KafkaNet.Protocol
 
             body.Pack(new[] { message.MagicNumber },
                       new[] { message.Attribute },
-                      message.Key.ToIntSizedBytes(),
-                      message.Value.ToIntSizedBytes());
+                      message.Key.ToIntPrefixedBytes(),
+                      message.Value.ToIntPrefixedBytes());
 
             var crc = Crc32.ComputeHash(body.Payload());
             body.Prepend(crc);
@@ -145,14 +160,14 @@ namespace KafkaNet.Protocol
                 Meta = new MessageMetadata { Offset = offset },
                 MagicNumber = stream.ReadByte(),
                 Attribute = stream.ReadByte(),
-                Key = stream.ReadIntString()
+                Key = stream.ReadIntPrefixedBytes()
             };
 
             var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
             switch (codec)
             {
                 case MessageCodec.CodecNone:
-                    message.Value = stream.ReadIntString();
+                    message.Value = stream.ReadIntPrefixedBytes();
                     yield return message;
                     break;
                 case MessageCodec.CodecGzip:

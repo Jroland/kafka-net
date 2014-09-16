@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Common;
+using KafkaNet.Model;
 using KafkaNet.Protocol;
 using NUnit.Framework;
 using kafka_tests.Helpers;
@@ -20,13 +21,14 @@ namespace kafka_tests.Unit
     public class KafkaTcpSocketTests
     {
         private const int FakeServerPort = 8999;
-        private readonly Uri _fakeServerUrl;
-        private readonly Uri _badServerUrl;
+        private readonly KafkaEndpoint _fakeServerUrl;
+        private readonly KafkaEndpoint _badServerUrl;
 
         public KafkaTcpSocketTests()
         {
-            _fakeServerUrl = new Uri("http://localhost:8999");
-            _badServerUrl = new Uri("http://localhost:1");
+            var log = new DefaultTraceLog();
+            _fakeServerUrl = new DefaultKafkaConnectionFactory().Resolve(new Uri("http://localhost:8999"), log);
+            _badServerUrl = new DefaultKafkaConnectionFactory().Resolve(new Uri("http://localhost:1"), log);
         }
 
         [Test]
@@ -36,7 +38,7 @@ namespace kafka_tests.Unit
             {
 
                 Assert.That(test, Is.Not.Null);
-                Assert.That(test.ClientUri, Is.EqualTo(_fakeServerUrl));
+                Assert.That(test.Endpoint, Is.EqualTo(_fakeServerUrl));
             }
         }
 
@@ -107,7 +109,7 @@ namespace kafka_tests.Unit
         {
             var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
-            var taskResult = test.WriteAsync(4.ToBytes(), 0, 4);
+            var taskResult = test.WriteAsync(4.ToBytes());
 
             using (test) { } //allow the sockets to set
 
@@ -343,7 +345,7 @@ namespace kafka_tests.Unit
                 var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
                 server.OnBytesReceived += data => result = data.ToInt32();
 
-                test.WriteAsync(testData.ToBytes(), 0, 4).Wait(TimeSpan.FromSeconds(1));
+                test.WriteAsync(testData.ToBytes()).Wait(TimeSpan.FromSeconds(1));
                 TaskTest.WaitFor(() => result > 0);
                 Assert.That(result, Is.EqualTo(testData));
             }

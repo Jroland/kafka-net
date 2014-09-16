@@ -57,6 +57,7 @@
     <Compile Include="Interfaces\IKafkaLog.cs" />
     <Compile Include="Interfaces\IPartitionSelector.cs" />
     <Compile Include="BrokerRouter.cs" />
+    <Compile Include="Model\KafkaEndpoint.cs" />
     <Compile Include="Protocol\Broker.cs" />
     <Compile Include="Common\ReadByteStream.cs" />
     <Compile Include="Common\Crc32.cs" />

@@ -15,9 +15,10 @@ namespace kafka_tests.Integration
     {
         private readonly KafkaOptions _options = new KafkaOptions(IntegrationConfig.IntegrationUri);
 
-       private KafkaConnection GetKafkaConnection()
+        private KafkaConnection GetKafkaConnection()
         {
-            return new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), _options.KafkaServerUri.First()), _options.ResponseTimeoutMs, _options.Log);
+            var endpoint = new DefaultKafkaConnectionFactory().Resolve(_options.KafkaServerUri.First(), _options.Log);
+            return new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), endpoint), _options.ResponseTimeoutMs, _options.Log);
         }
 
         [Test]
@@ -46,9 +47,9 @@ namespace kafka_tests.Integration
                                             Partition = 0,
                                             Messages = new List<Message>
                                                     {
-                                                        new Message {Value = "0", Key = "1"},
-                                                        new Message {Value = "1", Key = "1"},
-                                                        new Message {Value = "2", Key = "1"}
+                                                        new Message("0", "1"),
+                                                        new Message("1", "1"),
+                                                        new Message("2", "1")
                                                     }
                                         }
                                 }

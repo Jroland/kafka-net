@@ -114,6 +114,11 @@ namespace KafkaNet.Protocol
     {
         public LeaderNotFoundException(string message) : base(message) { }
     }
+
+    public class UnresolvedHostnameException : Exception
+    {
+        public UnresolvedHostnameException(string message, params object[] args) : base(string.Format(message, args)) { }
+    }
     #endregion
 
 

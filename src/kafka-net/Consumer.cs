@@ -60,7 +60,7 @@ namespace KafkaNet
             _options.Log.DebugFormat("Consumer: Beginning consumption of topic: {0}", _options.Topic);
             _topicPartitionQueryTimer.Begin();
 
-            return _fetchResponseQueue.GetConsumingEnumerable(cancellationToken ?? new CancellationToken(false));
+            return _fetchResponseQueue.GetConsumingEnumerable(cancellationToken ?? CancellationToken.None);
         }
 
         /// <summary>

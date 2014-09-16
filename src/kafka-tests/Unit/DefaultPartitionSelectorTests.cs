@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using KafkaNet;
+using KafkaNet.Common;
 using KafkaNet.Model;
 using NUnit.Framework;
 using KafkaNet.Protocol;
@@ -101,15 +102,46 @@ namespace kafka_tests.Unit
         }
 
         [Test]
+        public void RoundRobinShouldEvenlyDistributeAcrossManyPartitions()
+        {
+            const int TotalPartitions = 100;
+            var selector = new DefaultPartitionSelector();
+            var partitions = new List<Partition>();
+            for (int i = 0; i < TotalPartitions; i++)
+            {
+                partitions.Add(new Partition { LeaderId = i, PartitionId = i });
+            }
+            var topic = new Topic { Name = "a", Partitions = partitions };
+
+            var bag = new ConcurrentBag<Partition>();
+            Parallel.For(0, TotalPartitions * 3, x => bag.Add(selector.Select(topic, null)));
+
+            var eachPartitionHasThree = bag.GroupBy(x => x.PartitionId).Count();
+                
+            Assert.That(eachPartitionHasThree, Is.EqualTo(TotalPartitions), "Each partition should have received three selections.");
+        }
+
+
+        [Test]
         public void KeyHashShouldSelectEachPartitionType()
         {
             var selector = new DefaultPartitionSelector();
 
-            var first = selector.Select(_topicA, "0");
-            var second = selector.Select(_topicA, "1");
+            var first = selector.Select(_topicA, CreateKeyForPartition(0));
+            var second = selector.Select(_topicA, CreateKeyForPartition(1));
 
             Assert.That(first.PartitionId, Is.EqualTo(0));
             Assert.That(second.PartitionId, Is.EqualTo(1));
+        }
+
+        private byte[] CreateKeyForPartition(int partitionId)
+        {
+            while(true)
+            {
+                var key = Guid.NewGuid().ToString().ToIntSizedBytes();
+                if ((Crc32.Compute(key) % 2) == partitionId)
+                return key;
+            }
         }
 
         [Test]
@@ -126,7 +158,7 @@ namespace kafka_tests.Unit
                 };
 
 
-            selector.Select(topic, "1");
+            selector.Select(topic, CreateKeyForPartition(1));
         }
 
         [Test]
@@ -139,7 +171,7 @@ namespace kafka_tests.Unit
                 Name = "emptyPartition",
                 Partitions = new List<Partition>()
             };
-            selector.Select(topic, "1");
+            selector.Select(topic, CreateKeyForPartition(1));
         }
 
     }

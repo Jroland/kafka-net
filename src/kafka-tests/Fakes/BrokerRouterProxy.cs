@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Net;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
@@ -20,13 +18,13 @@ namespace kafka_tests
         private readonly MoqMockingKernel _kernel;
         private int _offset0;
         private int _offset1;
-        private FakeKafkaConnection _fakeConn0;
-        private FakeKafkaConnection _fakeConn1;
-        private Mock<IKafkaConnectionFactory> _factoryMock;
+        private readonly FakeKafkaConnection _fakeConn0;
+        private readonly FakeKafkaConnection _fakeConn1;
+        private readonly Mock<IKafkaConnectionFactory> _mockKafkaConnectionFactory;
 
         public FakeKafkaConnection BrokerConn0 { get { return _fakeConn0; } }
         public FakeKafkaConnection BrokerConn1 { get { return _fakeConn1; } }
-        public Mock<IKafkaConnectionFactory> KafkaConnectionFactory { get { return _factoryMock; } }
+        public Mock<IKafkaConnectionFactory> KafkaConnectionMockKafkaConnectionFactory { get { return _mockKafkaConnectionFactory; } }
 
         public Func<MetadataResponse> MetadataResponse = () => DefaultMetadataResponse();
 
@@ -49,9 +47,15 @@ namespace kafka_tests
             _fakeConn1.OffsetResponseFunction = () => new OffsetResponse { Offsets = new List<long> { 0, 100 }, PartitionId = 1, Topic = TestTopic };
             _fakeConn1.FetchResponseFunction = () => { Thread.Sleep(500); return null; };
             
-            _factoryMock = _kernel.GetMock<IKafkaConnectionFactory>();
-            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _fakeConn0);
-            _factoryMock.Setup(x => x.Create(It.Is<Uri>(uri => uri.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _fakeConn1);
+            _mockKafkaConnectionFactory = _kernel.GetMock<IKafkaConnectionFactory>();
+            _mockKafkaConnectionFactory.Setup(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _fakeConn0);
+            _mockKafkaConnectionFactory.Setup(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _fakeConn1);
+            _mockKafkaConnectionFactory.Setup(x => x.Resolve(It.IsAny<Uri>(), It.IsAny<IKafkaLog>()))
+                .Returns<Uri, IKafkaLog>((uri, log) => new KafkaEndpoint
+                {
+                    Endpoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), uri.Port),
+                    ServeUri = uri
+                });
         }
 
         public IBrokerRouter Create()
@@ -59,7 +63,7 @@ namespace kafka_tests
             return new BrokerRouter(new KafkaNet.Model.KafkaOptions
             {
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },
-                KafkaConnectionFactory = _factoryMock.Object,
+                KafkaConnectionFactory = _mockKafkaConnectionFactory.Object,
                 PartitionSelector = PartitionSelector
             });
         }

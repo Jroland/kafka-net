@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
-using KafkaNet.Model;
 using KafkaNet.Protocol;
 
 namespace KafkaNet
@@ -30,7 +28,7 @@ namespace KafkaNet
         /// <returns>A broker route for the given topic.</returns>
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        BrokerRoute SelectBrokerRoute(string topic, string key = null);
+        BrokerRoute SelectBrokerRoute(string topic, byte[] key = null);
 
         /// <summary>
         /// Returns Topic metadata for each topic requested. 

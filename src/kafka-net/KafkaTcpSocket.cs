@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Threading;
 using KafkaNet.Common;
+using KafkaNet.Model;
 using KafkaNet.Protocol;
 
 namespace KafkaNet
@@ -25,7 +27,7 @@ namespace KafkaNet
         private readonly ThreadWall _getConnectedClientThreadWall = new ThreadWall(ThreadWallState.Blocked);
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly IKafkaLog _log;
-        private readonly Uri _serverUri;
+        private readonly KafkaEndpoint _endpoint;
 
         private TcpClient _client;
         private int _ensureOneThread;
@@ -36,22 +38,20 @@ namespace KafkaNet
         /// Construct socket and open connection to a specified server.
         /// </summary>
         /// <param name="log">Logging facility for verbose messaging of actions.</param>
-        /// <param name="serverUri">The server to connect to.</param>
+        /// <param name="endpoint">The IP endpoint to connect to.</param>
         /// <param name="delayConnectAttemptMS">Time in milliseconds to delay the initial connection attempt to the given server.</param>
-        public KafkaTcpSocket(IKafkaLog log, Uri serverUri, int delayConnectAttemptMS = 0)
+        public KafkaTcpSocket(IKafkaLog log, KafkaEndpoint endpoint, int delayConnectAttemptMS = 0)
         {
             _log = log;
-            _serverUri = serverUri;
+            _endpoint = endpoint;
             Task.Delay(TimeSpan.FromMilliseconds(delayConnectAttemptMS)).ContinueWith(x => TriggerReconnection());
-
-
         }
 
         #region Interface Implementation...
         /// <summary>
-        /// The Uri to the connected server.
+        /// The IP Endpoint to the server.
         /// </summary>
-        public Uri ClientUri { get { return _serverUri; } }
+        public KafkaEndpoint Endpoint { get { return _endpoint; } }
 
         /// <summary>
         /// Read a certain byte array size return only when all bytes received.
@@ -81,32 +81,19 @@ namespace KafkaNet
         /// <returns>Returns Task handle to the write operation.</returns>
         public Task WriteAsync(byte[] buffer)
         {
-            return WriteAsync(buffer, 0, buffer.Length, _disposeToken.Token);
+            return WriteAsync(buffer, _disposeToken.Token);
         }
 
+       
         /// <summary>
         /// Write the buffer data to the server.
         /// </summary>
         /// <param name="buffer">The buffer data to send.</param>
-        /// <param name="offset">The offset to start the read from the buffer.</param>
-        /// <param name="count">The length of data to read off the buffer.</param>
-        /// <returns>Returns Task handle to the write operation.</returns>
-        public Task WriteAsync(byte[] buffer, int offset, int count)
-        {
-            return WriteAsync(buffer, offset, count, _disposeToken.Token);
-        }
-
-        /// <summary>
-        /// Write the buffer data to the server.
-        /// </summary>
-        /// <param name="buffer">The buffer data to send.</param>
-        /// <param name="offset">The offset to start the read from the buffer.</param>
-        /// <param name="count">The length of data to read off the buffer.</param>
         /// <param name="cancellationToken">A cancellation token which will cancel the request.</param>
         /// <returns>Returns Task handle to the write operation.</returns>
-        public Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        public Task WriteAsync(byte[] buffer, CancellationToken cancellationToken)
         {
-            return EnsureWriteAsync(buffer, offset, count, cancellationToken);
+            return EnsureWriteAsync(buffer, 0, buffer.Length, cancellationToken);
         }
         #endregion
 
@@ -116,7 +103,7 @@ namespace KafkaNet
                 {
                     if (_client == null)
                     {
-                        throw new ServerUnreachableException(string.Format("Connection to {0} was not established.", _serverUri));
+                        throw new ServerUnreachableException(string.Format("Connection to {0} was not established.", _endpoint));
                     }
                     return _client;
                 });
@@ -143,10 +130,6 @@ namespace KafkaNet
             {
                 await _singleReaderSemaphore.WaitAsync(token);
 
-                //note we use a parallel cancel token here because ReadAsync does not seem to cancel when token is set.  .Net issue?
-                var cancelTask = new TaskCompletionSource<byte>();
-                cancelTaskToken = token.Register(cancelTask.SetCanceled);
-
                 var result = new List<byte>();
                 var bytesReceived = 0;
 
@@ -156,19 +139,13 @@ namespace KafkaNet
                     var buffer = new byte[readSize];
 
                     var client = await GetClientAsync();
-                    var readTask = client.GetStream().ReadAsync(buffer, 0, readSize, token);
-                    var completedTask = await Task.WhenAny(cancelTask.Task, readTask);
 
-                    if (completedTask == cancelTask.Task)
-                    {
-                        throw new TaskCanceledException("Task cancel token was set.");
-                    }
+                    bytesReceived = await client.GetStream().ReadAsync(buffer, 0, readSize, token).WithCancellation(token);
 
-                    bytesReceived = readTask.Result;
                     if (bytesReceived <= 0)
                     {
                         TriggerReconnection();
-                        throw new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _serverUri));
+                        throw new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _endpoint));
                     }
 
                     result.AddRange(buffer.Take(bytesReceived));
@@ -213,7 +190,7 @@ namespace KafkaNet
         {
             var attempts = 1;
             var reconnectionDelay = DefaultReconnectionTimeout;
-            _log.WarnFormat("No connection to:{0}.  Attempting to re-connect...", ClientUri);
+            _log.WarnFormat("No connection to:{0}.  Attempting to re-connect...", _endpoint);
 
             //clean up existing client
             using (_client) { _client = null; }
@@ -224,14 +201,14 @@ namespace KafkaNet
                 {
                     if (OnReconnectionAttempt != null) OnReconnectionAttempt(attempts++);
                     _client = new TcpClient();
-                    await _client.ConnectAsync(_serverUri.Host, _serverUri.Port);
-                    _log.WarnFormat("Connection established to:{0}.", ClientUri);
+                    await _client.ConnectAsync(_endpoint.Endpoint.Address, _endpoint.Endpoint.Port);
+                    _log.WarnFormat("Connection established to:{0}.", _endpoint);
                     return _client;
                 }
                 catch
                 {
                     reconnectionDelay = reconnectionDelay * DefaultReconnectionTimeoutMultiplier;
-                    _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", ClientUri, reconnectionDelay);
+                    _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", _endpoint, reconnectionDelay);
                 }
 
                 await Task.Delay(TimeSpan.FromMilliseconds(reconnectionDelay), _disposeToken.Token);

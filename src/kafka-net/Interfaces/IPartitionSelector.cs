@@ -6,6 +6,6 @@ namespace KafkaNet
 {
     public interface IPartitionSelector
     {
-        Partition Select(Topic topic, string key);
+        Partition Select(Topic topic, byte[] key);
     }
 }

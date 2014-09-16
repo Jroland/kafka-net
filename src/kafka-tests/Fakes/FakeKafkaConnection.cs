@@ -1,4 +1,6 @@
-﻿using KafkaNet;
+﻿using System.Net;
+using KafkaNet;
+using KafkaNet.Model;
 using KafkaNet.Protocol;
 using System;
 using System.Collections.Generic;
@@ -10,8 +12,6 @@ namespace kafka_tests.Fakes
 {
     public class FakeKafkaConnection : IKafkaConnection
     {
-        private Uri _address;
-
         public Func<ProduceResponse> ProduceResponseFunction;
         public Func<MetadataResponse> MetadataResponseFunction;
         public Func<OffsetResponse> OffsetResponseFunction;
@@ -19,7 +19,7 @@ namespace kafka_tests.Fakes
 
         public FakeKafkaConnection(Uri address)
         {
-            _address = address;
+            Endpoint = new DefaultKafkaConnectionFactory().Resolve(address, new DefaultTraceLog());
         }
 
         public int MetadataRequestCallCount { get; set; }
@@ -27,10 +27,7 @@ namespace kafka_tests.Fakes
         public int OffsetRequestCallCount { get; set; }
         public int FetchRequestCallCount { get; set; }
 
-        public Uri KafkaUri
-        {
-            get { return _address; }
-        }
+        public KafkaEndpoint Endpoint { get; private set; }
 
         public bool ReadPolling
         {
