@@ -34,7 +34,7 @@ namespace kafka_tests.Integration
                 var results = tasks.SelectMany(x => x.Result).ToList();
 
                 Assert.That(results.Count, Is.EqualTo(amount));
-                Assert.That(results.Any(x => x.Error != 0), Is.False);
+                Assert.That(results.Any(x => x.Error != 0), Is.False, "Should not have received any results as failures.");
             }
         }
 

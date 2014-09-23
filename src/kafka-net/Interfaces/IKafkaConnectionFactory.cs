@@ -12,7 +12,7 @@ namespace KafkaNet
         /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received after sending a message to Kafka</param>
         /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
         /// <returns>IKafkaConnection initialized to connecto to the given endpoint.</returns>
-        IKafkaConnection Create(KafkaEndpoint endpoint, int responseTimeoutMs, IKafkaLog log);
+        IKafkaConnection Create(KafkaEndpoint endpoint, TimeSpan responseTimeoutMs, IKafkaLog log);
 
         /// <summary>
         /// Resolves a generic Uri into a uniquely identifiable KafkaEndpoint.

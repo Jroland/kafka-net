@@ -25,7 +25,7 @@ namespace KafkaNet
 
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
         private readonly IScheduledTimer _responseTimeoutTimer;
-        private readonly int _responseTimeoutMS;
+        private readonly TimeSpan _responseTimeoutMS;
         private readonly IKafkaLog _log;
         private readonly IKafkaTcpSocket _client;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
@@ -41,16 +41,16 @@ namespace KafkaNet
         /// </summary>
         /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
         /// <param name="client">The kafka socket initialized to the kafka server.</param>
-        /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received after sending message to Kafka.</param>
-        public KafkaConnection(IKafkaTcpSocket client, int responseTimeoutMs = DefaultResponseTimeoutMs, IKafkaLog log = null)
+        /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received after sending message to Kafka.  Defaults to 30s.</param>
+        public KafkaConnection(IKafkaTcpSocket client, TimeSpan? responseTimeoutMs = null, IKafkaLog log = null)
         {
             _client = client;
             _log = log ?? new DefaultTraceLog();
-            _responseTimeoutMS = responseTimeoutMs;
+            _responseTimeoutMS = responseTimeoutMs ?? TimeSpan.FromMilliseconds(DefaultResponseTimeoutMs);
             _responseTimeoutTimer = new ScheduledTimer()
                 .Do(ResponseTimeoutCheck)
                 .Every(TimeSpan.FromMilliseconds(100))
-                .StartingAt(DateTime.Now.AddMilliseconds(_responseTimeoutMS))
+                .StartingAt(DateTime.Now.Add(_responseTimeoutMS))
                 .Begin();
 
             StartReadStreamPoller();
@@ -202,7 +202,7 @@ namespace KafkaNet
                 _timeoutSemaphore.Wait();
 
                 var timeouts = _requestIndex.Values.Where(x =>
-                    x.CreatedOnUtc.AddMilliseconds(_responseTimeoutMS) < DateTime.UtcNow || _disposeToken.IsCancellationRequested).ToList();
+                    x.CreatedOnUtc.Add(_responseTimeoutMS) < DateTime.UtcNow || _disposeToken.IsCancellationRequested).ToList();
 
                 foreach (var timeout in timeouts)
                 {

@@ -136,7 +136,7 @@ namespace kafka_tests.Unit
         {
             using (var server = new FakeTcpServer(8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
-            using (var conn = new KafkaConnection(socket, 100, log: _log))
+            using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(100), log: _log))
             {
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
@@ -155,7 +155,7 @@ namespace kafka_tests.Unit
         {
             using (var server = new FakeTcpServer(8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
-            using (var conn = new KafkaConnection(socket, 100, log: _log))
+            using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(100), log: _log))
             {
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));

@@ -33,7 +33,7 @@ namespace KafkaNet.Model
         /// <summary>
         /// Timeout length in milliseconds waiting for a response from kafka.
         /// </summary>
-        public int ResponseTimeoutMs { get; set; }
+        public TimeSpan ResponseTimeoutMs { get; set; }
         /// <summary>
         /// Log object to record operational messages.
         /// </summary>
@@ -45,7 +45,7 @@ namespace KafkaNet.Model
             PartitionSelector = new DefaultPartitionSelector();
             Log = new DefaultTraceLog();
             KafkaConnectionFactory = new DefaultKafkaConnectionFactory();
-            ResponseTimeoutMs = DefaultResponseTimeout;
+            ResponseTimeoutMs = TimeSpan.FromMilliseconds(DefaultResponseTimeout);
         }
     }
 }
