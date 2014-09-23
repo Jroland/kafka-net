@@ -44,7 +44,7 @@ namespace kafka_tests.Unit
         [Test]
         public void BrokerRouterCanConstruct()
         {
-            var result = new BrokerRouter(new KafkaNet.Model.KafkaOptions
+            var result = new BrokerRouter(new KafkaOptions
             {
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
                 KafkaConnectionFactory = _mockKafkaConnectionFactory.Object
@@ -54,9 +54,28 @@ namespace kafka_tests.Unit
         }
 
         [Test]
+        [ExpectedException(typeof(ServerUnreachableException))]
+        public void BrokerRouterConstructorThrowsServerUnreachableException()
+        {
+            var result = new BrokerRouter(new KafkaOptions
+            {
+                KafkaServerUri = new List<Uri> { new Uri("http://noaddress:1") }
+            });
+        }
+
+        [Test]
+        public void BrokerRouterConstructorShouldIgnoreUnresolvableUriWhenAtLeastOneIsGood()
+        {
+            var result = new BrokerRouter(new KafkaOptions
+            {
+                KafkaServerUri = new List<Uri> { new Uri("http://noaddress:1"), new Uri("http://localhost:1") }
+            });
+        }
+
+        [Test]
         public void BrokerRouterUsesFactoryToAddNewBrokers()
         {
-            var router = new BrokerRouter(new KafkaNet.Model.KafkaOptions
+            var router = new BrokerRouter(new KafkaOptions
             {
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
                 KafkaConnectionFactory = _mockKafkaConnectionFactory.Object

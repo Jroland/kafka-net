@@ -15,7 +15,17 @@ namespace KafkaNet
     /// response is received.  It is recommended therefore to provide more than one Kafka Uri as this API will be able to to get
     /// metadata information even if one of the Kafka servers goes down.
     /// 
-    /// TODO : there is currently no way to update the cache once it is in there in this class
+    /// TODO
+    /// The metadata will stay in cache until an error condition is received indicating the metadata is out of data.  This error 
+    /// can be in the form of a socket disconnect or an error code from a response indicating a broker no longer hosts a partition.
+    /// 
+    /// Error Codes:
+    /// LeaderNotAvailable = 5
+    /// NotLeaderForPartition = 6
+    /// ConsumerCoordinatorNotAvailableCode = 15
+    /// 
+    /// Documentation:
+    /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataResponse
     /// </summary>
     public class BrokerRouter : IBrokerRouter
     {
@@ -29,12 +39,14 @@ namespace KafkaNet
         {
             _kafkaOptions = kafkaOptions;
 
-            //TODO a potential exception could be thrown here, on failed resolve of uri.
             foreach (var endpoint in _kafkaOptions.KafkaServerEndpoints)
             {
                 var conn = _kafkaOptions.KafkaConnectionFactory.Create(endpoint, _kafkaOptions.ResponseTimeoutMs,_kafkaOptions.Log);
                 _defaultConnectionIndex.AddOrUpdate(endpoint, e => conn, (e, c) => conn);
             }
+
+            if (_defaultConnectionIndex.Count <= 0)
+                throw new ServerUnreachableException("None of the provided Kafka servers are resolvable.");
         }
 
         /// <summary>

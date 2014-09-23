@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using KafkaNet.Protocol;
 
 namespace KafkaNet.Model
 {
@@ -13,13 +14,26 @@ namespace KafkaNet.Model
         /// </summary>
         public List<Uri> KafkaServerUri { get; set; }
         /// <summary>
-        /// List of resolved endpoints generated from the KafkaServerUri.
+        /// Safely attempts to resolve endpoints from the KafkaServerUri, ignoreing all resolvable ones.
         /// </summary>
         public IEnumerable<KafkaEndpoint> KafkaServerEndpoints
         {
             get
             {
-                return KafkaServerUri.Select(uri => KafkaConnectionFactory.Resolve(uri, Log));
+                foreach (var uri in KafkaServerUri)
+                {
+                    KafkaEndpoint endpoint = null;
+                    try
+                    {
+                        endpoint = KafkaConnectionFactory.Resolve(uri, Log);
+                    }
+                    catch (UnresolvedHostnameException ex)
+                    {
+                        Log.WarnFormat("Ignoring the following uri as it could not be resolved.  Uri:{0}  Exception:{1}", uri, ex);
+                    }
+
+                    if (endpoint != null) yield return endpoint;
+                }
             }
         }
         /// <summary>
