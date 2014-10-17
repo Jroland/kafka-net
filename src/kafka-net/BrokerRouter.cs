@@ -66,7 +66,7 @@ namespace KafkaNet
             var cachedTopic = GetTopicMetadata(topic);
 
             if (cachedTopic.Count <= 0)
-                throw new InvalidTopicMetadataException(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
+                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
 
             var topicMetadata = cachedTopic.First();
 
@@ -90,7 +90,7 @@ namespace KafkaNet
             var cachedTopic = GetTopicMetadata(topic).FirstOrDefault();
 
             if (cachedTopic == null)
-                throw new InvalidTopicMetadataException(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
+                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
 
             var partition = _kafkaOptions.PartitionSelector.Select(cachedTopic, key);
 
@@ -100,10 +100,10 @@ namespace KafkaNet
         /// <summary>
         /// Returns Topic metadata for each topic requested. 
         /// </summary>
-        /// <param name="topics">Collection of topids to request metadata for.</param>
+        /// <param name="topics">Collection of topics to request metadata for.</param>
         /// <returns>List of Topics as provided by Kafka.</returns>
         /// <remarks>
-        /// The topic metadata will by default check the cache first and then if it does not exist there will then
+        /// The topic metadata will by default check the cache first and then if it does not exist it will then
         /// request metadata from the server.  To force querying the metadata from the server use <see cref="RefreshTopicMetadata"/>
         /// </remarks>
         public List<Topic> GetTopicMetadata(params string[] topics)

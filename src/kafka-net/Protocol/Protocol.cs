@@ -64,7 +64,10 @@ namespace KafkaNet.Protocol
         ReplicaNotAvailable = 9,
         MessageSizeTooLarge = 10,
         StaleControllerEpochCode = 11,
-        OffsetMetadataTooLargeCode = 12
+        OffsetMetadataTooLargeCode = 12,
+        OffsetsLoadInProgressCode = 14,
+        ConsumerCoordinatorNotAvailableCode = 15,
+        NotCoordinatorForConsumerCode = 16
     }
 
     public struct ProtocolConstants
@@ -82,37 +85,41 @@ namespace KafkaNet.Protocol
     #region Exceptions...
     public class FailCrcCheckException : Exception
     {
-        public FailCrcCheckException(string message) : base(message) { }
+        public FailCrcCheckException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
     public class ResponseTimeoutException : Exception
     {
-        public ResponseTimeoutException(string message) : base(message) { }
+        public ResponseTimeoutException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
     public class InvalidPartitionException : Exception
     {
-        public InvalidPartitionException(string message) : base(message) { }
+        public InvalidPartitionException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
     public class ServerDisconnectedException : Exception
     {
-        public ServerDisconnectedException(string message) : base(message) { }
+        public ServerDisconnectedException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
     public class ServerUnreachableException : Exception
     {
-        public ServerUnreachableException(string message) : base(message) { }
+        public ServerUnreachableException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
     public class InvalidTopicMetadataException : Exception
     {
-        public InvalidTopicMetadataException(string message) : base(message) { }
+        public InvalidTopicMetadataException(ErrorResponseCode code, string message, params object[] args) : base(string.Format(message, args))
+        {
+            ErrorResponseCode = code;
+        }
+        public ErrorResponseCode ErrorResponseCode { get; private set; }
     }
 
     public class LeaderNotFoundException : Exception
     {
-        public LeaderNotFoundException(string message) : base(message) { }
+        public LeaderNotFoundException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
     public class UnresolvedHostnameException : Exception

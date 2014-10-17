@@ -65,7 +65,7 @@ namespace KafkaNet
         {
             var response = _brokerRouter.GetTopicMetadata(topic);
 
-            if (response.Count <= 0) throw new InvalidTopicMetadataException(string.Format("No metadata could be found for topic: {0}", topic));
+            if (response.Count <= 0) throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "No metadata could be found for topic: {0}", topic);
 
             return response.First();
         }
