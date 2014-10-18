@@ -24,7 +24,7 @@ namespace kafka_tests.Integration
         public void NewlyCreatedTopicShouldRetryUntilBrokerIsAssigned()
         {
             var expectedTopic = Guid.NewGuid().ToString();
-            var repo = new KafkaMetadataProvider(_options);
+            var repo = new KafkaMetadataProvider(_options.Log);
             var response = repo.Get(new[] { GetKafkaConnection() }, new[] { expectedTopic });
             var topic = response.Topics.FirstOrDefault();
 

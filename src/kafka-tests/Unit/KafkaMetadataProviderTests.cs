@@ -12,14 +12,12 @@ namespace kafka_tests.Unit
     public class KafkaMetadataProviderTests
     {
         private IKafkaLog _log;
-        private KafkaOptions _options;
 
 
         [SetUp]
         public void Setup()
         {
             _log = Substitute.For<IKafkaLog>();
-            _options = new KafkaOptions { Log = _log };
         }
 
         [Test]
@@ -33,7 +31,7 @@ namespace kafka_tests.Unit
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>())
                 .Returns(x => CreateMetadataResponse(errorCode), x => CreateMetadataResponse(ErrorResponseCode.NoError));
 
-            using (var provider = new KafkaMetadataProvider(_options))
+            using (var provider = new KafkaMetadataProvider(_log))
             {
                 var response = provider.Get(new[] { conn }, new[] { "Test" });
             }
@@ -58,7 +56,7 @@ namespace kafka_tests.Unit
                             x => CreateMetadataResponse(errorCode),
                             x => CreateMetadataResponse(ErrorResponseCode.NoError));
 
-            using (var provider = new KafkaMetadataProvider(_options))
+            using (var provider = new KafkaMetadataProvider(_log))
             {
                 var response = provider.Get(new[] { conn }, new[] { "Test" });
             }
@@ -83,7 +81,7 @@ namespace kafka_tests.Unit
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>())
                 .Returns(x => CreateMetadataResponse(-1, "123", 1), x => CreateMetadataResponse(ErrorResponseCode.NoError));
 
-            using (var provider = new KafkaMetadataProvider(_options))
+            using (var provider = new KafkaMetadataProvider(_log))
             {
                 var response = provider.Get(new[] { conn }, new[] { "Test" });
             }
@@ -104,7 +102,7 @@ namespace kafka_tests.Unit
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>())
                 .Returns(x => CreateMetadataResponse(ErrorResponseCode.NoError));
 
-            using (var provider = new KafkaMetadataProvider(_options))
+            using (var provider = new KafkaMetadataProvider(_log))
             {
                 var response = provider.Get(new[] { conn }, new[] { "Test" });
             }
@@ -125,7 +123,7 @@ namespace kafka_tests.Unit
 
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Returns(x => CreateMetadataResponse(errorCode));
 
-            using (var provider = new KafkaMetadataProvider(_options))
+            using (var provider = new KafkaMetadataProvider(_log))
             {
                 var response = provider.Get(new[] { conn }, new[] { "Test" });
             }
@@ -141,7 +139,7 @@ namespace kafka_tests.Unit
 
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Returns(x => CreateMetadataResponse(1, host, 1));
 
-            using (var provider = new KafkaMetadataProvider(_options))
+            using (var provider = new KafkaMetadataProvider(_log))
             {
                 var response = provider.Get(new[] { conn }, new[] { "Test" });
             }
@@ -157,7 +155,7 @@ namespace kafka_tests.Unit
 
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Returns(x => CreateMetadataResponse(1, "123", port));
 
-            using (var provider = new KafkaMetadataProvider(_options))
+            using (var provider = new KafkaMetadataProvider(_log))
             {
                 var response = provider.Get(new[] { conn }, new[] { "Test" });
             }

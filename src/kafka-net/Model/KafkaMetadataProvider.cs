@@ -9,12 +9,14 @@ namespace KafkaNet.Model
     public class KafkaMetadataProvider : IDisposable
     {
         private const int BackoffMilliseconds = 100;
-        private readonly KafkaOptions _kafkaOptions;
+
+        private readonly IKafkaLog _log;
+        
         private bool _interrupted;
 
-        public KafkaMetadataProvider(KafkaOptions kafkaOptions)
+        public KafkaMetadataProvider(IKafkaLog log)
         {
-            _kafkaOptions = kafkaOptions;
+            _log = log;
         }
 
         public MetadataResponse Get(IKafkaConnection[] connections, IEnumerable<string> topics)
@@ -38,7 +40,7 @@ namespace KafkaNet.Model
                     {
                         case ValidationResult.Retry:
                             performRetry = true;
-                            _kafkaOptions.Log.WarnFormat(validation.Message);
+                            _log.WarnFormat(validation.Message);
                             break;
                         case ValidationResult.Error:
                             throw validation.Exception;
@@ -57,12 +59,12 @@ namespace KafkaNet.Model
             if (performRetry && retryAttempt > 0)
             {
                 var backoff = retryAttempt*retryAttempt*BackoffMilliseconds;
-                _kafkaOptions.Log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", backoff);
+                _log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", backoff);
                 Thread.Sleep(TimeSpan.FromMilliseconds(backoff));
             }
         }
 
-        private MetadataResponse GetMetadataResponse(IEnumerable<IKafkaConnection> connections, MetadataRequest request)
+        private MetadataResponse GetMetadataResponse(IKafkaConnection[] connections, MetadataRequest request)
         {
             //try each default broker until we find one that is available
             foreach (var conn in connections)
@@ -77,13 +79,13 @@ namespace KafkaNet.Model
                 }
                 catch (Exception ex)
                 {
-                    _kafkaOptions.Log.WarnFormat("Failed to contact Kafka server={0}.  Trying next default server.  Exception={1}", conn.Endpoint, ex);
+                    _log.WarnFormat("Failed to contact Kafka server={0}.  Trying next default server.  Exception={1}", conn.Endpoint, ex);
                 }
             }
 
             throw new ServerUnreachableException(
                         "Unable to query for metadata from any of the default Kafka servers.  At least one provided server must be available.  Server list: {0}",
-                        string.Join(", ", _kafkaOptions.KafkaServerUri.Select(x => x.ToString())));
+                        string.Join(", ", connections.Select(x => x.ToString())));
         }
 
         private IEnumerable<MetadataValidationResult> ValidateResponse(MetadataResponse metadata)
