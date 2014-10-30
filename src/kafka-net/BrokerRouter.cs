@@ -15,22 +15,14 @@ namespace KafkaNet
     /// response is received.  It is recommended therefore to provide more than one Kafka Uri as this API will be able to to get
     /// metadata information even if one of the Kafka servers goes down.
     /// 
-    /// TODO
     /// The metadata will stay in cache until an error condition is received indicating the metadata is out of data.  This error 
     /// can be in the form of a socket disconnect or an error code from a response indicating a broker no longer hosts a partition.
-    /// 
-    /// Error Codes:
-    /// LeaderNotAvailable = 5
-    /// NotLeaderForPartition = 6
-    /// ConsumerCoordinatorNotAvailableCode = 15
-    /// 
-    /// Documentation:
-    /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataResponse
     /// </summary>
     public class BrokerRouter : IBrokerRouter
     {
         private readonly object _threadLock = new object();
         private readonly KafkaOptions _kafkaOptions;
+        private readonly KafkaMetadataProvider _kafkaMetadataProvider;
         private readonly ConcurrentDictionary<KafkaEndpoint, IKafkaConnection> _defaultConnectionIndex = new ConcurrentDictionary<KafkaEndpoint, IKafkaConnection>();
         private readonly ConcurrentDictionary<int, IKafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, IKafkaConnection>();
         private readonly ConcurrentDictionary<string, Topic> _topicIndex = new ConcurrentDictionary<string, Topic>();
@@ -38,10 +30,11 @@ namespace KafkaNet
         public BrokerRouter(KafkaOptions kafkaOptions)
         {
             _kafkaOptions = kafkaOptions;
+            _kafkaMetadataProvider = new KafkaMetadataProvider(_kafkaOptions.Log);
 
             foreach (var endpoint in _kafkaOptions.KafkaServerEndpoints)
             {
-                var conn = _kafkaOptions.KafkaConnectionFactory.Create(endpoint, _kafkaOptions.ResponseTimeoutMs,_kafkaOptions.Log);
+                var conn = _kafkaOptions.KafkaConnectionFactory.Create(endpoint, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log);
                 _defaultConnectionIndex.AddOrUpdate(endpoint, e => conn, (e, c) => conn);
             }
 
@@ -66,7 +59,7 @@ namespace KafkaNet
             var cachedTopic = GetTopicMetadata(topic);
 
             if (cachedTopic.Count <= 0)
-                throw new InvalidTopicMetadataException(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
+                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
 
             var topicMetadata = cachedTopic.First();
 
@@ -90,7 +83,7 @@ namespace KafkaNet
             var cachedTopic = GetTopicMetadata(topic).FirstOrDefault();
 
             if (cachedTopic == null)
-                throw new InvalidTopicMetadataException(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
+                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
 
             var partition = _kafkaOptions.PartitionSelector.Select(cachedTopic, key);
 
@@ -100,10 +93,10 @@ namespace KafkaNet
         /// <summary>
         /// Returns Topic metadata for each topic requested. 
         /// </summary>
-        /// <param name="topics">Collection of topids to request metadata for.</param>
+        /// <param name="topics">Collection of topics to request metadata for.</param>
         /// <returns>List of Topics as provided by Kafka.</returns>
         /// <remarks>
-        /// The topic metadata will by default check the cache first and then if it does not exist there will then
+        /// The topic metadata will by default check the cache first and then if it does not exist it will then
         /// request metadata from the server.  To force querying the metadata from the server use <see cref="RefreshTopicMetadata"/>
         /// </remarks>
         public List<Topic> GetTopicMetadata(params string[] topics)
@@ -137,22 +130,11 @@ namespace KafkaNet
             {
                 _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
 
-                //use the initial default connections to retrieve metadata
-                if (_defaultConnectionIndex.Count > 0)
-                {
-                    CycleConnectionsForTopicMetadata(_defaultConnectionIndex.Values, topics);
-                    if (_brokerConnectionIndex.Values.Count > 0)
-                    {
-                        _defaultConnectionIndex.Clear();
-                    }
-                    return;
-                }
+                //get the connections to query against and get metadata
+                var connections = _defaultConnectionIndex.Values.Union(_brokerConnectionIndex.Values).ToArray();
+                var metadataResponse = _kafkaMetadataProvider.Get(connections, topics);
 
-                //once the default is used we can then use the brokers to cycle for metadata
-                if (_brokerConnectionIndex.Values.Count > 0)
-                {
-                    CycleConnectionsForTopicMetadata(_brokerConnectionIndex.Values, topics);
-                }
+                UpdateInternalMetadataCache(metadataResponse);
             }
         }
 
@@ -210,37 +192,7 @@ namespace KafkaNet
 
             return null;
         }
-
-        private void CycleConnectionsForTopicMetadata(IEnumerable<IKafkaConnection> connections, IEnumerable<string> topics)
-        {
-            var request = new MetadataRequest { Topics = topics.ToList() };
-            if (request.Topics.Count <= 0) return;
-
-            //try each default broker until we find one that is available
-            foreach (var conn in connections)
-            {
-                try
-                {
-                    var response = conn.SendAsync(request).Result;
-                    if (response != null && response.Count > 0)
-                    {
-                        var metadataResponse = response.First();
-                        UpdateInternalMetadataCache(metadataResponse);
-                        return;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _kafkaOptions.Log.WarnFormat("Failed to contact Kafka server={0}.  Trying next default server.  Exception={1}", conn.Endpoint, ex);
-                }
-            }
-
-            throw new ServerUnreachableException(
-                    string.Format(
-                        "Unable to query for metadata from any of the default Kafka servers.  At least one provided server must be available.  Server list: {0}",
-                        string.Join(", ", _kafkaOptions.KafkaServerUri.Select(x => x.ToString()))));
-        }
-
+        
         private void UpdateInternalMetadataCache(MetadataResponse metadata)
         {
 
