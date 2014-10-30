@@ -5,7 +5,21 @@ namespace KafkaNet
 {
     public interface IKafkaConnectionFactory
     {
-        IKafkaConnection Create(KafkaEndpoint endpoint, int responseTimeoutMs, IKafkaLog log);
+        /// <summary>
+        /// Create a new KafkaConnection.
+        /// </summary>
+        /// <param name="endpoint">The specific KafkaEndpoint of the server to connect to.</param>
+        /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received after sending a message to Kafka</param>
+        /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
+        /// <returns>IKafkaConnection initialized to connecto to the given endpoint.</returns>
+        IKafkaConnection Create(KafkaEndpoint endpoint, TimeSpan responseTimeoutMs, IKafkaLog log);
+
+        /// <summary>
+        /// Resolves a generic Uri into a uniquely identifiable KafkaEndpoint.
+        /// </summary>
+        /// <param name="kafkaAddress">The address to the kafka server to resolve.</param>
+        /// <param name="log">Logging interface used to record any log messages created by the Resolving process.</param>
+        /// <returns>KafkaEndpoint with resolved IP and Address.</returns>
         KafkaEndpoint Resolve(Uri kafkaAddress, IKafkaLog log);
     }
 }

@@ -44,6 +44,9 @@
     <Reference Include="Ninject.MockingKernel.Moq">
       <HintPath>..\packages\Ninject.MockingKernel.Moq.3.0.0.5\lib\net45-full\Ninject.MockingKernel.Moq.dll</HintPath>
     </Reference>
+    <Reference Include="NSubstitute">
+      <HintPath>..\packages\NSubstitute.1.7.2.0\lib\NET45\NSubstitute.dll</HintPath>
+    </Reference>
     <Reference Include="nunit.framework">
       <HintPath>..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
     </Reference>
@@ -64,11 +67,13 @@
     <Compile Include="Helpers\MessageHelper.cs" />
     <Compile Include="Helpers\TaskTest.cs" />
     <Compile Include="Integration\GzipProducerConsumerTests.cs" />
+    <Compile Include="Integration\KafkaMetadataProviderUnitTests.cs" />
     <Compile Include="Integration\OffsetManagementTests.cs" />
     <Compile Include="Integration\ProducerConsumerIntegrationTests.cs" />
     <Compile Include="Unit\FakeTcpServerTests.cs" />
     <Compile Include="Unit\KafkaConnectionTests.cs" />
     <Compile Include="Unit\KafkaEndpointTests.cs" />
+    <Compile Include="Unit\KafkaMetadataProviderTests.cs" />
     <Compile Include="Unit\KafkaTcpSocketTests.cs" />
     <Compile Include="Integration\KafkaConnectionIntegrationTests.cs" />
     <Compile Include="RequestFactory.cs" />

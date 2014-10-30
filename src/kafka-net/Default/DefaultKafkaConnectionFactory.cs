@@ -9,7 +9,7 @@ namespace KafkaNet
 {
     public class DefaultKafkaConnectionFactory : IKafkaConnectionFactory
     {
-        public IKafkaConnection Create(KafkaEndpoint endpoint, int responseTimeoutMs, IKafkaLog log)
+        public IKafkaConnection Create(KafkaEndpoint endpoint, TimeSpan responseTimeoutMs, IKafkaLog log)
         {
             return new KafkaConnection(new KafkaTcpSocket(log, endpoint), responseTimeoutMs, log);
         }
@@ -31,18 +31,25 @@ namespace KafkaNet
 
         private static IPAddress GetFirstAddress(string hostname, IKafkaLog log)
         {
-            //lookup the IP address from the provided host name
-            var addresses = Dns.GetHostAddresses(hostname);
-
-            if (addresses.Length > 0)
+            try
             {
-                Array.ForEach(addresses, address => log.DebugFormat("Found address {0} for {1}", address, hostname));
+                //lookup the IP address from the provided host name
+                var addresses = Dns.GetHostAddresses(hostname);
 
-                var selectedAddress = addresses.FirstOrDefault(item => item.AddressFamily == AddressFamily.InterNetwork) ?? addresses.First();
+                if (addresses.Length > 0)
+                {
+                    Array.ForEach(addresses, address => log.DebugFormat("Found address {0} for {1}", address, hostname));
 
-                log.DebugFormat("Using address {0} for {1}", selectedAddress, hostname);
+                    var selectedAddress = addresses.FirstOrDefault(item => item.AddressFamily == AddressFamily.InterNetwork) ?? addresses.First();
 
-                return selectedAddress;
+                    log.DebugFormat("Using address {0} for {1}", selectedAddress, hostname);
+
+                    return selectedAddress;
+                }
+            }
+            catch 
+            {
+                throw new UnresolvedHostnameException("Could not resolve the following hostname: {0}", hostname);
             }
 
             throw new UnresolvedHostnameException("Could not resolve the following hostname: {0}", hostname);

@@ -36,6 +36,7 @@ namespace KafkaNet
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
             _metadataQueries = new MetadataQueries(_options.Router);
 
+            //TODO this is wrong, we should only query once and then react only to errors or socket exceptions
             //this timer will periodically look for new partitions and automatically add them to the consuming queue
             //using the same whitelist logic
             _topicPartitionQueryTimer = new ScheduledTimer()

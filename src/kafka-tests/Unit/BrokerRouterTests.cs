@@ -32,7 +32,7 @@ namespace kafka_tests.Unit
             _mockPartitionSelector = _kernel.GetMock<IPartitionSelector>();
             _mockKafkaConnection1 = _kernel.GetMock<IKafkaConnection>();
             _mockKafkaConnectionFactory = _kernel.GetMock<IKafkaConnectionFactory>();
-            _mockKafkaConnectionFactory.Setup(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 1), It.IsAny<int>(), It.IsAny<IKafkaLog>())).Returns(() => _mockKafkaConnection1.Object);
+            _mockKafkaConnectionFactory.Setup(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 1), It.IsAny<TimeSpan>(), It.IsAny<IKafkaLog>())).Returns(() => _mockKafkaConnection1.Object);
             _mockKafkaConnectionFactory.Setup(x => x.Resolve(It.IsAny<Uri>(), It.IsAny<IKafkaLog>()))
                 .Returns<Uri, IKafkaLog>((uri, log) => new KafkaEndpoint
                 {
@@ -44,7 +44,7 @@ namespace kafka_tests.Unit
         [Test]
         public void BrokerRouterCanConstruct()
         {
-            var result = new BrokerRouter(new KafkaNet.Model.KafkaOptions
+            var result = new BrokerRouter(new KafkaOptions
             {
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
                 KafkaConnectionFactory = _mockKafkaConnectionFactory.Object
@@ -54,9 +54,28 @@ namespace kafka_tests.Unit
         }
 
         [Test]
+        [ExpectedException(typeof(ServerUnreachableException))]
+        public void BrokerRouterConstructorThrowsServerUnreachableException()
+        {
+            var result = new BrokerRouter(new KafkaOptions
+            {
+                KafkaServerUri = new List<Uri> { new Uri("http://noaddress:1") }
+            });
+        }
+
+        [Test]
+        public void BrokerRouterConstructorShouldIgnoreUnresolvableUriWhenAtLeastOneIsGood()
+        {
+            var result = new BrokerRouter(new KafkaOptions
+            {
+                KafkaServerUri = new List<Uri> { new Uri("http://noaddress:1"), new Uri("http://localhost:1") }
+            });
+        }
+
+        [Test]
         public void BrokerRouterUsesFactoryToAddNewBrokers()
         {
-            var router = new BrokerRouter(new KafkaNet.Model.KafkaOptions
+            var router = new BrokerRouter(new KafkaOptions
             {
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1") },
                 KafkaConnectionFactory = _mockKafkaConnectionFactory.Object
@@ -66,7 +85,7 @@ namespace kafka_tests.Unit
                       .Returns(() => Task.Factory.StartNew(() => new List<MetadataResponse> { CreateMetaResponse() }));
 
             var topics = router.GetTopicMetadata(TestTopic);
-            _mockKafkaConnectionFactory.Verify(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 2), It.IsAny<int>(), It.IsAny<IKafkaLog>()), Times.Once());
+            _mockKafkaConnectionFactory.Verify(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 2), It.IsAny<TimeSpan>(), It.IsAny<IKafkaLog>()), Times.Once());
         }
 
         #region MetadataRequest Tests...

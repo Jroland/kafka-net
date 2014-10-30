@@ -61,6 +61,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
+        [Ignore("Not working, sometimes crashing server.  Needs review.")]
         public void EnsureGzipCanDecompressMessageFromKafka()
         {
             var router = new BrokerRouter(_options);
