@@ -19,7 +19,7 @@ using ZooKeeperNet;
 namespace KafkaNet
 {
 	/// <summary>
-	/// Description of HLConsumer.
+	/// High level consumer using zookeeper for coordination.
 	/// </summary>
 	public class HLConsumer
 	{
@@ -45,31 +45,18 @@ namespace KafkaNet
 		}
 		
 		public IEnumerable<Message> consume(string groupID){
-			var path = new StringBuilder( "/consumers" ); //+ groupID + "/offsets/" + this._topic ;
 			var p = "/consumers/"+groupID+"/offsets/"+this._topic;
 			try {
 				if(_zookeeper.Exists(p , _watcher) ==null){
-					if(_zookeeper.Exists(path.ToString(), _watcher) ==null){
-						_zookeeper.Create(path.ToString(), new byte[0], Ids.CREATOR_ALL_ACL, CreateMode.Persistent);
-						
-					} else if(_zookeeper.Exists(path.Append("/").Append(groupID).ToString(), _watcher) == null){
-						_zookeeper.Create(path.ToString(), new byte[0], Ids.CREATOR_ALL_ACL, CreateMode.Persistent);
-						
-					} else if (_zookeeper.Exists(path.Append("/offsets").ToString(), _watcher) == null){
-						_zookeeper.Create(path.ToString(), new byte[0], Ids.CREATOR_ALL_ACL, CreateMode.Persistent);
-						
-					} else if (_zookeeper.Exists(path.Append("/").Append(this._topic).ToString(), _watcher) == null){
-						_zookeeper.Create(path.ToString(), new byte[0], Ids.CREATOR_ALL_ACL, CreateMode.Persistent);
-					}
-
+					CreateZookeeperPath("/consumers","/"+groupID, "/offsets", "/"+this._topic);
 					var common = new MetadataQueries(_router);
 					var offsets = common.GetTopicOffsetAsync(groupID).Result;
 					_consumer.SetOffsetPosition(offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Min())).ToArray());
 					offsets.ForEach(off => {
 					                	_zookeeper.Create(p + "/" + off.PartitionId.ToString(),
-					                                  System.Text.Encoding.UTF8.GetBytes(off.Offsets.Min().ToString()),
-					                                  Ids.OPEN_ACL_UNSAFE,
-					                                  CreateMode.PersistentSequential);
+					                	                  System.Text.Encoding.UTF8.GetBytes(off.Offsets.Min().ToString()),
+					                	                  Ids.OPEN_ACL_UNSAFE,
+					                	                  CreateMode.PersistentSequential);
 					                });
 				}
 				else {
@@ -82,7 +69,6 @@ namespace KafkaNet
 					                          		if(data != null && data.Length >0){
 					                          			long offset = 0;
 					                          			if(long.TryParse(System.Text.Encoding.Default.GetString(data), out offset)){
-//					                          				_consumer.SetOffsetPosition(new OffsetPosition(partition, offset));
 					                          				offsets.Add(new OffsetPosition(partition, offset));
 					                          			}
 					                          		}
@@ -90,11 +76,33 @@ namespace KafkaNet
 					                          });
 					_consumer.SetOffsetPosition(offsets.ToArray());
 				}
-			} catch (Exception e) {
-				//TODO: Log the error, or handle it? 
+			} catch (Exception) {
+				//TODO: Log the error, or handle it?
 			}
 			
 			return _consumer.Consume();
+		}
+		
+		/// <summary>
+		/// create zookeeper path hierarchically. 
+		/// </summary>
+		/// <param name="path">paths by level, the next path should be append to the previous one to form a valid path</param>
+		/// <returns></returns>
+		public bool CreateZookeeperPath(params string[] path){
+			var sb = new StringBuilder();
+			var success = true;
+			try{
+				for (int i = 0; i < path.Length; i++) {
+					sb.Append(path[i]);
+					if(_zookeeper.Exists(sb.ToString(), _watcher) == null){
+						_zookeeper.Create(sb.ToString(), new byte[0], Ids.CREATOR_ALL_ACL, CreateMode.Persistent);
+					}
+				}
+			} catch (Exception){
+				success = false;
+				//TODO:
+			}
+			return success;
 		}
 	}
 }
