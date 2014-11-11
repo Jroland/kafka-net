@@ -66,6 +66,7 @@
     <Compile Include="BrokerRouter.cs" />
     <Compile Include="Model\KafkaEndpoint.cs" />
     <Compile Include="KafkaMetadataProvider.cs" />
+    <Compile Include="NativeHLConsumer.cs" />
     <Compile Include="Protocol\Broker.cs" />
     <Compile Include="Common\ReadByteStream.cs" />
     <Compile Include="Common\Crc32.cs" />

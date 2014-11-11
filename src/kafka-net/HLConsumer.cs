@@ -13,6 +13,7 @@ using System.Collections.Generic;
 
 using KafkaNet.Model;
 using KafkaNet.Protocol;
+using KafkaNet.Common;
 
 using ZooKeeperNet;
 
@@ -44,7 +45,13 @@ namespace KafkaNet
 			_watcher = watcher;
 		}
 		
-		public IEnumerable<Message> consume(string groupID){
+		/// <summary>
+		/// consume topic specified in the constructor with groupID here. Only consume n messages. 
+		/// </summary>
+		/// <param name="groupID"></param>
+		/// <param name="n"></param>
+		/// <returns></returns>
+		public IEnumerable<Message> consume(string groupID, int n){
 			var p = "/consumers/"+groupID+"/offsets/"+this._topic;
 			try {
 				if(_zookeeper.Exists(p , _watcher) ==null){
@@ -80,8 +87,13 @@ namespace KafkaNet
 				//TODO: Log the error, or handle it?
 			}
 			
-			return _consumer.Consume();
+			return _consumer.Consume().Take(n);
 		}
+		
+//		public bool CommitOffset(string path, int pid, long offset){
+//			path = path + "/" + pid.ToString();
+//			_zookeeper.SetData(path, offset.ToBytes(), -1);
+//		}
 		
 		/// <summary>
 		/// create zookeeper path hierarchically. 

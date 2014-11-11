@@ -207,5 +207,10 @@ namespace KafkaNet.Protocol
         /// The partition id this offset is from.
         /// </summary>
         public int PartitionId { get; set; }
+        public override string ToString()
+		{
+			return string.Format("[MessageMetadata Offset={0}, PartitionId={1}]", Offset, PartitionId);
+		}
+
     }
 }

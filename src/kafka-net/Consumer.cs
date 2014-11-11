@@ -18,17 +18,17 @@ namespace KafkaNet
     /// </summary>
     public class Consumer : IMetadataQueries, IDisposable
     {
-        private readonly ConsumerOptions _options;
-        private readonly BlockingCollection<Message> _fetchResponseQueue;
-        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
-        private readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
-        private readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
-        private readonly IScheduledTimer _topicPartitionQueryTimer;
-        private readonly IMetadataQueries _metadataQueries;
+        protected readonly ConsumerOptions _options;
+        protected readonly BlockingCollection<Message> _fetchResponseQueue;
+        protected readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        protected readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
+        protected readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
+        protected readonly IScheduledTimer _topicPartitionQueryTimer;
+        protected readonly IMetadataQueries _metadataQueries;
 
-        private int _disposeCount;
-        private int _ensureOneThread;
-        private Topic _topic;
+        protected int _disposeCount;
+        protected int _ensureOneThread;
+        protected Topic _topic;
 
         public Consumer(ConsumerOptions options, params OffsetPosition[] positions)
         {
@@ -87,7 +87,7 @@ namespace KafkaNet
             return _partitionOffsetIndex.Select(x => new OffsetPosition { PartitionId = x.Key, Offset = x.Value }).ToList();
         }
 
-        private void RefreshTopicPartitions()
+        protected void RefreshTopicPartitions()
         {
             try
             {
@@ -164,13 +164,11 @@ namespace KafkaNet
                                     foreach (var message in response.Messages)
                                     {
                                         _fetchResponseQueue.Add(message, _disposeToken.Token);
-
                                         if (_disposeToken.IsCancellationRequested) return;
                                     }
 
                                     var nextOffset = response.Messages.Max(x => x.Meta.Offset) + 1;
                                     _partitionOffsetIndex.AddOrUpdate(partitionId, i => nextOffset, (i, l) => nextOffset);
-
                                     // sleep is not needed if responses were received
                                     continue;
                                 }

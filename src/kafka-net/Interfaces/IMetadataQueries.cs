@@ -7,7 +7,7 @@ namespace KafkaNet
     /// <summary>
     /// Contains common metadata query commands that are used by both a consumer and producer.
     /// </summary>
-    interface IMetadataQueries : IDisposable
+    public interface IMetadataQueries : IDisposable
     {
         /// <summary>
         /// Get metadata on the given topic.
