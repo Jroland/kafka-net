@@ -33,6 +33,9 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="log4net">
+      <HintPath>..\packages\log4net.2.0.3\lib\net40-full\log4net.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -40,10 +43,14 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="ZooKeeperNet">
+      <HintPath>..\packages\ZooKeeper.Net.3.4.6.0\lib\net40\ZooKeeperNet.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Common\ThreadWall.cs" />
     <Compile Include="Default\DefaultKafkaConnectionFactory.cs" />
+    <Compile Include="HLConsumer.cs" />
     <Compile Include="Interfaces\IMetadataQueries.cs" />
     <Compile Include="Interfaces\IKafkaTcpSocket.cs" />
     <Compile Include="Model\BrokerRoute.cs" />
@@ -86,6 +93,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="kafka-net.nuspec" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="lib\net45\" />

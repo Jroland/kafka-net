@@ -181,6 +181,13 @@ namespace KafkaNet.Protocol
                     throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
             }
         }
+        
+        public override string ToString()
+		{
+        	return string.Format("[Message Meta={0}, MagicNumber={1}, Attribute={2}, Key={3}, Value={4}]", Meta, MagicNumber, Attribute, 
+        	       Key==null? "null" : System.Text.Encoding.Default.GetString(Key), Value==null? "null" : System.Text.Encoding.Default.GetString(Value));
+		}
+
     }
 
     /// <summary>
