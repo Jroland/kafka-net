@@ -31,6 +31,9 @@ namespace KafkaNet
 		}
 		
 		public void RefreshOffsets(){
+			var actualOffsets = _metadataQueries.GetTopicOffsetAsync(_options.Topic).Result;
+			var maxminGroups = actualOffsets.Select(x => new {pid = x.PartitionId, min = x.Offsets.Min(), max = x.Offsets.Max()});
+			
 			_topic.Partitions.ForEach(
 				partition => {
 					var conn = _options.Router.SelectBrokerRoute(_topic.Name, partition.PartitionId);
@@ -39,14 +42,21 @@ namespace KafkaNet
 						.Result.ForEach(
 							offsetResp => {
 								Console.WriteLine("fetch offset: " + offsetResp.ToString());
+								
+								if(actualOffsets.Any(x => x.PartitionId==partition.PartitionId)){
+									var actual = maxminGroups.First(x => x.pid==partition.PartitionId);
+									if(actual.min > offsetResp.Offset || actual.max < offsetResp.Offset){
+										offsetResp.Offset = actual.min;
+									}
+								}
 								_partitionOffsetIndex.AddOrUpdate(partition.PartitionId, i => offsetResp.Offset, (i, l) => offsetResp.Offset);
 							});
 				});
 			
-//			var actualOffsets = _metadataQueries.GetTopicOffsetAsync(_options.Topic).Result;
-//			var maxGroup = from o in actualOffsets 
-//						group o by o.PartitionId into g 
-//				select new {pid = g.Key, offset = g.Max(x => x.)};
+			
+//				group o by o.PartitionId into g
+//				select new {pid = g.Key, min = g.Min(x => x.Offsets), max = g.Max(x => x.Offsets) };
+			
 
 		}
 		
@@ -55,7 +65,7 @@ namespace KafkaNet
 			var result = base.Consume(null).Take(num).ToList();
 //			var maxgroups = result.GroupBy(x => x.Meta.PartitionId).GroupJoin(;
 			var maxgroups = from r in result
-				group r by r.Meta.PartitionId into g 
+				group r by r.Meta.PartitionId into g
 				select new {pid = g.Key, offset = g.Max(m => m.Meta.Offset) + 1 };
 			
 			maxgroups.ToList().ForEach(x => Console.WriteLine(x.pid + " : " + x.offset));
@@ -64,8 +74,8 @@ namespace KafkaNet
 //				Console.WriteLine("partition: " + pos.Meta.PartitionId + " , offset: "+ pos.Meta.Offset);
 				
 				if(!CommitOffset(pos.pid, pos.offset)){
-					var mingroup = from r in result 
-						group r by r.Meta.PartitionId into g 
+					var mingroup = from r in result
+						group r by r.Meta.PartitionId into g
 						select new { pid = g.Key, offset = g.Min(m => m.Meta.Offset)};
 					mingroup.ToList().ForEach(x => CommitOffset(x.pid, x.offset));
 					return null;
