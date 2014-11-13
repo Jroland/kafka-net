@@ -22,7 +22,7 @@ namespace KafkaNet
 	/// <summary>
 	/// High level consumer using zookeeper for coordination.
 	/// </summary>
-	public class HLConsumer
+	public class ZookeeperHLConsumer
 	{
 		KafkaOptions _options ;
 		BrokerRouter _router ;
@@ -31,7 +31,7 @@ namespace KafkaNet
 		string _topic;
 		IWatcher _watcher;
 		
-		public HLConsumer(string topic, List<string> brokerList, string zookps, TimeSpan? timeout = null, IWatcher watcher = null)
+		public ZookeeperHLConsumer(string topic, List<string> brokerList, string zookps, TimeSpan? timeout = null, IWatcher watcher = null)
 		{
 			_options = new KafkaOptions();
 			_options.KafkaServerUri = brokerList.ConvertAll<Uri>(x => new Uri(x));
@@ -51,7 +51,7 @@ namespace KafkaNet
 		/// <param name="groupID"></param>
 		/// <param name="n"></param>
 		/// <returns></returns>
-		public IEnumerable<Message> consume(string groupID, int n){
+		public IEnumerable<Message> Consume(string groupID, int n){
 			var p = "/consumers/"+groupID+"/offsets/"+this._topic;
 			try {
 				if(_zookeeper.Exists(p , _watcher) ==null){
@@ -89,12 +89,7 @@ namespace KafkaNet
 			
 			return _consumer.Consume().Take(n);
 		}
-		
-//		public bool CommitOffset(string path, int pid, long offset){
-//			path = path + "/" + pid.ToString();
-//			_zookeeper.SetData(path, offset.ToBytes(), -1);
-//		}
-		
+	
 		/// <summary>
 		/// create zookeeper path hierarchically. 
 		/// </summary>

@@ -53,10 +53,6 @@ namespace KafkaNet
 							});
 				});
 			
-			
-//				group o by o.PartitionId into g
-//				select new {pid = g.Key, min = g.Min(x => x.Offsets), max = g.Max(x => x.Offsets) };
-			
 
 		}
 		
