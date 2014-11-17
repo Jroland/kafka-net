@@ -182,12 +182,6 @@ namespace KafkaNet.Protocol
             }
         }
         
-        public override string ToString()
-		{
-        	return string.Format("[Message Meta={0}, MagicNumber={1}, Attribute={2}, Key={3}, Value={4}]", Meta, MagicNumber, Attribute, 
-        	       Key==null? "null" : System.Text.Encoding.Default.GetString(Key), Value==null? "null" : System.Text.Encoding.Default.GetString(Value));
-		}
-
     }
 
     /// <summary>
@@ -207,10 +201,7 @@ namespace KafkaNet.Protocol
         /// The partition id this offset is from.
         /// </summary>
         public int PartitionId { get; set; }
-        public override string ToString()
-		{
-			return string.Format("[MessageMetadata Offset={0}, PartitionId={1}]", Offset, PartitionId);
-		}
+
 
     }
 }

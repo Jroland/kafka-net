@@ -66,9 +66,9 @@ namespace KafkaNet
 
 		public IEnumerable<Message> Consume(int num)
 		{
-			CancellationToken cancellationToken = new CancellationToken();
+			var cancellationToken = new CancellationTokenSource();
 			
-			var result = base.Consume(cancellationToken).Take(num).ToList();
+			var result = base.Consume(cancellationToken.Token).Take(num).ToList();
 			
 			if(_fetchResponseQueue.Count < num){
 				
@@ -91,7 +91,7 @@ namespace KafkaNet
 					return null;
 				}
 			}
-//			tokenSrc.Cancel();
+			cancellationToken.Cancel();
 			return result;
 		}
 

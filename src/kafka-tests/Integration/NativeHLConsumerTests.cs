@@ -17,12 +17,14 @@ namespace kafka_tests.Integration
 	[Category("Integration")]
 	public class NativeHLConsumerTests {
 		private KafkaOptions Options ;
+		private string cgroup = "test";
+		private string topic = "integration_test";
 		
 		[TestFixtureSetUpAttribute]
 		public void SetupFixture()
 		{
 			Options = new KafkaOptions(IntegrationConfig.IntegrationUri);
-			var amount = 100;
+			var amount = 200;
 			using (var router = new BrokerRouter(Options)){
 				using (var producer = new Producer(router, -1))
 				{
@@ -31,7 +33,7 @@ namespace kafka_tests.Integration
 					for (var i = 0; i < amount; i++)
 					{
 						Console.WriteLine("produce test message... ");
-						tasks[i] = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(Guid.NewGuid().ToString()) });
+						tasks[i] = producer.SendMessageAsync(topic, new[] { new Message(Guid.NewGuid().ToString()) });
 					}
 
 					var results = tasks.SelectMany(x => x.Result).ToList();
@@ -46,8 +48,8 @@ namespace kafka_tests.Integration
 		public void ConsumerShouldConsumeCorrectNumberOfResults()
 		{
 			using (var router = new BrokerRouter(Options)){
-				var nativeConsumer = new NativeHLConsumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router),
-				                                          IntegrationConfig.IntegrationConsumer);
+				var nativeConsumer = new NativeHLConsumer(new ConsumerOptions(topic, router),
+				                                          cgroup);
 				for (int i = 0; i < 10; i++) {
 					var result = nativeConsumer.Consume(i);
 					Assert.AreEqual(result.Count(), i);
@@ -62,7 +64,7 @@ namespace kafka_tests.Integration
 		{
 			int num = 30;
 			using (var router = new BrokerRouter(Options)){
-				using (var nativeConsumer = new NativeHLConsumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router),
+				using (var nativeConsumer = new NativeHLConsumer(new ConsumerOptions(topic, router),
 				                                                 "multiconsume") )
 				{
 					
@@ -86,7 +88,7 @@ namespace kafka_tests.Integration
 					Assert.AreEqual(shouldempty.Count(), 0);
 					Assert.True(dic1.All(x => dic2.Single(y => y.pid == x.pid).offset == x.offset+num));
 					
-					using (var consumer2 = new NativeHLConsumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router),
+					using (var consumer2 = new NativeHLConsumer(new ConsumerOptions(topic, router),
 					                                            "multiconsume")) {
 						var result3 = consumer2.Consume(num);
 						Assert.AreEqual(result3.Count(), num);
@@ -112,19 +114,27 @@ namespace kafka_tests.Integration
 		[Test]
 		public void ConsumerShouldCommitOffsetOnSuccess()
 		{
-			//TODO
+			using (var router = new BrokerRouter(Options)){
+				using (var nativeConsumer = new NativeHLConsumer(new ConsumerOptions(topic, router),
+				                                                 "multiconsume") )
+				{
+					
+					var result = nativeConsumer.Consume(10);
+					
+				}
+			}
 		}
-		
-		[Test]
-		public void ConsumerShouldNotCommitOffsetOnFail()
-		{
-			//TODO
-		}
-		
-		[Test]
-		public void ConsumerShouldCancelTaskAfterConsume()
-		{
-			//TODO
+			
+			[Test]
+			public void ConsumerShouldNotCommitOffsetOnFail()
+			{
+				//TODO
+			}
+			
+			[Test]
+			public void ConsumerShouldCancelTaskAfterConsume()
+			{
+				//TODO
+			}
 		}
 	}
-}
