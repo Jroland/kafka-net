@@ -8,6 +8,7 @@
  */
 using System;
 using System.Linq;
+using System.Threading;
 using System.Collections.Generic;
 
 using KafkaNet.Protocol;
@@ -22,77 +23,93 @@ namespace KafkaNet
 	{
 
 		protected string _consumerGroup;
-		
-		public NativeHLConsumer(ConsumerOptions options, string consumerGroup, params OffsetPosition[] positions) : base(options, positions){
-			if(_topic == null || _topic.Name != _options.Topic)
+
+		public NativeHLConsumer(ConsumerOptions options, string consumerGroup, params OffsetPosition[] positions)
+			: base(options, positions)
+		{
+			if (_topic == null || _topic.Name != _options.Topic)
 				_topic = _metadataQueries.GetTopic(_options.Topic);
 			_consumerGroup = consumerGroup;
 			RefreshOffsets();
 		}
-		
-		public void RefreshOffsets(){
+
+		public void RefreshOffsets()
+		{
 			var actualOffsets = _metadataQueries.GetTopicOffsetAsync(_options.Topic).Result;
-			var maxminGroups = actualOffsets.Select(x => new {pid = x.PartitionId, min = x.Offsets.Min(), max = x.Offsets.Max()});
-			
+			var maxminGroups = actualOffsets.Select(x => new { pid = x.PartitionId, min = x.Offsets.Min(), max = x.Offsets.Max() });
+
 			_topic.Partitions.ForEach(
-				partition => {
+				partition =>
+				{
 					var conn = _options.Router.SelectBrokerRoute(_topic.Name, partition.PartitionId);
 					conn.Connection
 						.SendAsync(CreateOffsetFetchRequest(_consumerGroup, partition.PartitionId))
 						.Result.ForEach(
-							offsetResp => {
+							offsetResp =>
+							{
 								Console.WriteLine("fetch offset: " + offsetResp.ToString());
-								
-								if(actualOffsets.Any(x => x.PartitionId==partition.PartitionId)){
-									var actual = maxminGroups.First(x => x.pid==partition.PartitionId);
-									if(actual.min > offsetResp.Offset || actual.max < offsetResp.Offset){
+
+								if (actualOffsets.Any(x => x.PartitionId == partition.PartitionId))
+								{
+									var actual = maxminGroups.First(x => x.pid == partition.PartitionId);
+									if (actual.min > offsetResp.Offset || actual.max < offsetResp.Offset)
+									{
 										offsetResp.Offset = actual.min;
 									}
 								}
 								_partitionOffsetIndex.AddOrUpdate(partition.PartitionId, i => offsetResp.Offset, (i, l) => offsetResp.Offset);
 							});
 				});
-			
+
 
 		}
-		
-		public IEnumerable<Message> Consume(int num){
-//			RefreshOffsets();
-			var result = base.Consume(null).Take(num).ToList();
-//			var maxgroups = result.GroupBy(x => x.Meta.PartitionId).GroupJoin(;
+
+		public IEnumerable<Message> Consume(int num)
+		{
+			CancellationToken cancellationToken = new CancellationToken();
+			
+			var result = base.Consume(cancellationToken).Take(num).ToList();
+			
+			if(_fetchResponseQueue.Count < num){
+				
+			}
 			var maxgroups = from r in result
 				group r by r.Meta.PartitionId into g
-				select new {pid = g.Key, offset = g.Max(m => m.Meta.Offset) + 1 };
-			
+				select new { pid = g.Key, offset = g.Max(m => m.Meta.Offset) + 1 };
+
 			maxgroups.ToList().ForEach(x => Console.WriteLine(x.pid + " : " + x.offset));
-			
-			foreach (var pos in maxgroups) {
-//				Console.WriteLine("partition: " + pos.Meta.PartitionId + " , offset: "+ pos.Meta.Offset);
-				
-				if(!CommitOffset(pos.pid, pos.offset)){
+
+			foreach (var pos in maxgroups)
+			{
+
+				if (!CommitOffset(pos.pid, pos.offset))
+				{
 					var mingroup = from r in result
 						group r by r.Meta.PartitionId into g
-						select new { pid = g.Key, offset = g.Min(m => m.Meta.Offset)};
+						select new { pid = g.Key, offset = g.Min(m => m.Meta.Offset) };
 					mingroup.ToList().ForEach(x => CommitOffset(x.pid, x.offset));
 					return null;
 				}
 			}
+//			tokenSrc.Cancel();
 			return result;
 		}
-		
-		protected bool CommitOffset(int pid, long offset){
+
+		protected bool CommitOffset(int pid, long offset)
+		{
 			Console.WriteLine("*** Committing partition: " + pid + ", offset: " + offset);
 			var conn = _options.Router.SelectBrokerRoute(_topic.Name, pid);
 			var resp = conn.Connection
 				.SendAsync(CreateOffsetCommitRequest(_consumerGroup, pid, offset)).Result.FirstOrDefault();
-			if(resp != null && ((int)resp.Error)== (int)ErrorResponseCode.NoError)
+			if (resp != null && ((int)resp.Error) == (int)ErrorResponseCode.NoError)
 				return true;
-			else {
-				Console.WriteLine(resp.Error + " topic name: "+ _topic.Name);
+			else
+			{
+				Console.WriteLine(resp.Error + " topic name: " + _topic.Name);
 				return false;
 			}
 		}
-		
+
 		protected OffsetFetchRequest CreateOffsetFetchRequest(string consumerGroup, int partitionId)
 		{
 			var request = new OffsetFetchRequest
@@ -110,7 +127,7 @@ namespace KafkaNet
 
 			return request;
 		}
-		
+
 		protected OffsetCommitRequest CreateOffsetCommitRequest(string consumerGroup, int partitionId, long offset, string metadata = null)
 		{
 			var commit = new OffsetCommitRequest

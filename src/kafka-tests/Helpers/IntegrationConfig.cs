@@ -21,5 +21,15 @@ namespace kafka_tests.Helpers
                 return new Uri(url);
             }
         }
+        
+        public static Uri ZookeeperUri
+        {
+        	get
+        	{
+        		var zkpurl = ConfigurationManager.AppSettings["IntegrationZookeeperServerUrl"];
+        		if( zkpurl == null) throw new ConfigurationErrorsException("IntegrationZookeeperServerUrl must be specified in the app.config file.");
+        		return new Uri(zkpurl);
+        	}
+        }
     }
 }
