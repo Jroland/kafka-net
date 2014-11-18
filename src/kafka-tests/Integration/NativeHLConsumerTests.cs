@@ -124,17 +124,17 @@ namespace kafka_tests.Integration
 				}
 			}
 		}
-			
-			[Test]
-			public void ConsumerShouldNotCommitOffsetOnFail()
-			{
-				//TODO
-			}
-			
-			[Test]
-			public void ConsumerShouldCancelTaskAfterConsume()
-			{
-				//TODO
-			}
+		
+		[Test]
+		public void ConsumerShouldNotCommitOffsetOnFail()
+		{
+			//TODO
+		}
+		
+		[Test]
+		public void ConsumerShouldCancelTaskAfterConsume()
+		{
+			//TODO
 		}
 	}
+}

@@ -33,6 +33,10 @@ namespace KafkaNet
 			RefreshOffsets();
 		}
 
+		/// <summary>
+		/// Refresh offset by fetching the offset from kafka server for this._consumerGroup; also check if the offset is within the range of 
+		/// min-max offset in current topic, if not, set to minimum offset. 
+		/// </summary>
 		public void RefreshOffsets()
 		{
 			var actualOffsets = _metadataQueries.GetTopicOffsetAsync(_options.Topic).Result;
@@ -60,10 +64,14 @@ namespace KafkaNet
 								_partitionOffsetIndex.AddOrUpdate(partition.PartitionId, i => offsetResp.Offset, (i, l) => offsetResp.Offset);
 							});
 				});
-
-
 		}
 
+		/// <summary>
+		/// One time consuming certain num of messages specified, and stop consuming more at the end of call. It'll automatically increase 
+		/// the offset by num and commit it. If fail to commit offset, it'll return null result.
+		/// </summary>
+		/// <param name="num"></param>
+		/// <returns></returns>
 		public IEnumerable<Message> Consume(int num)
 		{
 			var cancellationToken = new CancellationTokenSource();
