@@ -1,22 +1,20 @@
 ﻿using System;
 using System.IO;
 using System.IO.Compression;
-using System.Text;
 
 namespace KafkaNet.Protocol
 {
+
     public static class Compression
     {
         public static byte[] Zip(byte[] bytes)
         {
-            using (var source = new MemoryStream(bytes))
             using (var destination = new MemoryStream())
+            using (var gzip = new GZipStream(destination, CompressionMode.Compress, true))
             {
-                using (var gzip = new GZipStream(destination, CompressionMode.Compress, false))
-                {
-                    source.CopyTo(gzip);
-                }
-
+                gzip.Write(bytes, 0, bytes.Length);
+                gzip.Flush();
+                gzip.Close();
                 return destination.ToArray();
             }
         }
@@ -25,12 +23,11 @@ namespace KafkaNet.Protocol
         {
             using (var source = new MemoryStream(bytes))
             using (var destination = new MemoryStream())
+            using (var gzip = new GZipStream(source, CompressionMode.Decompress, true))
             {
-                using (var gzip = new GZipStream(source, CompressionMode.Decompress, false))
-                {
-                    gzip.CopyTo(destination);
-                }
-
+                gzip.CopyTo(destination);
+                gzip.Flush();
+                gzip.Close();
                 return destination.ToArray();
             }
         }
@@ -83,46 +80,47 @@ namespace KafkaNet.Protocol
     }
 
     #region Exceptions...
-    public class FailCrcCheckException : Exception
+    public class FailCrcCheckException : ApplicationException
     {
         public FailCrcCheckException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
-    public class ResponseTimeoutException : Exception
+    public class ResponseTimeoutException : ApplicationException
     {
         public ResponseTimeoutException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
-    public class InvalidPartitionException : Exception
+    public class InvalidPartitionException : ApplicationException
     {
         public InvalidPartitionException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
-    public class ServerDisconnectedException : Exception
+    public class ServerDisconnectedException : ApplicationException
     {
         public ServerDisconnectedException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
-    public class ServerUnreachableException : Exception
+    public class ServerUnreachableException : ApplicationException
     {
         public ServerUnreachableException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
-    public class InvalidTopicMetadataException : Exception
+    public class InvalidTopicMetadataException : ApplicationException
     {
-        public InvalidTopicMetadataException(ErrorResponseCode code, string message, params object[] args) : base(string.Format(message, args))
+        public InvalidTopicMetadataException(ErrorResponseCode code, string message, params object[] args)
+            : base(string.Format(message, args))
         {
             ErrorResponseCode = code;
         }
         public ErrorResponseCode ErrorResponseCode { get; private set; }
     }
 
-    public class LeaderNotFoundException : Exception
+    public class LeaderNotFoundException : ApplicationException
     {
         public LeaderNotFoundException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
-    public class UnresolvedHostnameException : Exception
+    public class UnresolvedHostnameException : ApplicationException
     {
         public UnresolvedHostnameException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
