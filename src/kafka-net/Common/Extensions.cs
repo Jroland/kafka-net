@@ -116,5 +116,11 @@ namespace KafkaNet.Common
 
             return await task;
         }
+        
+        public static void times(this int n, Action action){
+        	for (int i = 0; i < n; i++) {
+        		action.Invoke();
+        	}
+        }
     }
 }

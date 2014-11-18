@@ -27,5 +27,7 @@ namespace kafka_tests.Helpers
         public static string ToString(this KafkaNet.Protocol.MessageMetadata mata){
 			return string.Format("[MessageMetadata Offset={0}, PartitionId={1}]", mata.Offset, mata.PartitionId);
         }
+        
+
     }
 }
