@@ -181,6 +181,7 @@ namespace KafkaNet.Protocol
                     throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
             }
         }
+        
     }
 
     /// <summary>
@@ -200,5 +201,7 @@ namespace KafkaNet.Protocol
         /// The partition id this offset is from.
         /// </summary>
         public int PartitionId { get; set; }
+
+
     }
 }
