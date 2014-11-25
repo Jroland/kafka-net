@@ -143,7 +143,8 @@ namespace KafkaNet
                                             {
                                                 Topic = topic,
                                                 PartitionId = partitionId,
-                                                Offset = offset
+                                                Offset = offset,
+                                                MaxBytes = _options.MaxMessageSize
                                             }
                                     };
 

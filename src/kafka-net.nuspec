@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>kafka-net</id>
-    <version>@build.number@-alpha</version>
+    <version>1.0.0.0-alpha</version>
     <authors>James Roland</authors>
     <owners>James Roland</owners>
     <licenseUrl>https://github.com/Jroland/kafka-net/blob/master/LICENSE</licenseUrl>
@@ -16,6 +16,6 @@
     <tags>C# Apache Kafka</tags>
   </metadata>
   <files>
-    <file src="lib\*" target="lib\net45" />
+    <file src="kafka-net\lib\*" target="kafka-net\lib\net45" />
   </files>
 </package>

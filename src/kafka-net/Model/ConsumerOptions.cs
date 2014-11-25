@@ -7,7 +7,7 @@ namespace KafkaNet.Model
     {
         private const int DefaultMaxConsumerBufferSize = 50;
         private const int DefaultBackoffIntervalMS = 1000;
-
+		private const int DefaultMaxMsgSize = 4096 * 1024;	// default to be 4 MB for max message size.
         /// <summary>
         /// The topic to consume messages from.
         /// </summary>
@@ -37,6 +37,8 @@ namespace KafkaNet.Model
         /// </summary>
         public TimeSpan BackoffInterval { get; set; }
 
+        public int MaxMessageSize { get; set; }
+        
         public ConsumerOptions(string topic, IBrokerRouter router)
         {
             Topic = topic;
@@ -46,6 +48,7 @@ namespace KafkaNet.Model
             TopicPartitionQueryTimeMs = (int)TimeSpan.FromMinutes(15).TotalMilliseconds;
             ConsumerBufferSize = DefaultMaxConsumerBufferSize;
             BackoffInterval = TimeSpan.FromMilliseconds(DefaultBackoffIntervalMS);
+            MaxMessageSize = DefaultMaxMsgSize;
         }
     }
 }

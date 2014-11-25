@@ -100,7 +100,7 @@ namespace KafkaNet.Protocol
     {
         public Fetch()
         {
-            MaxBytes = FetchRequest.DefaultMinBlockingByteBufferSize * 8;
+            MaxBytes = FetchRequest.DefaultMinBlockingByteBufferSize * 800;
         }
 
         /// <summary>

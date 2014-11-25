@@ -2,7 +2,7 @@
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
     <id>kafka-net</id>
-    <version>$version$-beta</version>
+    <version>1.0.0.1-beta</version>
     <authors>James Roland</authors>
     <owners>James Roland</owners>
     <licenseUrl>https://github.com/Jroland/kafka-net/blob/master/LICENSE</licenseUrl>
