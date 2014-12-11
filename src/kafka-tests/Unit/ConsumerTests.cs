@@ -32,7 +32,11 @@ namespace kafka_tests.Unit
             {
                 var tokenSrc = new CancellationTokenSource();
 
-                var consumeTask = Task.Run(() => consumer.Consume(tokenSrc.Token).FirstOrDefault());
+#if NET40
+				var consumeTask = TaskEx.Run(() => consumer.Consume(tokenSrc.Token).FirstOrDefault());
+#else
+				var consumeTask = Task.Run(() => consumer.Consume(tokenSrc.Token).FirstOrDefault());
+#endif
 
                 //wait until the fake broker is running and requesting fetches
                 TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 10);
