@@ -26,7 +26,7 @@ namespace KafkaNet.Protocol
     /// </summary>
     public class Message
     {
-        private const int MinimumMessageSize = 12;
+        private const int MessageHeaderSize = 12;
         private static readonly Crc32 Crc32 = new Crc32();
 
         /// <summary>
@@ -98,14 +98,19 @@ namespace KafkaNet.Protocol
 
             while (stream.HasData)
             {
-                //if the message set hits against our max bytes wall on the fetch we will have a 1/2 completed message downloaded.
-                //the decode should guard against this situation
-                if (stream.Available(MinimumMessageSize) == false)
+                //this checks that we have at least the minimum amount of data to retrieve a header
+                if (stream.Available(MessageHeaderSize) == false)
                     yield break;
 
                 var offset = stream.ReadLong();
                 var messageSize = stream.ReadInt();
 
+               
+                //if messagessize is greater than payload, our max buffer is insufficient.
+                if (stream.Payload.Length < messageSize)
+                    throw new BufferUnderRunException(messageSize + MessageHeaderSize);
+
+                //if the stream does not have enough left in the payload, we got only a partial message
                 if (stream.Available(messageSize) == false)
                     yield break;
 
