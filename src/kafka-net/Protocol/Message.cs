@@ -107,7 +107,7 @@ namespace KafkaNet.Protocol
 
                
                 //if messagessize is greater than payload, our max buffer is insufficient.
-                if (stream.Payload.Length < messageSize)
+                if (stream.Payload.Length - MessageHeaderSize < messageSize)
                     throw new BufferUnderRunException(messageSize + MessageHeaderSize);
 
                 //if the stream does not have enough left in the payload, we got only a partial message
