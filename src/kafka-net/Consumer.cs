@@ -29,7 +29,7 @@ namespace KafkaNet
         private int _disposeCount;
         private int _ensureOneThread;
         private Topic _topic;
-        
+
         public Consumer(ConsumerOptions options, params OffsetPosition[] positions)
         {
             _options = options;
@@ -123,7 +123,7 @@ namespace KafkaNet
 
         private Task ConsumeTopicPartitionAsync(string topic, int partitionId)
         {
-            return Task.Factory.StartNew(async () => 
+            return Task.Factory.StartNew(async () =>
             {
                 try
                 {
@@ -185,8 +185,8 @@ namespace KafkaNet
                         }
                         catch (BufferUnderRunException ex)
                         {
-                            _options.Log.InfoFormat("Buffer underrun.  Increasing buffer size to: {0}", ex.RequiredBufferSize);
-                            bufferSizeHighWatermark = ex.RequiredBufferSize * 4;
+                            bufferSizeHighWatermark = (int)(ex.RequiredBufferSize * _options.FetchBufferMultiplier) + ex.MessageHeaderSize;
+                            _options.Log.InfoFormat("Buffer underrun.  Increasing buffer size to: {0}", bufferSizeHighWatermark);
                         }
                         catch (Exception ex)
                         {

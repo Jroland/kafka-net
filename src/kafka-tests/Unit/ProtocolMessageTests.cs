@@ -5,7 +5,6 @@ using kafka_tests.Helpers;
 using KafkaNet.Common;
 using KafkaNet.Protocol;
 using NUnit.Framework;
-using Zoltu.IO;
 
 namespace kafka_tests.Unit
 {

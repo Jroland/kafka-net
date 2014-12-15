@@ -209,11 +209,13 @@ namespace KafkaNet.Protocol
 
     public class BufferUnderRunException : ApplicationException
     {
+        public int MessageHeaderSize { get; set; }
         public int RequiredBufferSize { get; set; }
 
-        public BufferUnderRunException(int requiredBufferSize)
+        public BufferUnderRunException(int messageHeaderSize, int requiredBufferSize)
             : base("The size of the message from Kafka exceeds the provide buffer size.")
         {
+            MessageHeaderSize = messageHeaderSize;
             RequiredBufferSize = requiredBufferSize;
         }
     }

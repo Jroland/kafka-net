@@ -104,11 +104,10 @@ namespace KafkaNet.Protocol
 
                 var offset = stream.ReadLong();
                 var messageSize = stream.ReadInt();
-
                
                 //if messagessize is greater than payload, our max buffer is insufficient.
-                if (stream.Payload.Length < messageSize)
-                    throw new BufferUnderRunException(messageSize + MessageHeaderSize);
+                if ((stream.Payload.Length - MessageHeaderSize) < messageSize)
+                    throw new BufferUnderRunException(MessageHeaderSize, messageSize);
 
                 //if the stream does not have enough left in the payload, we got only a partial message
                 if (stream.Available(messageSize) == false)
