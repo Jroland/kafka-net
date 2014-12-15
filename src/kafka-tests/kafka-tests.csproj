@@ -58,6 +58,9 @@
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
+    <Reference Include="Zoltu.EndianAwareBinaryReaderWriter">
+      <HintPath>..\packages\Zoltu.EndianAwareBinaryReaderWriter.0.0.5.0\lib\net45\Zoltu.EndianAwareBinaryReaderWriter.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Fakes\BrokerRouterProxy.cs" />

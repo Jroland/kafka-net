@@ -29,7 +29,7 @@ namespace KafkaNet
         private int _disposeCount;
         private int _ensureOneThread;
         private Topic _topic;
-
+        
         public Consumer(ConsumerOptions options, params OffsetPosition[] positions)
         {
             _options = options;
@@ -123,10 +123,12 @@ namespace KafkaNet
 
         private Task ConsumeTopicPartitionAsync(string topic, int partitionId)
         {
-            return Task.Factory.StartNew(() =>
+            return Task.Factory.StartNew(async () => 
             {
                 try
                 {
+                    var bufferSizeHighWatermark = FetchRequest.DefaultBufferSize;
+
                     _options.Log.DebugFormat("Consumer: Creating polling task for topic: {0} on parition: {1}", topic, partitionId);
                     while (_disposeToken.IsCancellationRequested == false)
                     {
@@ -143,7 +145,8 @@ namespace KafkaNet
                                             {
                                                 Topic = topic,
                                                 PartitionId = partitionId,
-                                                Offset = offset
+                                                Offset = offset,
+                                                MaxBytes = bufferSizeHighWatermark
                                             }
                                     };
 
@@ -154,7 +157,8 @@ namespace KafkaNet
 
                             //make request and post to queue
                             var route = _options.Router.SelectBrokerRoute(topic, partitionId);
-                            var responses = route.Connection.SendAsync(fetchRequest).Result;
+
+                            var responses = await route.Connection.SendAsync(fetchRequest);
 
                             if (responses.Count > 0)
                             {
@@ -178,6 +182,11 @@ namespace KafkaNet
 
                             //no message received from server wait a while before we try another long poll
                             Thread.Sleep(_options.BackoffInterval);
+                        }
+                        catch (BufferUnderRunException ex)
+                        {
+                            _options.Log.InfoFormat("Buffer underrun.  Increasing buffer size to: {0}", ex.RequiredBufferSize);
+                            bufferSizeHighWatermark = ex.RequiredBufferSize * 4;
                         }
                         catch (Exception ex)
                         {

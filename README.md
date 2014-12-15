@@ -76,9 +76,7 @@ The current version of this project is a functioning "work in progress" as it wa
 * Better handling of options for providing customization of internal behaviour of the base API. (right now the classes pass around option parameters)
 * General structure of the classes is not finalized and breaking changes will occur.
 * Only Gzip compression is implemented, snappy on the todo.
-* Offset Commits - central storage of offset progress, not implemented
 * Currently only works with .NET Framework 4.5 as it uses the await command.
-* nuget package.
 * Test coverage.
 * Documentation.
 

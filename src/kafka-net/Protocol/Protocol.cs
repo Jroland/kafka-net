@@ -139,7 +139,7 @@ namespace KafkaNet.Protocol
         /// </summary>
         NotCoordinatorForConsumerCode = 16
     }
-    
+
     /// <summary>
     /// Protocol specific constants
     /// </summary>
@@ -205,6 +205,17 @@ namespace KafkaNet.Protocol
     public class UnresolvedHostnameException : ApplicationException
     {
         public UnresolvedHostnameException(string message, params object[] args) : base(string.Format(message, args)) { }
+    }
+
+    public class BufferUnderRunException : ApplicationException
+    {
+        public int RequiredBufferSize { get; set; }
+
+        public BufferUnderRunException(int requiredBufferSize)
+            : base("The size of the message from Kafka exceeds the provide buffer size.")
+        {
+            RequiredBufferSize = requiredBufferSize;
+        }
     }
     #endregion
 
