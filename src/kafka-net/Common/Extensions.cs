@@ -108,11 +108,15 @@ namespace KafkaNet.Common
 
             using (cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs))
             {
+#if NET40
+                if (task != await TaskEx.WhenAny(task, tcs.Task))
+#else
                 if (task != await Task.WhenAny(task, tcs.Task))
+#endif
                 {
                     throw new OperationCanceledException(cancellationToken);
-                }
-            }
+				}
+     		}
 
             return await task;
         }

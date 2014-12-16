@@ -93,9 +93,12 @@ namespace KafkaNet
                         };
 
                     sendTasks.Add(route.Key.Connection.SendAsync(request));
-                }
-
-                await Task.WhenAll(sendTasks.ToArray());
+				}
+#if NET40
+				await TaskEx.WhenAll(sendTasks.ToArray());
+#else
+				await Task.WhenAll(sendTasks.ToArray());
+#endif
 
                 return sendTasks.SelectMany(t => t.Result).ToList();
             }

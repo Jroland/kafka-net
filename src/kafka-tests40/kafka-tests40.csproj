@@ -1,0 +1,201 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{7A0D1379-A6E8-4F23-A3B5-56AD3121377D}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>kafka_tests</RootNamespace>
+    <AssemblyName>kafka-tests</AssemblyName>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+    <RestorePackages>true</RestorePackages>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;NET40</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE;NET40</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.Threading.Tasks">
+      <HintPath>..\packages\Microsoft.Bcl.Async.1.0.168\lib\net40\Microsoft.Threading.Tasks.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Threading.Tasks.Extensions">
+      <HintPath>..\packages\Microsoft.Bcl.Async.1.0.168\lib\net40\Microsoft.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Threading.Tasks.Extensions.Desktop">
+      <HintPath>..\packages\Microsoft.Bcl.Async.1.0.168\lib\net40\Microsoft.Threading.Tasks.Extensions.Desktop.dll</HintPath>
+    </Reference>
+    <Reference Include="Moq">
+      <HintPath>..\packages\Moq.4.0.10827\lib\NET40\Moq.dll</HintPath>
+    </Reference>
+    <Reference Include="Ninject">
+      <HintPath>..\packages\Ninject.3.0.1.10\lib\net45-full\Ninject.dll</HintPath>
+    </Reference>
+    <Reference Include="Ninject.MockingKernel">
+      <HintPath>..\packages\Ninject.MockingKernel.3.0.0.5\lib\net45-full\Ninject.MockingKernel.dll</HintPath>
+    </Reference>
+    <Reference Include="Ninject.MockingKernel.Moq">
+      <HintPath>..\packages\Ninject.MockingKernel.Moq.3.0.0.5\lib\net45-full\Ninject.MockingKernel.Moq.dll</HintPath>
+    </Reference>
+    <Reference Include="NSubstitute">
+      <HintPath>..\packages\NSubstitute.1.7.2.0\lib\NET40\NSubstitute.dll</HintPath>
+    </Reference>
+    <Reference Include="nunit.framework">
+      <HintPath>..\packages\NUnit.2.6.3\lib\nunit.framework.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.IO">
+      <HintPath>..\packages\Microsoft.Bcl.1.1.8\lib\net40\System.IO.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net" />
+    <Reference Include="System.Runtime">
+      <HintPath>..\packages\Microsoft.Bcl.1.1.8\lib\net40\System.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Tasks">
+      <HintPath>..\packages\Microsoft.Bcl.1.1.8\lib\net40\System.Threading.Tasks.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\kafka-tests\Fakes\BrokerRouterProxy.cs">
+      <Link>Fakes\BrokerRouterProxy.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Fakes\FakeKafkaConnection.cs">
+      <Link>Fakes\FakeKafkaConnection.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Fakes\FakeTcpServer.cs">
+      <Link>Fakes\FakeTcpServer.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Helpers\IntegrationConfig.cs">
+      <Link>Helpers\IntegrationConfig.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Helpers\MessageHelper.cs">
+      <Link>Helpers\MessageHelper.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Helpers\TaskTest.cs">
+      <Link>Helpers\TaskTest.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Integration\GzipProducerConsumerTests.cs">
+      <Link>Integration\GzipProducerConsumerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Integration\KafkaMetadataProviderUnitTests.cs">
+      <Link>Integration\KafkaMetadataProviderUnitTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Integration\OffsetManagementTests.cs">
+      <Link>Integration\OffsetManagementTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Integration\ProducerConsumerIntegrationTests.cs">
+      <Link>Integration\ProducerConsumerIntegrationTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\BigEndianBinaryReaderTests.cs" >
+      <Link>Unit\BigEndianBinaryReaderTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\BigEndianBinaryWriterTests.cs" >
+      <Link>Unit\BigEndianBinaryWriterTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\FakeTcpServerTests.cs">
+      <Link>Unit\FakeTcpServerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\KafkaConnectionTests.cs">
+      <Link>Unit\KafkaConnectionTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\KafkaEndpointTests.cs">
+      <Link>Unit\KafkaEndpointTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\KafkaMetadataProviderTests.cs">
+      <Link>Unit\KafkaMetadataProviderTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\KafkaTcpSocketTests.cs">
+      <Link>Unit\KafkaTcpSocketTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Integration\KafkaConnectionIntegrationTests.cs">
+      <Link>Integration\KafkaConnectionIntegrationTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\RequestFactory.cs">
+      <Link>RequestFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\BrokerRouterTests.cs">
+      <Link>Unit\BrokerRouterTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\MetadataQueriesTests.cs">
+      <Link>Unit\MetadataQueriesTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\ConsumerTests.cs">
+      <Link>Unit\ConsumerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\DefaultPartitionSelectorTests.cs">
+      <Link>Unit\DefaultPartitionSelectorTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\ProducerTests.cs">
+      <Link>Unit\ProducerTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\ProtocolBaseRequestTests.cs">
+      <Link>Unit\ProtocolBaseRequestTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\ProtocolMessageTests.cs">
+      <Link>Unit\ProtocolMessageTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Properties\AssemblyInfo.cs">
+      <Link>Properties\AssemblyInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\ScheduleTimerTests.cs">
+      <Link>Unit\ScheduleTimerTests.cs</Link>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="App.config" />
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\kafka-net40\kafka-net40.csproj">
+      <Project>{e8dbfb90-fac3-4083-8116-74291b864443}</Project>
+      <Name>kafka-net40</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
+  </Target>
+  <Import Project="..\packages\Microsoft.Bcl.Build.1.0.14\tools\Microsoft.Bcl.Build.targets" Condition="Exists('..\packages\Microsoft.Bcl.Build.1.0.14\tools\Microsoft.Bcl.Build.targets')" />
+  <Target Name="EnsureBclBuildImported" BeforeTargets="BeforeBuild" Condition="'$(BclBuildImported)' == ''">
+    <Error Condition="!Exists('..\packages\Microsoft.Bcl.Build.1.0.14\tools\Microsoft.Bcl.Build.targets')" Text="This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=317567." HelpKeyword="BCLBUILD2001" />
+    <Error Condition="Exists('..\packages\Microsoft.Bcl.Build.1.0.14\tools\Microsoft.Bcl.Build.targets')" Text="The build restored NuGet packages. Build the project again to include these packages in the build. For more information, see http://go.microsoft.com/fwlink/?LinkID=317568." HelpKeyword="BCLBUILD2002" />
+  </Target>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

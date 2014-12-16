@@ -75,8 +75,12 @@ namespace KafkaNet.Common
         /// <returns>Task handle to signal passage allowed.</returns>
         public Task RequestPassageAsync()
         {
+#if NET40
+            return AsTask(_semaphore.AvailableWaitHandle, new TimeSpan(0,0,0,0,-1));
+#else
             return AsTask(_semaphore.AvailableWaitHandle, Timeout.InfiniteTimeSpan);
-        }
+#endif
+		}
 
         private static Task AsTask(WaitHandle handle, TimeSpan timeout)
         {
@@ -89,8 +93,13 @@ namespace KafkaNet.Common
                 else
                     localTcs.TrySetResult(null);
             }, tcs, timeout, executeOnlyOnce: true);
+#if NET40
+			tcs.Task.ContinueWith((_) => registration.Unregister(null), TaskScheduler.Default);
+#else
             tcs.Task.ContinueWith((_, state) => ((RegisteredWaitHandle)state).Unregister(null), registration, TaskScheduler.Default);
-            return tcs.Task;
+
+#endif
+			return tcs.Task;
         }
     }
 }

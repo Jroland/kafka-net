@@ -52,9 +52,14 @@ namespace KafkaNet
                         return route.Connection.SendAsync(request);
                     }).ToArray();
                  
+#if NET40
+               return TaskEx.WhenAll(sendRequests)
+                   .ContinueWith(t => sendRequests.SelectMany(x => x.Result).ToList());
+#else
                return Task.WhenAll(sendRequests)
                    .ContinueWith(t => sendRequests.SelectMany(x => x.Result).ToList());
-        }
+#endif
+		}
 
         /// <summary>
         /// Get metadata on the given topic.

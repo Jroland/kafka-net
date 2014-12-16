@@ -44,7 +44,11 @@ namespace KafkaNet
         {
             _log = log;
             _endpoint = endpoint;
+#if NET40
+			TaskEx.Delay(TimeSpan.FromMilliseconds(delayConnectAttemptMS)).ContinueWith(x => TriggerReconnection());
+#else
             Task.Delay(TimeSpan.FromMilliseconds(delayConnectAttemptMS)).ContinueWith(x => TriggerReconnection());
+#endif
         }
 
         #region Interface Implementation...
@@ -127,8 +131,12 @@ namespace KafkaNet
         {
             var cancelTaskToken = new CancellationTokenRegistration();
             try
-            {
-                await _singleReaderSemaphore.WaitAsync(token);
+			{
+#if NET40
+				await TaskEx.Run(()=>_singleReaderSemaphore.Wait(token));
+#else
+				await _singleReaderSemaphore.WaitAsync(token);
+#endif
 
                 var result = new List<byte>();
                 var bytesReceived = 0;
@@ -210,9 +218,12 @@ namespace KafkaNet
                     reconnectionDelay = reconnectionDelay * DefaultReconnectionTimeoutMultiplier;
                     _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", _endpoint, reconnectionDelay);
                 }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(reconnectionDelay), _disposeToken.Token);
-            }
+#if NET40
+		        await TaskEx.Delay(TimeSpan.FromMilliseconds(reconnectionDelay), _disposeToken.Token);
+#else
+		        await Task.Delay(TimeSpan.FromMilliseconds(reconnectionDelay), _disposeToken.Token);
+#endif
+			}
 
             return _client;
         }

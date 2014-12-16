@@ -167,7 +167,11 @@ namespace kafka_tests.Unit
                         conn.SendAsync(new MetadataRequest())
                     };
 
-                Task.WhenAll(tasks);
+#if NET40
+				TaskEx.WhenAll(tasks);
+#else
+				Task.WhenAll(tasks);
+#endif
 
                 TaskTest.WaitFor(() => tasks.Any(t => t.IsFaulted));
                 foreach (var task in tasks)
