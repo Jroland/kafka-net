@@ -70,6 +70,8 @@
     <Compile Include="Integration\KafkaMetadataProviderUnitTests.cs" />
     <Compile Include="Integration\OffsetManagementTests.cs" />
     <Compile Include="Integration\ProducerConsumerIntegrationTests.cs" />
+    <Compile Include="Unit\BigEndianBinaryReaderTests.cs" />
+    <Compile Include="Unit\BigEndianBinaryWriterTests.cs" />
     <Compile Include="Unit\FakeTcpServerTests.cs" />
     <Compile Include="Unit\KafkaConnectionTests.cs" />
     <Compile Include="Unit\KafkaEndpointTests.cs" />
