@@ -26,7 +26,11 @@ namespace KafkaNet.Common
         }
 
         public BigEndianBinaryWriter(Stream stream, Boolean leaveOpen)
+#if NET40
+			: base(stream, Encoding.UTF8)
+#else
             : base(stream, Encoding.UTF8, leaveOpen)
+#endif
         {
             Contract.Requires(stream != null);
         }

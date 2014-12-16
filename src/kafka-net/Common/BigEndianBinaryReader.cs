@@ -26,7 +26,11 @@ namespace KafkaNet.Common
         }
 
         public BigEndianBinaryReader(Stream input, Boolean leaveOpen)
+#if NET40
+			: base(input, Encoding.UTF8)
+#else
             : base(input, Encoding.UTF8, leaveOpen)
+#endif
         {
             Contract.Requires(input != null);
         }

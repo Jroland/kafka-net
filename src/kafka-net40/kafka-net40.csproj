@@ -63,6 +63,12 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\kafka-net\Common\BigEndianBinaryReader.cs" >
+      <Link>Common\BigEndianBinaryReader.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-net\Common\BigEndianBinaryWriter.cs" >
+      <Link>Common\BigEndianBinaryWriter.cs</Link>
+    </Compile>
     <Compile Include="..\kafka-net\Common\ThreadWall.cs">
       <Link>Common\ThreadWall.cs</Link>
     </Compile>

@@ -110,6 +110,12 @@
     <Compile Include="..\kafka-tests\Integration\ProducerConsumerIntegrationTests.cs">
       <Link>Integration\ProducerConsumerIntegrationTests.cs</Link>
     </Compile>
+    <Compile Include="..\kafka-tests\Unit\BigEndianBinaryReaderTests.cs" >
+      <Link>Unit\BigEndianBinaryReaderTests.cs</Link>
+    </Compile>
+    <Compile Include="..\kafka-tests\Unit\BigEndianBinaryWriterTests.cs" >
+      <Link>Unit\BigEndianBinaryWriterTests.cs</Link>
+    </Compile>
     <Compile Include="..\kafka-tests\Unit\FakeTcpServerTests.cs">
       <Link>Unit\FakeTcpServerTests.cs</Link>
     </Compile>
