@@ -15,12 +15,12 @@ namespace TestHarness
                 {
                     Log = new ConsoleLog()
                 };
-            var router = new BrokerRouter(options);
-            var client = new Producer(router);
+            
+            var producer = new Producer(new BrokerRouter(options));
 
             Task.Factory.StartNew(() =>
                 {
-                    var consumer = new Consumer(new ConsumerOptions("TestHarness", router));
+                    var consumer = new Consumer(new ConsumerOptions("TestHarness", new BrokerRouter(options)));
                     foreach (var data in consumer.Consume())
                     {
                         Console.WriteLine("Response: P{0},O{1} : {2}", data.Meta.PartitionId, data.Meta.Offset, data.Value);
@@ -33,11 +33,25 @@ namespace TestHarness
             {
                 var message = Console.ReadLine();
                 if (message == "quit") break;
-                client.SendMessageAsync("TestHarness", new[] { new Message(message) });
+                if (string.IsNullOrEmpty(message))
+                {
+                    for (int i = 0; i < 20; i++)
+                    {
+                        producer.SendMessageAsync("TestHarness", new[] { new Message(i.ToString()) })
+                            .ContinueWith(t =>
+                            {
+                                t.Result.ForEach(x => Console.WriteLine("Complete: {0}, Offset: {1}", x.PartitionId, x.Offset));
+                            });
+                    }
+                }
+                else
+                {
+                    producer.SendMessageAsync("TestHarness", new[] { new Message(message) });
+                }
+
             }
 
-            using (client)
-            using (router)
+            using (producer)
             {
 
             }
