@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Net.Sockets;
@@ -34,10 +35,10 @@ namespace KafkaNet.Common
         {
             if (value == null) return (-1).ToBytes();
 
-			return value.Length.ToBytes()
-						.Concat(value)
-						.ToArray();
-		}
+            return value.Length.ToBytes()
+                        .Concat(value)
+                        .ToArray();
+        }
 
         public static string ToUTF8String(this byte[] value)
         {
@@ -45,7 +46,7 @@ namespace KafkaNet.Common
 
             return Encoding.UTF8.GetString(value);
         }
-        
+
         public static byte[] ToBytes(this string value)
         {
             if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
@@ -115,6 +116,25 @@ namespace KafkaNet.Common
             }
 
             return await task;
+        }
+
+        /// <summary>
+        /// Splits a collection into given batch sizes and returns as an enumerable of batches.
+        /// </summary>
+        public static IEnumerable<IEnumerable<T>> Batch<T>(this IEnumerable<T> collection, int batchSize)
+        {
+            var nextbatch = new List<T>(batchSize);
+            foreach (T item in collection)
+            {
+                nextbatch.Add(item);
+                if (nextbatch.Count == batchSize)
+                {
+                    yield return nextbatch;
+                    nextbatch = new List<T>(batchSize);
+                }
+            }
+            if (nextbatch.Count > 0)
+                yield return nextbatch;
         }
     }
 }
