@@ -19,13 +19,13 @@ namespace KafkaNet
         private const int DefaultBatchSize = 10;
 
         private readonly IBrokerRouter _router;
-        private readonly TaskBlockingCollection<TopicMessageBatch> _taskBlockingCollection;
+        private readonly NagleBlockingCollection<TopicMessageBatch> _nagleBlockingCollection;
         private readonly IMetadataQueries _metadataQueries;
 
         /// <summary>
         /// Get the current message awaiting send
         /// </summary>
-        public int ActiveCount { get { return _taskBlockingCollection.Count; } }
+        public int ActiveCount { get { return _nagleBlockingCollection.Count; } }
 
         public int BatchSize { get; set; }
         public TimeSpan BatchDelayTime { get; set; }
@@ -48,7 +48,7 @@ namespace KafkaNet
         {
             _router = brokerRouter;
             _metadataQueries = new MetadataQueries(_router);
-            _taskBlockingCollection = new TaskBlockingCollection<TopicMessageBatch>(maximumMessageBuffer);
+            _nagleBlockingCollection = new NagleBlockingCollection<TopicMessageBatch>(maximumMessageBuffer);
 
             BatchSize = DefaultBatchSize;
             BatchDelayTime = TimeSpan.FromMilliseconds(DefaultBatchDelayMS);
@@ -83,7 +83,7 @@ namespace KafkaNet
                 Messages = messages.ToList()
             };
 
-            _taskBlockingCollection.Add(batch);
+            _nagleBlockingCollection.Add(batch);
             return batch.Tcs.Task;
         }
 
@@ -99,7 +99,7 @@ namespace KafkaNet
 
         public void Dispose()
         {
-            using (_taskBlockingCollection)
+            using (_nagleBlockingCollection)
             using (_metadataQueries)
             {
 
@@ -109,9 +109,9 @@ namespace KafkaNet
 
         private async Task BatchSendAsync()
         {
-            while (_taskBlockingCollection.IsComplete == false || _taskBlockingCollection.Count > 0)
+            while (_nagleBlockingCollection.IsComplete == false || _nagleBlockingCollection.Count > 0)
             {
-                var batch = await _taskBlockingCollection.TakeBatch(BatchSize, BatchDelayTime);
+                var batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime);
                 //TODO handle exceptions
                 ProduceAndSendBatch(batch);
             }

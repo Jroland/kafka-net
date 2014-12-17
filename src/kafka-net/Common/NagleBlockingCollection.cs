@@ -11,15 +11,19 @@ namespace KafkaNet.Common
     /// inbound data without having to actively poll the data collection.  The initial
     /// call to TakeBatch will block until data arrives, then the method will try to
     /// take up to x items from the collection within a specified timespan and return
-    /// all that it could grab. 
+    /// all that it could grab up to the x item limit.
+    /// 
+    /// This collection attempts to implement the pattern similar to that of the Nagle 
+    /// algorithm where an artificial delay is added to a send operation to see if a
+    /// collection of send items can be batched together before sending.
     /// </summary>
-    public class TaskBlockingCollection<T> : IDisposable
+    public class NagleBlockingCollection<T> : IDisposable
     {   
         private readonly BlockingCollection<T> _collection;
         private readonly SemaphoreSlim _dataAvailableSemaphore = new SemaphoreSlim(0);
         private readonly CancellationTokenSource _disposeCancellationTokenSource = new CancellationTokenSource();
 
-        public TaskBlockingCollection(int boundedCapacity)
+        public NagleBlockingCollection(int boundedCapacity)
         {
             _collection = new BlockingCollection<T>(boundedCapacity);
         }
@@ -31,7 +35,7 @@ namespace KafkaNet.Common
         public void Add(T data)
         {
             if (_collection.IsAddingCompleted)
-                throw new ObjectDisposedException("TaskBlockingCollection is currently being disposed.  Cannot add documents.");
+                throw new ObjectDisposedException("NagleBlockingCollection is currently being disposed.  Cannot add documents.");
 
             _collection.Add(data);
             _dataAvailableSemaphore.Release();
