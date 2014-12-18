@@ -64,7 +64,7 @@ namespace kafka_tests.Unit
             {
                 test.WriteAsync(1.ToBytes()); //will force a connection
                 test.OnReconnectionAttempt += x => Interlocked.Increment(ref count);
-                TaskTest.WaitFor(() => count > 1, 100000000);
+                TaskTest.WaitFor(() => count > 1);
                 Assert.That(count, Is.GreaterThan(1));
             }
         }
@@ -413,10 +413,32 @@ namespace kafka_tests.Unit
                         server.SendDataAsync(i.ToBytes())
                     }).ToArray();
 
-                Task.WaitAll(tasks, TimeSpan.FromSeconds(100));
-                Thread.Sleep(5000);
+                Task.WaitAll(tasks);
                 Assert.That(write.OrderBy(x => x), Is.EqualTo(expected));
                 Assert.That(read.OrderBy(x => x), Is.EqualTo(expected));
+            }
+        }
+
+        [Test]
+        public void WriteShouldHandleLargeVolumeSendAsyncronously()
+        {
+            var write = new List<int>();
+            
+            using (var server = new FakeTcpServer(FakeServerPort))
+            {
+                server.OnBytesReceived += data => write.AddRange(data.Batch(4).Select(x => x.ToArray().ToInt32()));
+
+                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
+
+                var tasks = Enumerable.Range(1, 10000)
+                    .SelectMany(i => new[]
+                    {
+                        test.WriteAsync(i.ToBytes()),
+                    }).ToArray();
+
+                Task.WaitAll(tasks);
+                
+                Assert.That(write.OrderBy(x => x), Is.EqualTo(Enumerable.Range(1, 10000)));
             }
         }
         #endregion

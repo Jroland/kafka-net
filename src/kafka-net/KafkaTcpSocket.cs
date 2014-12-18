@@ -150,6 +150,7 @@ namespace KafkaNet
 
         private async Task<TcpClient> GetClientAsync()
         {
+            //using a semaphore here to allow async waiting rather than blocking locks
             await _clientSemaphoreSlim.WaitAsync(_disposeToken.Token);
             if (_client == null || _client.Connected == false)
             {
