@@ -44,15 +44,15 @@ namespace kafka_tests.Unit
 
         #region Connection Tests...
         [Test]
-        public void ConnectionShouldAttemptOnceOnConstruction()
+        public void ConnectionNotShouldAttemptOnConstruction()
         {
             var count = 0;
 
-            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl, 20))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 test.OnReconnectionAttempt += x => Interlocked.Increment(ref count);
                 TaskTest.WaitFor(() => count > 0);
-                Assert.That(count, Is.EqualTo(1));
+                Assert.That(count, Is.EqualTo(0));
             }
         }
 
@@ -60,10 +60,11 @@ namespace kafka_tests.Unit
         public void ConnectionShouldAttemptMultipleTimesWhenConnectionFails()
         {
             var count = 0;
-            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _badServerUrl, 20))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _badServerUrl))
             {
+                test.WriteAsync(1.ToBytes()); //will force a connection
                 test.OnReconnectionAttempt += x => Interlocked.Increment(ref count);
-                TaskTest.WaitFor(() => count > 1, 3000);
+                TaskTest.WaitFor(() => count > 1);
                 Assert.That(count, Is.GreaterThan(1));
             }
         }
@@ -196,16 +197,39 @@ namespace kafka_tests.Unit
                 var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
                 Console.WriteLine("Sending first message to receive...");
-                server.SendDataAsync(firstMessage.ToBytes()).Wait(TimeSpan.FromSeconds(2));
+                server.SendDataAsync(firstMessage.ToBytes());
 
                 var firstResponse = test.ReadAsync(4).Result.ToInt32();
                 Assert.That(firstResponse, Is.EqualTo(firstMessage));
 
                 Console.WriteLine("Sending second message to receive...");
-                server.SendDataAsync(secondMessage).Wait(TimeSpan.FromSeconds(2));
+                server.SendDataAsync(secondMessage);
 
                 var secondResponse = Encoding.ASCII.GetString(test.ReadAsync(secondMessage.Length).Result);
                 Assert.That(secondResponse, Is.EqualTo(secondMessage));
+            }
+        }
+
+        [Test]
+        public void ReadShouldBeAbleToReceiveMoreThanOnceAsyncronously()
+        {
+            using (var server = new FakeTcpServer(FakeServerPort))
+            {
+                const int firstMessage = 99;
+                const int secondMessage = 100;
+
+                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
+
+                Console.WriteLine("Sending first message to receive...");
+                server.SendDataAsync(firstMessage.ToBytes());
+                var firstResponseTask = test.ReadAsync(4);
+
+                Console.WriteLine("Sending second message to receive...");
+                server.SendDataAsync(secondMessage.ToBytes());
+                var secondResponseTask = test.ReadAsync(4);
+
+                Assert.That(firstResponseTask.Result.ToInt32(), Is.EqualTo(firstMessage));
+                Assert.That(secondResponseTask.Result.ToInt32(), Is.EqualTo(secondMessage));
             }
         }
 
@@ -311,7 +335,7 @@ namespace kafka_tests.Unit
         {
             using (var server = new FakeTcpServer(FakeServerPort))
             {
-                var messages = new[]{"test1", "test2", "test3", "test4"};
+                var messages = new[] { "test1", "test2", "test3", "test4" };
                 var expectedLength = "test1".Length;
 
                 var payload = new WriteByteStream();
@@ -365,6 +389,56 @@ namespace kafka_tests.Unit
                 Task.WaitAll(test.WriteAsync(testData.ToBytes()), test.WriteAsync(testData.ToBytes()));
                 TaskTest.WaitFor(() => results.Count >= 8);
                 Assert.That(results.Count, Is.EqualTo(8));
+            }
+        }
+
+        [Test]
+        public void WriteAndReadShouldBeAsyncronous()
+        {
+            var write = new List<int>();
+            var read = new List<int>();
+            var expected = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+
+            using (var server = new FakeTcpServer(FakeServerPort))
+            {
+                server.OnBytesReceived += data => write.AddRange(data.Batch(4).Select(x => x.ToArray().ToInt32()));
+
+                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
+
+                var tasks = Enumerable.Range(1, 10)
+                    .SelectMany(i => new[]
+                    {
+                        test.WriteAsync(i.ToBytes()),
+                        test.ReadAsync(4).ContinueWith(t => read.Add(t.Result.ToInt32())),
+                        server.SendDataAsync(i.ToBytes())
+                    }).ToArray();
+
+                Task.WaitAll(tasks);
+                Assert.That(write.OrderBy(x => x), Is.EqualTo(expected));
+                Assert.That(read.OrderBy(x => x), Is.EqualTo(expected));
+            }
+        }
+
+        [Test]
+        public void WriteShouldHandleLargeVolumeSendAsyncronously()
+        {
+            var write = new List<int>();
+            
+            using (var server = new FakeTcpServer(FakeServerPort))
+            {
+                server.OnBytesReceived += data => write.AddRange(data.Batch(4).Select(x => x.ToArray().ToInt32()));
+
+                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
+
+                var tasks = Enumerable.Range(1, 10000)
+                    .SelectMany(i => new[]
+                    {
+                        test.WriteAsync(i.ToBytes()),
+                    }).ToArray();
+
+                Task.WaitAll(tasks);
+                
+                Assert.That(write.OrderBy(x => x), Is.EqualTo(Enumerable.Range(1, 10000)));
             }
         }
         #endregion

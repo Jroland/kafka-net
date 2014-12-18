@@ -18,7 +18,7 @@ namespace kafka_tests.Helpers
         public event ClientEventDelegate OnClientDisconnected;
 
         private TcpClient _client;
-        private readonly ThreadWall _threadWall = new ThreadWall(ThreadWallState.Blocked);
+        private readonly SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(0);
         private readonly TcpListener _listener;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
 
@@ -40,9 +40,16 @@ namespace kafka_tests.Helpers
 
         public async Task SendDataAsync(byte[] data)
         {
-            await _threadWall.RequestPassageAsync();
-            Console.WriteLine("FakeTcpServer: writing {0} bytes.", data.Length);
-            await _client.GetStream().WriteAsync(data, 0, data.Length);
+            try
+            {
+                await _semaphoreSlim.WaitAsync();
+                Console.WriteLine("FakeTcpServer: writing {0} bytes.", data.Length);
+                await _client.GetStream().WriteAsync(data, 0, data.Length);
+            }
+            finally
+            {
+                _semaphoreSlim.Release();
+            }
         }
 
         public Task SendDataAsync(string data)
@@ -73,7 +80,7 @@ namespace kafka_tests.Helpers
 
                 Console.WriteLine("FakeTcpServer: Connected client");
                 if (OnClientConnected != null) OnClientConnected();
-                _threadWall.Release();
+                _semaphoreSlim.Release();
 
                 try
                 {
@@ -102,7 +109,7 @@ namespace kafka_tests.Helpers
                 finally
                 {
                     Console.WriteLine("FakeTcpServer: Client Disconnected.");
-                    _threadWall.Block();
+                    _semaphoreSlim.Wait(); //remove the one client
                     if (OnClientDisconnected != null) OnClientDisconnected();
                 }
             }
