@@ -117,7 +117,7 @@ namespace kafka_tests.Unit
             crcContentWriter.Write(payload);
             var crcContentBytes = crcContentStream.ToArray();
 
-            var crc = Crc32.Compute(crcContentBytes);
+            var crc = Crc32Provider.Compute(crcContentBytes);
 
             var messageStream = new MemoryStream();
             var messageWriter = new BigEndianBinaryWriter(messageStream);

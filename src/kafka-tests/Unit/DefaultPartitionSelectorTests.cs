@@ -139,7 +139,7 @@ namespace kafka_tests.Unit
             while(true)
             {
                 var key = Guid.NewGuid().ToString().ToIntSizedBytes();
-                if ((Crc32.Compute(key) % 2) == partitionId)
+                if ((Crc32Provider.Compute(key) % 2) == partitionId)
                 return key;
             }
         }
