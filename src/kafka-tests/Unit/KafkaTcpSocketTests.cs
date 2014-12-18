@@ -64,7 +64,7 @@ namespace kafka_tests.Unit
             {
                 test.WriteAsync(1.ToBytes()); //will force a connection
                 test.OnReconnectionAttempt += x => Interlocked.Increment(ref count);
-                TaskTest.WaitFor(() => count > 1);
+                TaskTest.WaitFor(() => count > 1, 10000);
                 Assert.That(count, Is.GreaterThan(1));
             }
         }
