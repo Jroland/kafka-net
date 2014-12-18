@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Net.Sockets;
@@ -116,5 +117,26 @@ namespace KafkaNet.Common
 
             return await task;
         }
+
+
+        /// <summary>
+        /// Splits a collection into given batch sizes and returns as an enumerable of batches.
+        /// </summary>
+        public static IEnumerable<IEnumerable<T>> Batch<T>(this IEnumerable<T> collection, int batchSize)
+        {
+            var nextbatch = new List<T>(batchSize);
+            foreach (T item in collection)
+            {
+                nextbatch.Add(item);
+                if (nextbatch.Count == batchSize)
+                {
+                    yield return nextbatch;
+                    nextbatch = new List<T>(batchSize);
+                }
+            }
+            if (nextbatch.Count > 0)
+                yield return nextbatch;
+        }
+
     }
 }
