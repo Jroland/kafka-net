@@ -19,7 +19,7 @@ var options = new KafkaOptions(new Uri("http://SERVER1:9092"), new Uri("http://S
 var router = new BrokerRouter(options);
 var client = new Producer(router);
 
-client.SendMessageAsync("TestHarness", new[] { new Message { Value = message } }).Wait();
+client.SendMessageAsync("TestHarness", new[] { new Message("hello world")}).Wait();
 
 using (client) { }
 ```
@@ -27,7 +27,7 @@ using (client) { }
 ```sh
 var options = new KafkaOptions(new Uri("http://SERVER1:9092"), new Uri("http://SERVER2:9092"));
 var router = new BrokerRouter(options);
-var consumer = new Consumer(new ConsumerOptions { Topic = "TestHarness", Router = router });
+var consumer = new Consumer(new ConsumerOptions("TestHarness", new BrokerRouter(options)));
 
 //Consume returns a blocking IEnumerable (ie: never ending stream)
 foreach (var message in consumer.Consume())
