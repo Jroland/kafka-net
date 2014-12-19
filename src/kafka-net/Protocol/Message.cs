@@ -27,7 +27,6 @@ namespace KafkaNet.Protocol
     public class Message
     {
         private const int MessageHeaderSize = 12;
-        private static readonly Crc32 Crc32 = new Crc32();
 
         /// <summary>
         /// Metadata on source offset and partition location for this message.
@@ -138,7 +137,7 @@ namespace KafkaNet.Protocol
                       message.Key.ToIntPrefixedBytes(),
                       message.Value.ToIntPrefixedBytes());
 
-            var crc = Crc32.ComputeHash(body.Payload());
+            var crc = Crc32Provider.ComputeHash(body.Payload());
             body.Prepend(crc);
 
             return body.Payload();
@@ -153,10 +152,11 @@ namespace KafkaNet.Protocol
         /// <remarks>The return type is an Enumerable as the message could be a compressed message set.</remarks>
         public static IEnumerable<Message> DecodeMessage(long offset, byte[] payload)
         {
-            var crc = payload.Take(4);
+            var crc = payload.Take(4).ToArray();
             var stream = new ReadByteStream(payload.Skip(4));
-
-            if (crc.SequenceEqual(Crc32.ComputeHash(stream.Payload)) == false)
+            var hash = Crc32Provider.ComputeHash(stream.Payload);
+            
+            if (crc.SequenceEqual(hash) == false)
                 throw new FailCrcCheckException("Payload did not match CRC validation.");
 
             var message = new Message

@@ -9,8 +9,6 @@ namespace KafkaNet
 {
     public class DefaultPartitionSelector : IPartitionSelector
     {
-        private static readonly Crc32 Crc32 = new Crc32();
-
         private readonly ConcurrentDictionary<string, int> _roundRobinTracker = new ConcurrentDictionary<string, int>();
 
         public Partition Select(Topic topic, byte[] key)
@@ -32,7 +30,7 @@ namespace KafkaNet
             }
 
             //use key hash
-            var partitionId = Crc32.Compute(key) % partitions.Count;
+            var partitionId = Crc32Provider.Compute(key) % partitions.Count;
             var partition = partitions.FirstOrDefault(x => x.PartitionId == partitionId);
 
             if (partition == null)
