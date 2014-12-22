@@ -39,7 +39,7 @@ namespace KafkaNet.Common
 						.ToArray();
 		}
 
-        public static string ToUTF8String(this byte[] value)
+        public static string ToUtf8String(this byte[] value)
         {
             if (value == null) return string.Empty;
 
