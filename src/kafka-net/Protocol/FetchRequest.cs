@@ -67,31 +67,32 @@ namespace KafkaNet.Protocol
 
         private IEnumerable<FetchResponse> DecodeFetchResponse(byte[] data)
         {
-            var stream = new BigEndianBinaryReader(data);
-
-            var correlationId = stream.ReadInt32();
-
-            var topicCount = stream.ReadInt32();
-            for (int i = 0; i < topicCount; i++)
+            using (var stream = new BigEndianBinaryReader(data))
             {
-                var topic = stream.ReadInt16String();
+                var correlationId = stream.ReadInt32();
 
-                var partitionCount = stream.ReadInt32();
-                for (int j = 0; j < partitionCount; j++)
+                var topicCount = stream.ReadInt32();
+                for (int i = 0; i < topicCount; i++)
                 {
-                    var partitionId = stream.ReadInt32();
-                    var response = new FetchResponse
+                    var topic = stream.ReadInt16String();
+
+                    var partitionCount = stream.ReadInt32();
+                    for (int j = 0; j < partitionCount; j++)
                     {
-                        Topic = topic,
-                        PartitionId = partitionId,
-                        Error = stream.ReadInt16(),
-                        HighWaterMark = stream.ReadInt64()
-                    };
-                    //note: dont use initializer here as it breaks stream position.
-                    response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes())
-                        .Select(x => { x.Meta.PartitionId = partitionId; return x; })
-                        .ToList();
-                    yield return response;
+                        var partitionId = stream.ReadInt32();
+                        var response = new FetchResponse
+                        {
+                            Topic = topic,
+                            PartitionId = partitionId,
+                            Error = stream.ReadInt16(),
+                            HighWaterMark = stream.ReadInt64()
+                        };
+                        //note: dont use initializer here as it breaks stream position.
+                        response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes())
+                            .Select(x => { x.Meta.PartitionId = partitionId; return x; })
+                            .ToList();
+                        yield return response;
+                    }
                 }
             }
         }

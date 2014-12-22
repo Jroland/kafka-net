@@ -92,28 +92,29 @@ namespace KafkaNet.Protocol
         /// <returns>Enumerable representing stream of messages decoded from byte[]</returns>
         public static IEnumerable<Message> DecodeMessageSet(byte[] messageSet)
         {
-            var stream = new BigEndianBinaryReader(messageSet);
-            
-            while (stream.HasData)
+            using (var stream = new BigEndianBinaryReader(messageSet))
             {
-                //this checks that we have at least the minimum amount of data to retrieve a header
-                if (stream.Available(MessageHeaderSize) == false)
-                    yield break;
-
-                var offset = stream.ReadInt64();
-                var messageSize = stream.ReadInt32();
-               
-                //if messagessize is greater than the total payload, our max buffer is insufficient.
-                if ((stream.Length - MessageHeaderSize) < messageSize)
-                    throw new BufferUnderRunException(MessageHeaderSize, messageSize);
-
-                //if the stream does not have enough left in the payload, we got only a partial message
-                if (stream.Available(messageSize) == false)
-                    yield break;
-
-                foreach (var message in DecodeMessage(offset, stream.RawRead(messageSize)))
+                while (stream.HasData)
                 {
-                    yield return message;
+                    //this checks that we have at least the minimum amount of data to retrieve a header
+                    if (stream.Available(MessageHeaderSize) == false)
+                        yield break;
+
+                    var offset = stream.ReadInt64();
+                    var messageSize = stream.ReadInt32();
+
+                    //if messagessize is greater than the total payload, our max buffer is insufficient.
+                    if ((stream.Length - MessageHeaderSize) < messageSize)
+                        throw new BufferUnderRunException(MessageHeaderSize, messageSize);
+
+                    //if the stream does not have enough left in the payload, we got only a partial message
+                    if (stream.Available(messageSize) == false)
+                        yield break;
+
+                    foreach (var message in DecodeMessage(offset, stream.RawRead(messageSize)))
+                    {
+                        yield return message;
+                    }
                 }
             }
         }
@@ -152,35 +153,36 @@ namespace KafkaNet.Protocol
         public static IEnumerable<Message> DecodeMessage(long offset, byte[] payload)
         {
             var crc = payload.Take(4).ToArray();
-            var stream = new BigEndianBinaryReader(payload.Skip(4));
-            
-            if (crc.SequenceEqual(stream.CrcHash()) == false)
-                throw new FailCrcCheckException("Payload did not match CRC validation.");
-
-            var message = new Message
+            using (var stream = new BigEndianBinaryReader(payload.Skip(4)))
             {
-                Meta = new MessageMetadata { Offset = offset },
-                MagicNumber = stream.ReadByte(),
-                Attribute = stream.ReadByte(),
-                Key = stream.ReadIntPrefixedBytes()
-            };
+                if (crc.SequenceEqual(stream.CrcHash()) == false)
+                    throw new FailCrcCheckException("Payload did not match CRC validation.");
 
-            var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
-            switch (codec)
-            {
-                case MessageCodec.CodecNone:
-                    message.Value = stream.ReadIntPrefixedBytes();
-                    yield return message;
-                    break;
-                case MessageCodec.CodecGzip:
-                    var gZipData = stream.ReadIntPrefixedBytes();
-                    foreach (var m in DecodeMessageSet(Compression.Unzip(gZipData)))
-                    {
-                        yield return m;
-                    }
-                    break;
-                default:
-                    throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
+                var message = new Message
+                {
+                    Meta = new MessageMetadata { Offset = offset },
+                    MagicNumber = stream.ReadByte(),
+                    Attribute = stream.ReadByte(),
+                    Key = stream.ReadIntPrefixedBytes()
+                };
+
+                var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
+                switch (codec)
+                {
+                    case MessageCodec.CodecNone:
+                        message.Value = stream.ReadIntPrefixedBytes();
+                        yield return message;
+                        break;
+                    case MessageCodec.CodecGzip:
+                        var gZipData = stream.ReadIntPrefixedBytes();
+                        foreach (var m in DecodeMessageSet(Compression.Unzip(gZipData)))
+                        {
+                            yield return m;
+                        }
+                        break;
+                    default:
+                        throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
+                }
             }
         }
     }
