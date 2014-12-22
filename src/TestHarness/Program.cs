@@ -24,7 +24,7 @@ namespace TestHarness
                     var consumer = new Consumer(new ConsumerOptions("TestHarness", new BrokerRouter(options)));
                     foreach (var data in consumer.Consume())
                     {
-                        Console.WriteLine("Response: P{0},O{1} : {2}", data.Meta.PartitionId, data.Meta.Offset, data.Value.ToUTF8String());
+                        Console.WriteLine("Response: P{0},O{1} : {2}", data.Meta.PartitionId, data.Meta.Offset, data.Value.ToUtf8String());
                     }
                 });
 
