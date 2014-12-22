@@ -67,25 +67,25 @@ namespace KafkaNet.Protocol
 
         private IEnumerable<FetchResponse> DecodeFetchResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
+            var stream = new BigEndianBinaryReader(data);
 
-            var correlationId = stream.ReadInt();
+            var correlationId = stream.ReadInt32();
 
-            var topicCount = stream.ReadInt();
+            var topicCount = stream.ReadInt32();
             for (int i = 0; i < topicCount; i++)
             {
                 var topic = stream.ReadInt16String();
 
-                var partitionCount = stream.ReadInt();
+                var partitionCount = stream.ReadInt32();
                 for (int j = 0; j < partitionCount; j++)
                 {
-                    var partitionId = stream.ReadInt();
+                    var partitionId = stream.ReadInt32();
                     var response = new FetchResponse
                     {
                         Topic = topic,
                         PartitionId = partitionId,
                         Error = stream.ReadInt16(),
-                        HighWaterMark = stream.ReadLong()
+                        HighWaterMark = stream.ReadInt64()
                     };
                     //note: dont use initializer here as it breaks stream position.
                     response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes())

@@ -57,22 +57,22 @@ namespace KafkaNet.Protocol
 
         private IEnumerable<OffsetCommitResponse> DecodeOffsetCommitResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
+            var stream = new BigEndianBinaryReader(data);
 
-            var correlationId = stream.ReadInt();
+            var correlationId = stream.ReadInt32();
 
-            var topicCount = stream.ReadInt();
+            var topicCount = stream.ReadInt32();
             for (int i = 0; i < topicCount; i++)
             {
                 var topic = stream.ReadInt16String();
 
-                var partitionCount = stream.ReadInt();
+                var partitionCount = stream.ReadInt32();
                 for (int j = 0; j < partitionCount; j++)
                 {
                     var response = new OffsetCommitResponse()
                     {
                         Topic = topic,
-                        PartitionId = stream.ReadInt(),
+                        PartitionId = stream.ReadInt32(),
                         Error = stream.ReadInt16()
                     };
 

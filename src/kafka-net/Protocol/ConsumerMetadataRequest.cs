@@ -37,16 +37,16 @@ namespace KafkaNet.Protocol
 
         private IEnumerable<ConsumerMetadataResponse> DecodeConsumerMetadataResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
+            var stream = new BigEndianBinaryReader(data);
 
-            var correlationId = stream.ReadInt();
+            var correlationId = stream.ReadInt32();
 
             var response = new ConsumerMetadataResponse
                 {
                     Error = stream.ReadInt16(),
-                    CoordinatorId = stream.ReadInt(),
+                    CoordinatorId = stream.ReadInt32(),
                     CoordinatorHost = stream.ReadInt16String(),
-                    CoordinatorPort = stream.ReadInt()
+                    CoordinatorPort = stream.ReadInt32()
                 };
 
             yield return response;

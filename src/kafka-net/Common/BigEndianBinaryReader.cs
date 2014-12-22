@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace KafkaNet.Common
@@ -16,19 +18,25 @@ namespace KafkaNet.Common
     /// <remarks>
     /// BigEndianBinaryWriter code provided by Zoltu
     /// https://github.com/Zoltu/Zoltu.EndianAwareBinaryReaderWriter
+    /// 
+    /// The code was modified to provide Kafka specific logic and helper functions.
     /// </remarks>
     public class BigEndianBinaryReader : BinaryReader
     {
-        public BigEndianBinaryReader(Stream input)
-            : base(input)
+        private const int KafkaNullSize = -1;
+
+        public BigEndianBinaryReader(IEnumerable<byte> payload) : base(new MemoryStream(payload.ToArray()), Encoding.UTF8)
         {
-            Contract.Requires(input != null);
+
         }
 
-        public BigEndianBinaryReader(Stream input, Boolean leaveOpen)
-            : base(input, Encoding.UTF8, leaveOpen)
+        public long Length{get{return base.BaseStream.Length;}}
+        public long Position { get { return base.BaseStream.Position; } set { base.BaseStream.Position = 0; } }
+        public bool HasData { get { return base.BaseStream.Position < base.BaseStream.Length; } }
+
+        public bool Available(int dataSize)
         {
-            Contract.Requires(input != null);
+            return (base.BaseStream.Length - base.BaseStream.Position) >= dataSize;
         }
 
         public override Decimal ReadDecimal()
@@ -58,45 +66,120 @@ namespace KafkaNet.Common
 
         public override Single ReadSingle()
         {
-            return Read(4, BitConverter.ToSingle);
+            return EndianAwareRead(4, BitConverter.ToSingle);
         }
 
         public override Double ReadDouble()
         {
-            return Read(8, BitConverter.ToDouble);
+            return EndianAwareRead(8, BitConverter.ToDouble);
         }
 
         public override Int16 ReadInt16()
         {
-            return Read(2, BitConverter.ToInt16);
+            return EndianAwareRead(2, BitConverter.ToInt16);
         }
 
         public override Int32 ReadInt32()
         {
-            return Read(4, BitConverter.ToInt32);
+            return EndianAwareRead(4, BitConverter.ToInt32);
         }
 
         public override Int64 ReadInt64()
         {
-            return Read(8, BitConverter.ToInt64);
+            return EndianAwareRead(8, BitConverter.ToInt64);
         }
 
         public override UInt16 ReadUInt16()
         {
-            return Read(2, BitConverter.ToUInt16);
+            return EndianAwareRead(2, BitConverter.ToUInt16);
         }
 
         public override UInt32 ReadUInt32()
         {
-            return Read(4, BitConverter.ToUInt32);
+            return EndianAwareRead(4, BitConverter.ToUInt32);
         }
 
         public override UInt64 ReadUInt64()
         {
-            return Read(8, BitConverter.ToUInt64);
+            return EndianAwareRead(8, BitConverter.ToUInt64);
         }
 
-        private T Read<T>(Int32 size, Func<Byte[], Int32, T> converter) where T : struct
+        public string ReadInt16String()
+        {
+            var size = ReadInt16();
+            if (size == KafkaNullSize) return null;
+            return Encoding.UTF8.GetString(RawRead(size));
+        }
+
+        public string ReadIntString()
+        {
+            var size = ReadInt32();
+            if (size == KafkaNullSize) return null;
+            return Encoding.UTF8.GetString(RawRead(size));
+        }
+
+        public byte[] ReadInt16PrefixedBytes()
+        {
+            var size = ReadInt16();
+            if (size == KafkaNullSize) { return null; }
+            return RawRead(size);
+        }
+
+        public byte[] ReadIntPrefixedBytes()
+        {
+            var size = ReadInt32();
+            if (size == KafkaNullSize) { return null; }
+            return RawRead(size);
+        }
+
+        public byte[] ReadToEnd()
+        {
+            var size = (int)(base.BaseStream.Length - base.BaseStream.Position);
+            var buffer = new byte[size];
+            base.BaseStream.Read(buffer, 0, size);
+            return buffer;
+        }
+
+        public byte[] CrcHash()
+        {
+            var currentPosition = base.BaseStream.Position;
+            try
+            {
+                base.BaseStream.Position = 0;
+                return Crc32Provider.ComputeHash(ReadToEnd());
+            }
+            finally
+            {
+                base.BaseStream.Position = currentPosition;
+            }
+        }
+
+        public uint Crc()
+        {
+            var currentPosition = base.BaseStream.Position;
+            try
+            {
+                base.BaseStream.Position = 0;
+                return Crc32Provider.Compute(ReadToEnd());
+            }
+            finally
+            {
+                base.BaseStream.Position = currentPosition;
+            }
+        }
+
+        public byte[] RawRead(int size)
+        {
+            if (size <= 0) { return new byte[0]; }
+
+            var buffer = new byte[size];
+
+            base.Read(buffer, 0, size);
+
+            return buffer;
+        }
+
+        private T EndianAwareRead<T>(Int32 size, Func<Byte[], Int32, T> converter) where T : struct
         {
             Contract.Requires(size >= 0);
             Contract.Requires(converter != null);

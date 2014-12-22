@@ -54,29 +54,29 @@ namespace KafkaNet.Protocol
 
         private IEnumerable<OffsetResponse> DecodeOffsetResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
+            var stream = new BigEndianBinaryReader(data);
 
-            var correlationId = stream.ReadInt();
+            var correlationId = stream.ReadInt32();
 
-            var topicCount = stream.ReadInt();
+            var topicCount = stream.ReadInt32();
             for (int i = 0; i < topicCount; i++)
             {
                 var topic = stream.ReadInt16String();
 
-                var partitionCount = stream.ReadInt();
+                var partitionCount = stream.ReadInt32();
                 for (int j = 0; j < partitionCount; j++)
                 {
                     var response = new OffsetResponse()
                     {
                         Topic = topic,
-                        PartitionId = stream.ReadInt(),
+                        PartitionId = stream.ReadInt32(),
                         Error = stream.ReadInt16(),
                         Offsets = new List<long>()
                     };
-                    var offsetCount = stream.ReadInt();
+                    var offsetCount = stream.ReadInt32();
                     for (int k = 0; k < offsetCount; k++)
                     {
-                        response.Offsets.Add(stream.ReadLong());
+                        response.Offsets.Add(stream.ReadInt64());
                     }
 
                     yield return response;

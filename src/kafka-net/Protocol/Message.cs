@@ -92,27 +92,26 @@ namespace KafkaNet.Protocol
         /// <returns>Enumerable representing stream of messages decoded from byte[]</returns>
         public static IEnumerable<Message> DecodeMessageSet(byte[] messageSet)
         {
-            var stream = new ReadByteStream(messageSet);
-
-
+            var stream = new BigEndianBinaryReader(messageSet);
+            
             while (stream.HasData)
             {
                 //this checks that we have at least the minimum amount of data to retrieve a header
                 if (stream.Available(MessageHeaderSize) == false)
                     yield break;
 
-                var offset = stream.ReadLong();
-                var messageSize = stream.ReadInt();
+                var offset = stream.ReadInt64();
+                var messageSize = stream.ReadInt32();
                
-                //if messagessize is greater than payload, our max buffer is insufficient.
-                if ((stream.Payload.Length - MessageHeaderSize) < messageSize)
+                //if messagessize is greater than the total payload, our max buffer is insufficient.
+                if ((stream.Length - MessageHeaderSize) < messageSize)
                     throw new BufferUnderRunException(MessageHeaderSize, messageSize);
 
                 //if the stream does not have enough left in the payload, we got only a partial message
                 if (stream.Available(messageSize) == false)
                     yield break;
 
-                foreach (var message in DecodeMessage(offset, stream.ReadBytesFromStream(messageSize)))
+                foreach (var message in DecodeMessage(offset, stream.RawRead(messageSize)))
                 {
                     yield return message;
                 }
@@ -134,12 +133,12 @@ namespace KafkaNet.Protocol
 
             body.Pack(new[] { message.MagicNumber },
                       new[] { message.Attribute },
-                      message.Key.ToIntPrefixedBytes(),
-                      message.Value.ToIntPrefixedBytes());
+                      message.Key.ToInt32PrefixedBytes(),
+                      message.Value.ToInt32PrefixedBytes());
 
             var crc = Crc32Provider.ComputeHash(body.Payload());
             body.Prepend(crc);
-
+            
             return body.Payload();
         }
 
@@ -153,10 +152,9 @@ namespace KafkaNet.Protocol
         public static IEnumerable<Message> DecodeMessage(long offset, byte[] payload)
         {
             var crc = payload.Take(4).ToArray();
-            var stream = new ReadByteStream(payload.Skip(4));
-            var hash = Crc32Provider.ComputeHash(stream.Payload);
+            var stream = new BigEndianBinaryReader(payload.Skip(4));
             
-            if (crc.SequenceEqual(hash) == false)
+            if (crc.SequenceEqual(stream.CrcHash()) == false)
                 throw new FailCrcCheckException("Payload did not match CRC validation.");
 
             var message = new Message

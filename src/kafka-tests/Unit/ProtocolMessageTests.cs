@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using kafka_tests.Helpers;
 using KafkaNet.Common;
 using KafkaNet.Protocol;
@@ -68,6 +69,9 @@ namespace kafka_tests.Unit
             //This message set has a truncated message bytes at the end of it
             var result = Message.DecodeMessageSet(MessageHelper.FetchResponseMaxBytesOverflow).ToList();
 
+            var message = Encoding.UTF8.GetString(result.First().Value);
+            
+            Assert.That(message, Is.EqualTo("test"));
             Assert.That(result.Count, Is.EqualTo(529));
         }
 

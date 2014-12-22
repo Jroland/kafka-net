@@ -24,8 +24,7 @@ namespace kafka_tests.Unit
         public void NativeBinaryWriterTests(Int32 expectedValue, Byte[] givenBytes)
         {
             // arrange
-            var memoryStream = new MemoryStream(givenBytes);
-            var binaryReader = new BinaryReader(memoryStream);
+            var binaryReader = new BinaryReader(new MemoryStream(givenBytes));
 
             // act
             var actualValue = binaryReader.ReadInt32();
@@ -43,8 +42,7 @@ namespace kafka_tests.Unit
         public void Int32Tests(Int32 expectedValue, Byte[] givenBytes)
         {
             // arrange
-            var memoryStream = new MemoryStream(givenBytes);
-            var binaryReader = new BigEndianBinaryReader(memoryStream);
+            var binaryReader = new BigEndianBinaryReader(givenBytes);
 
             // act
             var actualValue = binaryReader.ReadInt32();
@@ -62,8 +60,7 @@ namespace kafka_tests.Unit
         public void UInt32Tests(UInt32 expectedValue, Byte[] givenBytes)
         {
             // arrange
-            var memoryStream = new MemoryStream(givenBytes);
-            var binaryReader = new BigEndianBinaryReader(memoryStream);
+            var binaryReader = new BigEndianBinaryReader(givenBytes);
 
             // act
             var actualValue = binaryReader.ReadUInt32();
@@ -84,8 +81,7 @@ namespace kafka_tests.Unit
         public void SingleTests(Single expectedValue, Byte[] givenBytes)
         {
             // arrange
-            var memoryStream = new MemoryStream(givenBytes);
-            var binaryReader = new BigEndianBinaryReader(memoryStream);
+            var binaryReader = new BigEndianBinaryReader(givenBytes);
 
             // act
             var actualValue = binaryReader.ReadSingle();
@@ -106,8 +102,7 @@ namespace kafka_tests.Unit
         public void DoubleTests(Double expectedValue, Byte[] givenBytes)
         {
             // arrange
-            var memoryStream = new MemoryStream(givenBytes);
-            var binaryReader = new BigEndianBinaryReader(memoryStream);
+            var binaryReader = new BigEndianBinaryReader(givenBytes);
 
             // act
             var actualValue = binaryReader.ReadDouble();
@@ -122,8 +117,7 @@ namespace kafka_tests.Unit
         public void StringTests(String expectedValue, Byte[] givenBytes)
         {
             // arrange
-            var memoryStream = new MemoryStream(givenBytes);
-            var binaryReader = new BigEndianBinaryReader(memoryStream);
+            var binaryReader = new BigEndianBinaryReader(givenBytes);
 
             // act
             var actualValue = binaryReader.ReadString();
@@ -138,8 +132,7 @@ namespace kafka_tests.Unit
         public void CharTests(Char expectedValue, Byte[] givenBytes)
         {
             // arrange
-            var memoryStream = new MemoryStream(givenBytes);
-            var binaryReader = new BigEndianBinaryReader(memoryStream);
+            var binaryReader = new BigEndianBinaryReader(givenBytes);
 
             // act
             var actualValue = binaryReader.ReadChar();
@@ -154,8 +147,7 @@ namespace kafka_tests.Unit
         public void CharArrayTests(Char[] expectedValue, Byte[] givenBytes)
         {
             // arrange
-            var memoryStream = new MemoryStream(givenBytes);
-            var binaryReader = new BigEndianBinaryReader(memoryStream);
+            var binaryReader = new BigEndianBinaryReader(givenBytes);
 
             // act
             var actualValue = binaryReader.ReadChars(givenBytes.Length);

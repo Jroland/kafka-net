@@ -54,17 +54,17 @@ namespace KafkaNet.Protocol
         /// <returns></returns>
         private MetadataResponse DecodeMetadataResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
+            var stream = new BigEndianBinaryReader(data);
             var response = new MetadataResponse();
-            response.CorrelationId = stream.ReadInt();
+            response.CorrelationId = stream.ReadInt32();
 
-            var brokerCount = stream.ReadInt();
+            var brokerCount = stream.ReadInt32();
             for (var i = 0; i < brokerCount; i++)
             {
                 response.Brokers.Add(Broker.FromStream(stream));
             }
 
-            var topicCount = stream.ReadInt();
+            var topicCount = stream.ReadInt32();
             for (var i = 0; i < topicCount; i++)
             {
                 response.Topics.Add(Topic.FromStream(stream));

@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Net.Sockets;
 using System.Threading.Tasks;
 using System.Threading;
 
@@ -31,7 +30,7 @@ namespace KafkaNet.Common
                         .ToArray();
         }
 
-        public static byte[] ToIntPrefixedBytes(this byte[] value)
+        public static byte[] ToInt32PrefixedBytes(this byte[] value)
         {
             if (value == null) return (-1).ToBytes();
 
