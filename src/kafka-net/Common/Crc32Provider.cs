@@ -25,12 +25,12 @@ namespace KafkaNet.Common
 
         public static UInt32 Compute(byte[] buffer)
         {
-            return CalculateHash(buffer, 0, buffer.Length);
+            return ~CalculateHash(buffer, 0, buffer.Length);
         }
 
         public static UInt32 Compute(byte[] buffer, int offset, int length)
         {
-            return CalculateHash(buffer, offset, length);
+            return ~CalculateHash(buffer, offset, length);
         }
 
         public static byte[] ComputeHash(byte[] buffer)
