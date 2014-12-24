@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Diagnostics.Contracts;
 using System.IO;
+using System.Linq;
+using System.Security.Permissions;
 using System.Text;
 
 namespace KafkaNet.Common
@@ -97,7 +99,7 @@ namespace KafkaNet.Common
             var bytes = BitConverter.GetBytes(value);
             WriteBigEndian(bytes);
         }
-
+        
         private void WriteBigEndian(Byte[] bytes)
         {
             Contract.Requires(bytes != null);
@@ -106,6 +108,63 @@ namespace KafkaNet.Common
                 Array.Reverse(bytes);
 
             Write(bytes);
+        }
+    }
+
+    public class KafkaResponsePacker
+    {
+        private readonly BigEndianBinaryWriter _stream = new BigEndianBinaryWriter(new MemoryStream());
+
+        public KafkaResponsePacker Pack(byte value)
+        {
+            _stream.Write(value);
+            return this;
+        }
+
+        public KafkaResponsePacker Pack(Int32 ints)
+        {
+            _stream.Write(ints);
+            return this;
+        }
+
+        public KafkaResponsePacker Pack(Int16 ints)
+        {
+            _stream.Write(ints);
+            return this;
+        }
+
+        public KafkaResponsePacker Pack(Int64 ints)
+        {
+            _stream.Write(ints);
+            return this;
+        }
+
+        public KafkaResponsePacker Pack(byte[] buffer)
+        {
+            _stream.Write(buffer.Length);
+            _stream.Write(buffer);
+            return this;
+        }
+        
+        public byte[] Payload()
+        {
+            var buffer = new byte[_stream.BaseStream.Length];
+            _stream.BaseStream.Position = 0;
+            _stream.BaseStream.Read(buffer, 0, (int)_stream.BaseStream.Length);
+            return buffer;
+        }
+
+        public byte[] CrcPayload()
+        {
+            var buffer = new byte[_stream.BaseStream.Length + 4];
+            _stream.BaseStream.Position = 0;
+            _stream.BaseStream.Read(buffer, 4, (int)_stream.BaseStream.Length);
+            var crc = Crc32Provider.ComputeHash(buffer, 4, buffer.Length);
+            buffer[0] = crc[0];
+            buffer[1] = crc[1];
+            buffer[2] = crc[2];
+            buffer[3] = crc[3];
+            return buffer;
         }
     }
 }
