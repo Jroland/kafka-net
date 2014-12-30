@@ -207,6 +207,18 @@ namespace KafkaNet.Protocol
         public UnresolvedHostnameException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
 
+    public class InvalidMetadataException : ApplicationException
+    {
+        public int ErrorCode { get; set; }
+        public InvalidMetadataException(string message, params object[] args) : base(string.Format(message, args)) { }
+    }
+
+    public class OffsetOutOfRangeException : ApplicationException
+    {
+        public Fetch FetchRequest { get; set; }
+        public OffsetOutOfRangeException(string message, params object[] args) : base(string.Format(message, args)) { }
+    }
+
     public class BufferUnderRunException : ApplicationException
     {
         public int MessageHeaderSize { get; set; }
@@ -218,6 +230,12 @@ namespace KafkaNet.Protocol
             MessageHeaderSize = messageHeaderSize;
             RequiredBufferSize = requiredBufferSize;
         }
+    }
+
+    public class KafkaApplicationException : ApplicationException
+    {
+        public int ErrorCode { get; set; }
+        public KafkaApplicationException(string message, params object[] args) : base(string.Format(message, args)) { }
     }
     #endregion
 
