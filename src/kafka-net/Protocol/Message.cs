@@ -27,6 +27,7 @@ namespace KafkaNet.Protocol
     public class Message
     {
         private const int MessageHeaderSize = 12;
+        private const long InitialMessageOffset = 0;
 
         /// <summary>
         /// Metadata on source offset and partition location for this message.
@@ -86,6 +87,24 @@ namespace KafkaNet.Protocol
         }
 
         /// <summary>
+        /// Encodes a collection of messages into one byte[].  Encoded in order of list.
+        /// </summary>
+        /// <param name="messages">The collection of messages to encode together.</param>
+        /// <returns>Encoded byte[] representing the collection of messages.</returns>
+        public static byte[] EncodeMessageSet2(IEnumerable<Message> messages)
+        {
+            var stream = new KafkaMessagePacker();
+
+            foreach (var message in messages)
+            {
+                stream.Pack(InitialMessageOffset)
+                    .Pack(EncodeMessage2(message));
+            }
+
+            return stream.PayloadNoLength();
+        }
+
+        /// <summary>
         /// Decode a byte[] that represents a collection of messages.
         /// </summary>
         /// <param name="messageSet">The byte[] encode as a message set from kafka.</param>
@@ -141,6 +160,25 @@ namespace KafkaNet.Protocol
             body.Prepend(crc);
             
             return body.Payload();
+        }
+
+        /// <summary>
+        /// Encodes a message object to byte[]
+        /// </summary>
+        /// <param name="message">Message data to encode.</param>
+        /// <returns>Encoded byte[] representation of the message object.</returns>
+        /// <remarks>
+        /// Format:
+        /// Crc (Int32), MagicByte (Byte), Attribute (Byte), Key (Byte[]), Value (Byte[])
+        /// </remarks>
+        public static byte[] EncodeMessage2(Message message)
+        {
+            return new KafkaMessagePacker()
+                .Pack(message.MagicNumber)
+                .Pack(message.Attribute)
+                .Pack(message.Key)
+                .Pack(message.Value)
+                .CrcPayload();
         }
 
         /// <summary>

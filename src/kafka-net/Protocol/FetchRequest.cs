@@ -31,6 +31,11 @@ namespace KafkaNet.Protocol
             return EncodeFetchRequest(this);
         }
 
+        public byte[] Encode2()
+        {
+            return EncodeFetchRequest2(this);
+        }
+
         public IEnumerable<FetchResponse> Decode(byte[] payload)
         {
             return DecodeFetchResponse(payload);
@@ -61,6 +66,39 @@ namespace KafkaNet.Protocol
             }
 
             message.Prepend(message.Length().ToBytes());
+
+            return message.Payload();
+        }
+
+
+        private byte[] EncodeFetchRequest2(FetchRequest request)
+        {          
+            if (request.Fetches == null) request.Fetches = new List<Fetch>();
+
+            var message = EncodeHeader2(request);
+
+            var topicGroups = request.Fetches.GroupBy(x => x.Topic).ToList();
+            message.Pack(ReplicaId)
+                .Pack(request.MaxWaitTime)
+                .Pack(request.MinBytes)
+                .Pack(topicGroups.Count);
+
+            foreach (var topicGroup in topicGroups)
+            {
+                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
+                    .Pack(partitions.Count);
+
+                foreach (var partition in partitions)
+                {
+                    foreach (var fetch in partition)
+                    {
+                        message.Pack(partition.Key)
+                            .Pack(fetch.Offset)
+                            .Pack(fetch.MaxBytes);
+                    }
+                }
+            }
 
             return message.Payload();
         }

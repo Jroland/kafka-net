@@ -5,9 +5,9 @@ using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
-	/// <summary>
-	/// A funky Protocol for requesting the starting offset of each segment for the requested partition 
-	/// </summary>
+    /// <summary>
+    /// A funky Protocol for requesting the starting offset of each segment for the requested partition 
+    /// </summary>
     public class OffsetRequest : BaseRequest, IKafkaRequest<OffsetResponse>
     {
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Offset; } }
@@ -16,6 +16,11 @@ namespace KafkaNet.Protocol
         public byte[] Encode()
         {
             return EncodeOffsetRequest(this);
+        }
+
+        public byte[] Encode2()
+        {
+            return EncodeOffsetRequest2(this);
         }
 
         public IEnumerable<OffsetResponse> Decode(byte[] payload)
@@ -51,6 +56,36 @@ namespace KafkaNet.Protocol
 
             return message.Payload();
         }
+
+        private byte[] EncodeOffsetRequest2(OffsetRequest request)
+        {
+            if (request.Offsets == null) request.Offsets = new List<Offset>();
+            var message = EncodeHeader2(request);
+
+            var topicGroups = request.Offsets.GroupBy(x => x.Topic).ToList();
+            message.Pack(ReplicaId)
+                   .Pack(topicGroups.Count);
+
+            foreach (var topicGroup in topicGroups)
+            {
+                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
+                    .Pack(partitions.Count);
+
+                foreach (var partition in partitions)
+                {
+                    foreach (var offset in partition)
+                    {
+                        message.Pack(partition.Key)
+                            .Pack(offset.Time)
+                            .Pack(offset.MaxOffsets);
+                    }
+                }
+            }
+
+            return message.Payload();
+        }
+
 
         private IEnumerable<OffsetResponse> DecodeOffsetResponse(byte[] data)
         {

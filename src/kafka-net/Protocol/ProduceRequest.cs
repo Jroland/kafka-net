@@ -1,9 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Text;
 using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
@@ -39,6 +36,11 @@ namespace KafkaNet.Protocol
         public byte[] Encode()
         {
             return EncodeProduceRequest(this);
+        }
+
+        public byte[] Encode2()
+        {
+            return EncodeProduceRequest2(this);
         }
 
         public IEnumerable<ProduceResponse> Decode(byte[] payload)
@@ -92,6 +94,48 @@ namespace KafkaNet.Protocol
             return message.Payload();
         }
 
+        private byte[] EncodeProduceRequest2(ProduceRequest request)
+        {
+            if (request.Payload == null) request.Payload = new List<Payload>();
+
+            var groupedPayloads = (from p in request.Payload
+                                   group p by new
+                                   {
+                                       p.Topic,
+                                       p.Partition,
+                                       p.Codec
+                                   } into tpc
+                                   select tpc).ToList();
+
+            var message = EncodeHeader2(request)
+                .Pack(request.Acks)
+                .Pack(request.TimeoutMS)
+                .Pack(groupedPayloads.Count);
+
+            foreach (var groupedPayload in groupedPayloads)
+            {
+                var payloads = groupedPayload.ToList();
+                message.Pack(groupedPayload.Key.Topic, StringPrefixEncoding.Int16)
+                    .Pack(payloads.Count)
+                    .Pack(groupedPayload.Key.Partition);
+
+                switch (groupedPayload.Key.Codec)
+                {
+                    case MessageCodec.CodecNone:
+                        message.Pack(Message.EncodeMessageSet2(payloads.SelectMany(x => x.Messages)));
+                        break;
+                    case MessageCodec.CodecGzip:
+                        message.Pack(Message.EncodeMessageSet2(CreateGzipCompressedMessage2(payloads.SelectMany(x => x.Messages))));
+                        break;
+                    default:
+                        throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
+                }
+            }
+
+            return message.Payload();
+        }
+
+        
         private IEnumerable<Message> CreateGzipCompressedMessage(IEnumerable<Message> messages)
         {
             var messageSet = Message.EncodeMessageSet(messages);
@@ -105,6 +149,21 @@ namespace KafkaNet.Protocol
                 };
 
                 return new[] { compressedMessage };
+        }
+
+        private IEnumerable<Message> CreateGzipCompressedMessage2(IEnumerable<Message> messages)
+        {
+            var messageSet = Message.EncodeMessageSet2(messages);
+
+            var gZipBytes = Compression.Zip(messageSet);
+
+            var compressedMessage = new Message
+            {
+                Attribute = (byte)(0x00 | (ProtocolConstants.AttributeCodeMask & (byte)MessageCodec.CodecGzip)),
+                Value = gZipBytes
+            };
+
+            return new[] { compressedMessage };
         }
 
         private IEnumerable<ProduceResponse> DecodeProduceResponse(byte[] data)

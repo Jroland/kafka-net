@@ -9,14 +9,14 @@ namespace kafka_tests.Helpers
         
         public static byte[] CreateMessage(long offset, byte[] key, byte[] payload, byte magicByte = 0, byte attributes = 0)
         {
-            var message = new KafkaResponsePacker()
+            var message = new KafkaMessagePacker()
                 .Pack(magicByte)
                 .Pack(attributes)
                 .Pack(key)
                 .Pack(payload)
                 .CrcPayload();
             
-            return new KafkaResponsePacker()
+            return new KafkaMessagePacker()
                 .Pack(offset)
                 .Pack(message)
                 .Payload();

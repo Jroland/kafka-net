@@ -28,7 +28,7 @@ namespace KafkaNet.Protocol
         /// It is useful for matching request and response between the client and server. 
         /// </summary>
         public int CorrelationId { get { return _correlationId; } set { _correlationId = value; } }
-        
+
         /// <summary>
         /// Encode the common head for kafka request.
         /// </summary>
@@ -45,6 +45,15 @@ namespace KafkaNet.Protocol
                           request.ClientId.ToInt16SizedBytes());
 
             return message.Payload();
+        }
+
+        public static KafkaMessagePacker EncodeHeader2<T>(IKafkaRequest<T> request)
+        {
+            return new KafkaMessagePacker()
+                 .Pack(((Int16)request.ApiKey))
+                 .Pack(ApiVersion)
+                 .Pack(request.CorrelationId)
+                 .Pack(request.ClientId, StringPrefixEncoding.Int16);
         }
     }
 }

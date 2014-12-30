@@ -1,8 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.IO;
-using System.Linq;
-using System.Security.Permissions;
 using System.Text;
 
 namespace KafkaNet.Common
@@ -18,6 +17,7 @@ namespace KafkaNet.Common
     /// <remarks>
     /// BigEndianBinaryWriter code provided by Zoltu
     /// https://github.com/Zoltu/Zoltu.EndianAwareBinaryReaderWriter
+    /// The code was modified to implement Kafka specific byte handling.
     /// </remarks>
     public class BigEndianBinaryWriter : BinaryWriter
     {
@@ -99,7 +99,45 @@ namespace KafkaNet.Common
             var bytes = BitConverter.GetBytes(value);
             WriteBigEndian(bytes);
         }
-        
+
+        public override void Write(string value)
+        {
+            throw new NotSupportedException("Kafka requires specific string length prefix encoding.");
+        }
+
+        public void Write(byte[] value, StringPrefixEncoding encoding)
+        {
+            if (value == null)
+            {
+                Write(-1);
+                return;
+            }
+
+            if (encoding == StringPrefixEncoding.Int16)
+                Write((Int16)value.Length);
+            else
+                Write(value.Length);
+
+            Write(value);
+        }
+
+        public void Write(string value, StringPrefixEncoding encoding)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                Write(-1);
+                return;
+            }
+
+            if (encoding == StringPrefixEncoding.Int16)
+                Write((Int16)value.Length);
+            else
+                Write(value.Length);
+
+            Write(Encoding.UTF8.GetBytes(value));
+        }
+
+
         private void WriteBigEndian(Byte[] bytes)
         {
             Contract.Requires(bytes != null);
@@ -111,59 +149,103 @@ namespace KafkaNet.Common
         }
     }
 
-    public class KafkaResponsePacker
+    public enum StringPrefixEncoding
     {
-        private readonly BigEndianBinaryWriter _stream = new BigEndianBinaryWriter(new MemoryStream());
+        Int16,
+        Int32
+    };
 
-        public KafkaResponsePacker Pack(byte value)
+    public class KafkaMessagePacker
+    {
+        private const int IntegerByteSize = 4;
+        private readonly BigEndianBinaryWriter _stream;
+
+        public KafkaMessagePacker()
+        {
+            _stream = new BigEndianBinaryWriter(new MemoryStream());
+            Pack(IntegerByteSize); //pre-allocate space for buffer length
+        }
+
+        public KafkaMessagePacker Pack(byte value)
         {
             _stream.Write(value);
             return this;
         }
 
-        public KafkaResponsePacker Pack(Int32 ints)
+        public KafkaMessagePacker Pack(Int32 ints)
         {
             _stream.Write(ints);
             return this;
         }
 
-        public KafkaResponsePacker Pack(Int16 ints)
+        public KafkaMessagePacker Pack(Int16 ints)
         {
             _stream.Write(ints);
             return this;
         }
 
-        public KafkaResponsePacker Pack(Int64 ints)
+        public KafkaMessagePacker Pack(Int64 ints)
         {
             _stream.Write(ints);
             return this;
         }
 
-        public KafkaResponsePacker Pack(byte[] buffer)
+        public KafkaMessagePacker Pack(byte[] buffer, StringPrefixEncoding encoding = StringPrefixEncoding.Int32)
         {
-            _stream.Write(buffer.Length);
-            _stream.Write(buffer);
+            _stream.Write(buffer, encoding);
             return this;
         }
-        
+
+        public KafkaMessagePacker Pack(string data, StringPrefixEncoding encoding = StringPrefixEncoding.Int32)
+        {
+            _stream.Write(data, encoding);
+            return this;
+        }
+
+        public KafkaMessagePacker Pack(List<string> data, StringPrefixEncoding encoding = StringPrefixEncoding.Int32)
+        {
+            foreach (var item in data)
+            {
+                _stream.Write(item, encoding);
+            }
+            
+            return this;
+        }
+
         public byte[] Payload()
         {
             var buffer = new byte[_stream.BaseStream.Length];
+            _stream.BaseStream.Position = 0;
+            Pack((Int32)(_stream.BaseStream.Length - IntegerByteSize));
             _stream.BaseStream.Position = 0;
             _stream.BaseStream.Read(buffer, 0, (int)_stream.BaseStream.Length);
             return buffer;
         }
 
+        public byte[] PayloadNoLength()
+        {
+            var payloadLength = _stream.BaseStream.Length - IntegerByteSize;
+            var buffer = new byte[payloadLength];
+            _stream.BaseStream.Position = IntegerByteSize;
+            _stream.BaseStream.Read(buffer, 0, (int)payloadLength);
+            return buffer;
+        }
+
         public byte[] CrcPayload()
         {
-            var buffer = new byte[_stream.BaseStream.Length + 4];
+            var buffer = new byte[_stream.BaseStream.Length];
+            
+            //copy the payload over
             _stream.BaseStream.Position = 0;
-            _stream.BaseStream.Read(buffer, 4, (int)_stream.BaseStream.Length);
-            var crc = Crc32Provider.ComputeHash(buffer, 4, buffer.Length);
+            _stream.BaseStream.Read(buffer, 0, (int)_stream.BaseStream.Length);
+
+            //calculate the crc
+            var crc = Crc32Provider.ComputeHash(buffer, IntegerByteSize, buffer.Length);
             buffer[0] = crc[0];
             buffer[1] = crc[1];
             buffer[2] = crc[2];
             buffer[3] = crc[3];
+            
             return buffer;
         }
     }
