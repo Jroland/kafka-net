@@ -113,11 +113,16 @@ namespace KafkaNet.Common
                 return;
             }
 
-            if (encoding == StringPrefixEncoding.Int16)
-                Write((Int16)value.Length);
-            else
-                Write(value.Length);
-
+            switch (encoding)
+            {
+                case StringPrefixEncoding.Int16:
+                    Write((Int16)value.Length);
+                    break;
+                case StringPrefixEncoding.Int32:
+                    Write(value.Length);
+                    break;
+            }
+           
             Write(value);
         }
 
@@ -129,10 +134,15 @@ namespace KafkaNet.Common
                 return;
             }
 
-            if (encoding == StringPrefixEncoding.Int16)
-                Write((Int16)value.Length);
-            else
-                Write(value.Length);
+            switch (encoding)
+            {
+                case StringPrefixEncoding.Int16:
+                    Write((Int16)value.Length);
+                    break;
+                case StringPrefixEncoding.Int32:
+                    Write(value.Length);
+                    break;
+            }
 
             Write(Encoding.UTF8.GetBytes(value));
         }
@@ -152,7 +162,8 @@ namespace KafkaNet.Common
     public enum StringPrefixEncoding
     {
         Int16,
-        Int32
+        Int32,
+        None
     };
 
     public class KafkaMessagePacker
@@ -202,13 +213,13 @@ namespace KafkaNet.Common
             return this;
         }
 
-        public KafkaMessagePacker Pack(List<string> data, StringPrefixEncoding encoding = StringPrefixEncoding.Int32)
+        public KafkaMessagePacker Pack(IEnumerable<string> data, StringPrefixEncoding encoding = StringPrefixEncoding.Int32)
         {
             foreach (var item in data)
             {
                 _stream.Write(item, encoding);
             }
-            
+
             return this;
         }
 
@@ -234,7 +245,7 @@ namespace KafkaNet.Common
         public byte[] CrcPayload()
         {
             var buffer = new byte[_stream.BaseStream.Length];
-            
+
             //copy the payload over
             _stream.BaseStream.Position = 0;
             _stream.BaseStream.Read(buffer, 0, (int)_stream.BaseStream.Length);
@@ -245,7 +256,7 @@ namespace KafkaNet.Common
             buffer[1] = crc[1];
             buffer[2] = crc[2];
             buffer[3] = crc[3];
-            
+
             return buffer;
         }
     }

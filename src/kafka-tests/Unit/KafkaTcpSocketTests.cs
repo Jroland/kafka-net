@@ -241,13 +241,14 @@ namespace kafka_tests.Unit
                 const int firstMessage = 99;
                 const string secondMessage = "testmessage";
 
-                var payload = new WriteByteStream();
-                payload.Pack(firstMessage.ToBytes(), secondMessage.ToBytes());
+                var payload = new KafkaMessagePacker()
+                    .Pack(firstMessage)
+                    .Pack(secondMessage, StringPrefixEncoding.None);
 
                 var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
                 //send the combined payload
-                server.SendDataAsync(payload.Payload());
+                server.SendDataAsync(payload.PayloadNoLength());
 
                 var firstResponse = test.ReadAsync(4).Result.ToInt32();
                 Assert.That(firstResponse, Is.EqualTo(firstMessage));
@@ -338,8 +339,7 @@ namespace kafka_tests.Unit
                 var messages = new[] { "test1", "test2", "test3", "test4" };
                 var expectedLength = "test1".Length;
 
-                var payload = new WriteByteStream();
-                payload.Pack(messages.Select(x => x.ToBytes()).ToArray());
+                var payload = new KafkaMessagePacker().Pack(messages);
 
                 var socket = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 

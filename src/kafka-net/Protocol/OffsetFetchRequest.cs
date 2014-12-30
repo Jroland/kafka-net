@@ -22,46 +22,11 @@ namespace KafkaNet.Protocol
             return EncodeOffsetFetchRequest(this);
         }
 
-        public byte[] Encode2()
-        {
-            return EncodeOffsetFetchRequest2(this);
-        }
-
         protected byte[] EncodeOffsetFetchRequest(OffsetFetchRequest request)
         {
-            var message = new WriteByteStream();
             if (request.Topics == null) request.Topics = new List<OffsetFetch>();
 
-            message.Pack(EncodeHeader(request));
-
-            var topicGroups = request.Topics.GroupBy(x => x.Topic).ToList();
-
-            message.Pack(ConsumerGroup.ToInt16SizedBytes(), topicGroups.Count.ToBytes());
-
-            foreach (var topicGroup in topicGroups)
-            {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                message.Pack(topicGroup.Key.ToInt16SizedBytes(), partitions.Count.ToBytes());
-
-                foreach (var partition in partitions)
-                {
-                    foreach (var offset in partition)
-                    {
-                        message.Pack(offset.PartitionId.ToBytes());
-                    }
-                }
-            }
-
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
-        }
-
-        protected byte[] EncodeOffsetFetchRequest2(OffsetFetchRequest request)
-        {
-            if (request.Topics == null) request.Topics = new List<OffsetFetch>();
-
-            var message = EncodeHeader2(request);
+            var message = EncodeHeader(request);
 
             var topicGroups = request.Topics.GroupBy(x => x.Topic).ToList();
 

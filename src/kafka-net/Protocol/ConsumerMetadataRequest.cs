@@ -19,10 +19,6 @@ namespace KafkaNet.Protocol
             return EncodeConsumerMetadataRequest(this);
         }
 
-        public byte[] Encode2()
-        {
-            return EncodeConsumerMetadataRequest2(this);
-        }
 
         public IEnumerable<ConsumerMetadataResponse> Decode(byte[] payload)
         {
@@ -31,18 +27,7 @@ namespace KafkaNet.Protocol
 
         private byte[] EncodeConsumerMetadataRequest(ConsumerMetadataRequest request)
         {
-            var message = new WriteByteStream();
-
-            message.Pack(EncodeHeader(request));
-            message.Pack(request.ConsumerGroup.ToInt16SizedBytes());
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
-        }
-
-        private byte[] EncodeConsumerMetadataRequest2(ConsumerMetadataRequest request)
-        {
-            var message = EncodeHeader2(request)
+            var message = EncodeHeader(request)
                 .Pack(request.ConsumerGroup, StringPrefixEncoding.Int16);
 
             return message.Payload();

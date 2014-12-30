@@ -67,7 +67,6 @@ namespace KafkaNet.Protocol
             Value = value.ToBytes();
         }
 
-
         /// <summary>
         /// Encodes a collection of messages into one byte[].  Encoded in order of list.
         /// </summary>
@@ -75,30 +74,12 @@ namespace KafkaNet.Protocol
         /// <returns>Encoded byte[] representing the collection of messages.</returns>
         public static byte[] EncodeMessageSet(IEnumerable<Message> messages)
         {
-            var messageSet = new WriteByteStream();
-
-            foreach (var message in messages)
-            {
-                var encodedMessage = EncodeMessage(message);
-                messageSet.Pack(((long)0).ToBytes(), encodedMessage.Length.ToBytes(), encodedMessage);
-            }
-
-            return messageSet.Payload();
-        }
-
-        /// <summary>
-        /// Encodes a collection of messages into one byte[].  Encoded in order of list.
-        /// </summary>
-        /// <param name="messages">The collection of messages to encode together.</param>
-        /// <returns>Encoded byte[] representing the collection of messages.</returns>
-        public static byte[] EncodeMessageSet2(IEnumerable<Message> messages)
-        {
             var stream = new KafkaMessagePacker();
 
             foreach (var message in messages)
             {
                 stream.Pack(InitialMessageOffset)
-                    .Pack(EncodeMessage2(message));
+                    .Pack(EncodeMessage(message));
             }
 
             return stream.PayloadNoLength();
@@ -148,30 +129,6 @@ namespace KafkaNet.Protocol
         /// Crc (Int32), MagicByte (Byte), Attribute (Byte), Key (Byte[]), Value (Byte[])
         /// </remarks>
         public static byte[] EncodeMessage(Message message)
-        {
-            var body = new WriteByteStream();
-
-            body.Pack(new[] { message.MagicNumber },
-                      new[] { message.Attribute },
-                      message.Key.ToInt32PrefixedBytes(),
-                      message.Value.ToInt32PrefixedBytes());
-
-            var crc = Crc32Provider.ComputeHash(body.Payload());
-            body.Prepend(crc);
-            
-            return body.Payload();
-        }
-
-        /// <summary>
-        /// Encodes a message object to byte[]
-        /// </summary>
-        /// <param name="message">Message data to encode.</param>
-        /// <returns>Encoded byte[] representation of the message object.</returns>
-        /// <remarks>
-        /// Format:
-        /// Crc (Int32), MagicByte (Byte), Attribute (Byte), Key (Byte[]), Value (Byte[])
-        /// </remarks>
-        public static byte[] EncodeMessage2(Message message)
         {
             return new KafkaMessagePacker()
                 .Pack(message.MagicNumber)

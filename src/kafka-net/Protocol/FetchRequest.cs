@@ -31,51 +31,16 @@ namespace KafkaNet.Protocol
             return EncodeFetchRequest(this);
         }
 
-        public byte[] Encode2()
-        {
-            return EncodeFetchRequest2(this);
-        }
-
         public IEnumerable<FetchResponse> Decode(byte[] payload)
         {
             return DecodeFetchResponse(payload);
         }
 
         private byte[] EncodeFetchRequest(FetchRequest request)
-        {
-            var message = new WriteByteStream();
-            if (request.Fetches == null) request.Fetches = new List<Fetch>();
-
-            message.Pack(EncodeHeader(request));
-
-            var topicGroups = request.Fetches.GroupBy(x => x.Topic).ToList();
-            message.Pack(ReplicaId.ToBytes(), request.MaxWaitTime.ToBytes(), request.MinBytes.ToBytes(), topicGroups.Count.ToBytes());
-
-            foreach (var topicGroup in topicGroups)
-            {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                message.Pack(topicGroup.Key.ToInt16SizedBytes(), partitions.Count.ToBytes());
-
-                foreach (var partition in partitions)
-                {
-                    foreach (var fetch in partition)
-                    {
-                        message.Pack(partition.Key.ToBytes(), fetch.Offset.ToBytes(), fetch.MaxBytes.ToBytes());
-                    }
-                }
-            }
-
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
-        }
-
-
-        private byte[] EncodeFetchRequest2(FetchRequest request)
         {          
             if (request.Fetches == null) request.Fetches = new List<Fetch>();
 
-            var message = EncodeHeader2(request);
+            var message = EncodeHeader(request);
 
             var topicGroups = request.Fetches.GroupBy(x => x.Topic).ToList();
             message.Pack(ReplicaId)

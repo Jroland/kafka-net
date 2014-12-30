@@ -97,7 +97,8 @@ namespace KafkaNet
             try
             {
                 var client = await GetClientAsync();
-                await client.GetStream().WriteAsync(buffer, offset, count, cancellationToken);
+                await client.GetStream().WriteAsync(buffer, offset, count, cancellationToken)
+                    .ConfigureAwait(false);
             }
             catch
             {

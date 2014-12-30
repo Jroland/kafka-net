@@ -22,11 +22,6 @@ namespace KafkaNet.Protocol
             return EncodeMetadataRequest(this);
         }
 
-        public byte[] Encode2()
-        {
-            return EncodeMetadataRequest2(this);
-        }
-
         public IEnumerable<MetadataResponse> Decode(byte[] payload)
         {
             return new[] { DecodeMetadataResponse(payload) };
@@ -40,29 +35,9 @@ namespace KafkaNet.Protocol
         /// <remarks>Format: (MessageSize), Header, ix(hs)</remarks>
         private byte[] EncodeMetadataRequest(MetadataRequest request)
         {
-            var message = new WriteByteStream();
-
             if (request.Topics == null) request.Topics = new List<string>();
 
-            message.Pack(EncodeHeader(request)); //header
-            message.Pack(request.Topics.Count.ToBytes());
-            message.Pack(request.Topics.Select(x => x.ToInt16SizedBytes()).ToArray());
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
-        }
-
-        /// <summary>
-        /// Encode a request for metadata about topic and broker information.
-        /// </summary>
-        /// <param name="request">The MetaDataRequest to encode.</param>
-        /// <returns>Encoded byte[] representing the request.</returns>
-        /// <remarks>Format: (MessageSize), Header, ix(hs)</remarks>
-        private byte[] EncodeMetadataRequest2(MetadataRequest request)
-        {
-            if (request.Topics == null) request.Topics = new List<string>();
-
-            var message = EncodeHeader2(request)
+            var message = EncodeHeader(request)
                 .Pack(request.Topics.Count)
                 .Pack(request.Topics, StringPrefixEncoding.Int16);
 

@@ -18,11 +18,6 @@ namespace KafkaNet.Protocol
             return EncodeOffsetRequest(this);
         }
 
-        public byte[] Encode2()
-        {
-            return EncodeOffsetRequest2(this);
-        }
-
         public IEnumerable<OffsetResponse> Decode(byte[] payload)
         {
             return DecodeOffsetResponse(payload);
@@ -30,37 +25,8 @@ namespace KafkaNet.Protocol
 
         private byte[] EncodeOffsetRequest(OffsetRequest request)
         {
-            var message = new WriteByteStream();
             if (request.Offsets == null) request.Offsets = new List<Offset>();
-
-            message.Pack(EncodeHeader(request));
-
-            var topicGroups = request.Offsets.GroupBy(x => x.Topic).ToList();
-            message.Pack(ReplicaId.ToBytes(), topicGroups.Count.ToBytes());
-
-            foreach (var topicGroup in topicGroups)
-            {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                message.Pack(topicGroup.Key.ToInt16SizedBytes(), partitions.Count.ToBytes());
-
-                foreach (var partition in partitions)
-                {
-                    foreach (var offset in partition)
-                    {
-                        message.Pack(partition.Key.ToBytes(), offset.Time.ToBytes(), offset.MaxOffsets.ToBytes());
-                    }
-                }
-            }
-
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
-        }
-
-        private byte[] EncodeOffsetRequest2(OffsetRequest request)
-        {
-            if (request.Offsets == null) request.Offsets = new List<Offset>();
-            var message = EncodeHeader2(request);
+            var message = EncodeHeader(request);
 
             var topicGroups = request.Offsets.GroupBy(x => x.Topic).ToList();
             message.Pack(ReplicaId)

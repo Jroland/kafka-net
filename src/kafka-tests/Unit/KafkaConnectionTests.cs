@@ -181,9 +181,7 @@ namespace kafka_tests.Unit
 
         private static byte[] CreateCorrelationMessage(int id)
         {
-            var stream = new WriteByteStream();
-            stream.Pack(4.ToBytes(), id.ToBytes());
-            return stream.Payload();
+            return new KafkaMessagePacker().Pack(id).Payload();
         }
     }
 }

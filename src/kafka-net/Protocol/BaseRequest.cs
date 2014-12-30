@@ -32,22 +32,9 @@ namespace KafkaNet.Protocol
         /// <summary>
         /// Encode the common head for kafka request.
         /// </summary>
-        /// <param name="request"></param>
-        /// <returns></returns>
+        /// <returns>KafkaMessagePacker with header populated</returns>
         /// <remarks>Format: (hhihs) </remarks>
-        public static byte[] EncodeHeader<T>(IKafkaRequest<T> request)
-        {
-            var message = new WriteByteStream();
-
-            message.Pack(((Int16)request.ApiKey).ToBytes(),
-                          ApiVersion.ToBytes(),
-                          request.CorrelationId.ToBytes(),
-                          request.ClientId.ToInt16SizedBytes());
-
-            return message.Payload();
-        }
-
-        public static KafkaMessagePacker EncodeHeader2<T>(IKafkaRequest<T> request)
+        public static KafkaMessagePacker EncodeHeader<T>(IKafkaRequest<T> request)
         {
             return new KafkaMessagePacker()
                  .Pack(((Int16)request.ApiKey))
