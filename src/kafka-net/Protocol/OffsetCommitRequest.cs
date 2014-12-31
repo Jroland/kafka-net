@@ -27,56 +27,58 @@ namespace KafkaNet.Protocol
 
         private byte[] EncodeOffsetCommitRequest(OffsetCommitRequest request)
         {
-            var message = new WriteByteStream();
             if (request.OffsetCommits == null) request.OffsetCommits = new List<OffsetCommit>();
 
-            message.Pack(EncodeHeader(request));
-            message.Pack(request.ConsumerGroup.ToInt16SizedBytes());
-
-            var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
-            message.Pack(topicGroups.Count.ToBytes());
-
-            foreach (var topicGroup in topicGroups)
+            using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
             {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                message.Pack(topicGroup.Key.ToInt16SizedBytes(), partitions.Count.ToBytes());
+                var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
+                message.Pack(topicGroups.Count);
 
-                foreach (var partition in partitions)
+                foreach (var topicGroup in topicGroups)
                 {
-                    foreach (var commit in partition)
+                    var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                    message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
+                        .Pack(partitions.Count);
+
+                    foreach (var partition in partitions)
                     {
-                        message.Pack(partition.Key.ToBytes(), commit.Offset.ToBytes(), commit.TimeStamp.ToBytes(), commit.Metadata.ToInt16SizedBytes());
+                        foreach (var commit in partition)
+                        {
+                            message.Pack(partition.Key)
+                            .Pack(commit.Offset)
+                            .Pack(commit.TimeStamp)
+                            .Pack(commit.Metadata, StringPrefixEncoding.Int16);
+                        }
                     }
                 }
+
+                return message.Payload();
             }
-
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
         }
 
         private IEnumerable<OffsetCommitResponse> DecodeOffsetCommitResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
-
-            var correlationId = stream.ReadInt();
-
-            var topicCount = stream.ReadInt();
-            for (int i = 0; i < topicCount; i++)
+            using (var stream = new BigEndianBinaryReader(data))
             {
-                var topic = stream.ReadInt16String();
+                var correlationId = stream.ReadInt32();
 
-                var partitionCount = stream.ReadInt();
-                for (int j = 0; j < partitionCount; j++)
+                var topicCount = stream.ReadInt32();
+                for (int i = 0; i < topicCount; i++)
                 {
-                    var response = new OffsetCommitResponse()
-                    {
-                        Topic = topic,
-                        PartitionId = stream.ReadInt(),
-                        Error = stream.ReadInt16()
-                    };
+                    var topic = stream.ReadInt16String();
 
-                    yield return response;
+                    var partitionCount = stream.ReadInt32();
+                    for (int j = 0; j < partitionCount; j++)
+                    {
+                        var response = new OffsetCommitResponse()
+                        {
+                            Topic = topic,
+                            PartitionId = stream.ReadInt32(),
+                            Error = stream.ReadInt16()
+                        };
+
+                        yield return response;
+                    }
                 }
             }
         }

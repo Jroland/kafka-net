@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Common;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 
@@ -23,7 +22,6 @@ namespace KafkaNet
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
         private readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
-        private readonly IScheduledTimer _topicPartitionQueryTimer;
         private readonly IMetadataQueries _metadataQueries;
 
         private int _disposeCount;
@@ -35,15 +33,7 @@ namespace KafkaNet
             _options = options;
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
             _metadataQueries = new MetadataQueries(_options.Router);
-
-            //TODO this is wrong, we should only query once and then react only to errors or socket exceptions
-            //this timer will periodically look for new partitions and automatically add them to the consuming queue
-            //using the same whitelist logic
-            _topicPartitionQueryTimer = new ScheduledTimer()
-                .Do(RefreshTopicPartitions)
-                .Every(TimeSpan.FromMilliseconds(_options.TopicPartitionQueryTimeMs))
-                .StartingAt(DateTime.Now);
-
+            
             SetOffsetPosition(positions);
         }
 
@@ -59,8 +49,7 @@ namespace KafkaNet
         public IEnumerable<Message> Consume(CancellationToken? cancellationToken = null)
         {
             _options.Log.DebugFormat("Consumer: Beginning consumption of topic: {0}", _options.Topic);
-            _topicPartitionQueryTimer.Begin();
-
+            EnsurePartitionPollingThreads();
             return _fetchResponseQueue.GetConsumingEnumerable(cancellationToken ?? CancellationToken.None);
         }
 
@@ -87,7 +76,7 @@ namespace KafkaNet
             return _partitionOffsetIndex.Select(x => new OffsetPosition { PartitionId = x.Key, Offset = x.Value }).ToList();
         }
 
-        private void RefreshTopicPartitions()
+        private void EnsurePartitionPollingThreads()
         {
             try
             {
@@ -139,16 +128,15 @@ namespace KafkaNet
                             _partitionOffsetIndex.AddOrUpdate(partitionId, i => offset, (i, currentOffset) => { offset = currentOffset; return currentOffset; });
 
                             //build a fetch request for partition at offset
-                            var fetches = new List<Fetch>
-                                    {
-                                        new Fetch
-                                            {
-                                                Topic = topic,
-                                                PartitionId = partitionId,
-                                                Offset = offset,
-                                                MaxBytes = bufferSizeHighWatermark
-                                            }
-                                    };
+                            var fetch = new Fetch
+                            {
+                                Topic = topic,
+                                PartitionId = partitionId,
+                                Offset = offset,
+                                MaxBytes = bufferSizeHighWatermark
+                            };
+
+                            var fetches = new List<Fetch> { fetch };
 
                             var fetchRequest = new FetchRequest
                                 {
@@ -163,6 +151,9 @@ namespace KafkaNet
                             if (responses.Count > 0)
                             {
                                 var response = responses.FirstOrDefault(); //we only asked for one response
+
+                                HandleResponseErrors(fetch, response);
+
                                 if (response != null && response.Messages.Count > 0)
                                 {
                                     foreach (var message in response.Messages)
@@ -188,6 +179,19 @@ namespace KafkaNet
                             bufferSizeHighWatermark = (int)(ex.RequiredBufferSize * _options.FetchBufferMultiplier) + ex.MessageHeaderSize;
                             _options.Log.InfoFormat("Buffer underrun.  Increasing buffer size to: {0}", bufferSizeHighWatermark);
                         }
+                        catch (OffsetOutOfRangeException ex)
+                        {
+                            //TODO this turned out really ugly.  Need to fix this section.
+                            _options.Log.ErrorFormat(ex.Message);
+                            FixOffsetOutOfRangeExceptionAsync(ex.FetchRequest);
+                        }
+                        catch (InvalidMetadataException ex)
+                        {
+                            //refresh our metadata and ensure we are polling the correct partitions
+                            _options.Log.ErrorFormat(ex.Message);
+                            _options.Router.RefreshTopicMetadata(topic);
+                            EnsurePartitionPollingThreads();
+                        }
                         catch (Exception ex)
                         {
                             _options.Log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
@@ -201,6 +205,48 @@ namespace KafkaNet
                     _partitionPollingIndex.TryRemove(partitionId, out tempTask);
                 }
             });
+        }
+
+        private void HandleResponseErrors(Fetch request, FetchResponse response)
+        {
+            switch ((ErrorResponseCode)response.Error)
+            {
+                case ErrorResponseCode.NoError:
+                    return;
+                case ErrorResponseCode.OffsetOutOfRange:
+                    throw new OffsetOutOfRangeException("FetchResponse indicated we requested an offset that is out of range.  Requested Offset:{0}", request.Offset) { FetchRequest = request };
+                case ErrorResponseCode.BrokerNotAvailable:
+                case ErrorResponseCode.ConsumerCoordinatorNotAvailableCode:
+                case ErrorResponseCode.LeaderNotAvailable:
+                case ErrorResponseCode.NotLeaderForPartition:
+                    throw new InvalidMetadataException("FetchResponse indicated we may have mismatched metadata.  ErrorCode:{0}", response.Error) { ErrorCode = response.Error };
+                default:
+                    throw new KafkaApplicationException("FetchResponse returned error condition.  ErrorCode:{0}", response.Error) { ErrorCode = response.Error };
+            }
+        }
+
+        private void FixOffsetOutOfRangeExceptionAsync(Fetch request)
+        {
+            _metadataQueries.GetTopicOffsetAsync(request.Topic)
+                   .ContinueWith(t =>
+                   {
+                       try
+                       {
+                           var offsets = t.Result.FirstOrDefault(x => x.PartitionId == request.PartitionId);
+                           if (offsets == null) return;
+
+                           if (offsets.Offsets.Min() > request.Offset)
+                               SetOffsetPosition(new OffsetPosition(request.PartitionId, offsets.Offsets.Min()));
+
+                           if (offsets.Offsets.Max() < request.Offset)
+                               SetOffsetPosition(new OffsetPosition(request.PartitionId, offsets.Offsets.Max()));
+                       }
+                       catch (Exception ex)
+                       {
+                           _options.Log.ErrorFormat("Failed to fix the offset out of range exception on topic:{0} partition:{1}.  Polling will continue.  Exception={2}",
+                               request.Topic, request.PartitionId, ex);
+                       }
+                   });
         }
 
         public Topic GetTopic(string topic)
@@ -219,7 +265,6 @@ namespace KafkaNet
 
             _options.Log.DebugFormat("Consumer: Disposing...");
             _disposeToken.Cancel();
-            _topicPartitionQueryTimer.End();
 
             //wait for all threads to unwind
             foreach (var task in _partitionPollingIndex.Values.Where(task => task != null))
@@ -227,7 +272,6 @@ namespace KafkaNet
                 task.Wait(TimeSpan.FromSeconds(5));
             }
 
-            using (_topicPartitionQueryTimer)
             using (_metadataQueries)
             using (_disposeToken)
             { }

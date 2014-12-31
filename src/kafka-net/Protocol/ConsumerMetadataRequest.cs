@@ -16,40 +16,39 @@ namespace KafkaNet.Protocol
 
         public byte[] Encode()
         {
-            return EncodeConsumerMetadataResponse(this);
+            return EncodeConsumerMetadataRequest(this);
         }
+
 
         public IEnumerable<ConsumerMetadataResponse> Decode(byte[] payload)
         {
             return DecodeConsumerMetadataResponse(payload);
         }
 
-        private byte[] EncodeConsumerMetadataResponse(ConsumerMetadataRequest request)
+        private byte[] EncodeConsumerMetadataRequest(ConsumerMetadataRequest request)
         {
-            var message = new WriteByteStream();
-
-            message.Pack(EncodeHeader(request));
-            message.Pack(request.ConsumerGroup.ToInt16SizedBytes());
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
+            using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
+            {
+                return message.Payload();
+            }
         }
 
         private IEnumerable<ConsumerMetadataResponse> DecodeConsumerMetadataResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
+            using (var stream = new BigEndianBinaryReader(data))
+            {
+                var correlationId = stream.ReadInt32();
 
-            var correlationId = stream.ReadInt();
+                var response = new ConsumerMetadataResponse
+                    {
+                        Error = stream.ReadInt16(),
+                        CoordinatorId = stream.ReadInt32(),
+                        CoordinatorHost = stream.ReadInt16String(),
+                        CoordinatorPort = stream.ReadInt32()
+                    };
 
-            var response = new ConsumerMetadataResponse
-                {
-                    Error = stream.ReadInt16(),
-                    CoordinatorId = stream.ReadInt(),
-                    CoordinatorHost = stream.ReadInt16String(),
-                    CoordinatorPort = stream.ReadInt()
-                };
-
-            yield return response;
+                yield return response;
+            }
         }
     }
 

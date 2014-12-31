@@ -62,11 +62,11 @@ namespace kafka_tests.Integration
                     var results = consumer.Consume().Take(20).ToList();
 
                     //ensure the produced messages arrived
-                    Console.WriteLine("Message order:  {0}", string.Join(", ", results.Select(x => x.Value.ToUTF8String()).ToList()));
+                    Console.WriteLine("Message order:  {0}", string.Join(", ", results.Select(x => x.Value.ToUtf8String()).ToList()));
 
                     Assert.That(results.Count, Is.EqualTo(20));
-                    Assert.That(results.Select(x => x.Value.ToUTF8String()).ToList(), Is.EqualTo(expected), "Expected the message list in the correct order.");
-                    Assert.That(results.Any(x => x.Key.ToUTF8String() != testId), Is.False);
+                    Assert.That(results.Select(x => x.Value.ToUtf8String()).ToList(), Is.EqualTo(expected), "Expected the message list in the correct order.");
+                    Assert.That(results.Any(x => x.Key.ToUtf8String() != testId), Is.False);
                 }
             }
         }
@@ -93,11 +93,11 @@ namespace kafka_tests.Integration
                     var sentMessages = consumer.Consume().Take(20).ToList();
 
                     //ensure the produced messages arrived
-                    Console.WriteLine("Message order:  {0}", string.Join(", ", sentMessages.Select(x => x.Value.ToUTF8String()).ToList()));
+                    Console.WriteLine("Message order:  {0}", string.Join(", ", sentMessages.Select(x => x.Value.ToUtf8String()).ToList()));
 
                     Assert.That(sentMessages.Count, Is.EqualTo(20));
-                    Assert.That(sentMessages.Select(x => x.Value.ToUTF8String()).ToList(), Is.EqualTo(expected));
-                    Assert.That(sentMessages.Any(x => x.Key.ToUTF8String() != testId), Is.False);
+                    Assert.That(sentMessages.Select(x => x.Value.ToUtf8String()).ToList(), Is.EqualTo(expected));
+                    Assert.That(sentMessages.Any(x => x.Key.ToUtf8String() != testId), Is.False);
 
                     //seek back to initial offset
                     consumer.SetOffsetPosition(offsets);
@@ -108,8 +108,8 @@ namespace kafka_tests.Integration
                     Console.WriteLine("Message order:  {0}", string.Join(", ", resetPositionMessages.Select(x => x.Value).ToList()));
 
                     Assert.That(resetPositionMessages.Count, Is.EqualTo(20));
-                    Assert.That(resetPositionMessages.Select(x => x.Value.ToUTF8String()).ToList(), Is.EqualTo(expected));
-                    Assert.That(resetPositionMessages.Any(x => x.Key.ToUTF8String() != testId), Is.False);
+                    Assert.That(resetPositionMessages.Select(x => x.Value.ToUtf8String()).ToList(), Is.EqualTo(expected));
+                    Assert.That(resetPositionMessages.Any(x => x.Key.ToUtf8String() != testId), Is.False);
                 }
             }
         }
@@ -137,7 +137,7 @@ namespace kafka_tests.Integration
                     //ensure the produced messages arrived
                     for (int i = 0; i < 20; i++)
                     {
-                        Assert.That(results[i].Value.ToUTF8String(), Is.EqualTo(i.ToString()));
+                        Assert.That(results[i].Value.ToUtf8String(), Is.EqualTo(i.ToString()));
                     }
 
                     //the current offsets should be 20 positions higher than start
@@ -170,8 +170,8 @@ namespace kafka_tests.Integration
                     for (int i = 0; i < 20; i++)
                     {
                         var result = consumer.Consume().Take(1).First();
-                        Assert.That(result.Key.ToUTF8String(), Is.EqualTo(testId));
-                        Assert.That(result.Value.ToUTF8String(), Is.EqualTo(i.ToString()));
+                        Assert.That(result.Key.ToUtf8String(), Is.EqualTo(testId));
+                        Assert.That(result.Value.ToUtf8String(), Is.EqualTo(i.ToString()));
                     }
                 }
             }

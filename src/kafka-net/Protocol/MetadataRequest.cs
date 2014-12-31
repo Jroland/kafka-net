@@ -35,16 +35,14 @@ namespace KafkaNet.Protocol
         /// <remarks>Format: (MessageSize), Header, ix(hs)</remarks>
         private byte[] EncodeMetadataRequest(MetadataRequest request)
         {
-            var message = new WriteByteStream();
-
             if (request.Topics == null) request.Topics = new List<string>();
 
-            message.Pack(EncodeHeader(request)); //header
-            message.Pack(request.Topics.Count.ToBytes());
-            message.Pack(request.Topics.Select(x => x.ToInt16SizedBytes()).ToArray());
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
+            using (var message = EncodeHeader(request)
+                .Pack(request.Topics.Count)
+                .Pack(request.Topics, StringPrefixEncoding.Int16))
+            {
+                return message.Payload();
+            }
         }
 
         /// <summary>
@@ -54,23 +52,25 @@ namespace KafkaNet.Protocol
         /// <returns></returns>
         private MetadataResponse DecodeMetadataResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
-            var response = new MetadataResponse();
-            response.CorrelationId = stream.ReadInt();
-
-            var brokerCount = stream.ReadInt();
-            for (var i = 0; i < brokerCount; i++)
+            using (var stream = new BigEndianBinaryReader(data))
             {
-                response.Brokers.Add(Broker.FromStream(stream));
-            }
+                var response = new MetadataResponse();
+                response.CorrelationId = stream.ReadInt32();
 
-            var topicCount = stream.ReadInt();
-            for (var i = 0; i < topicCount; i++)
-            {
-                response.Topics.Add(Topic.FromStream(stream));
-            }
+                var brokerCount = stream.ReadInt32();
+                for (var i = 0; i < brokerCount; i++)
+                {
+                    response.Brokers.Add(Broker.FromStream(stream));
+                }
 
-            return response;
+                var topicCount = stream.ReadInt32();
+                for (var i = 0; i < topicCount; i++)
+                {
+                    response.Topics.Add(Topic.FromStream(stream));
+                }
+
+                return response;
+            }
         }
 
     }

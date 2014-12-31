@@ -1,22 +1,12 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Text;
 using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
     public class ProduceRequest : BaseRequest, IKafkaRequest<ProduceResponse>
     {
-        private Func<MessageCodec, byte[], byte[]> compressionFunction;
-
-        public ProduceRequest(Func<MessageCodec, byte[], byte[]> compression = null)
-        {
-            compressionFunction = compression;    
-        }
-
         /// <summary>
         /// Indicates the type of kafka encoding this request is.
         /// </summary>
@@ -49,8 +39,6 @@ namespace KafkaNet.Protocol
         #region Protocol...
         private byte[] EncodeProduceRequest(ProduceRequest request)
         {
-            var message = new WriteByteStream();
-
             if (request.Payload == null) request.Payload = new List<Payload>();
 
             var groupedPayloads = (from p in request.Payload
@@ -62,34 +50,33 @@ namespace KafkaNet.Protocol
                                    } into tpc
                                    select tpc).ToList();
 
-            message.Pack(EncodeHeader(request)); //header
-            message.Pack(request.Acks.ToBytes(), request.TimeoutMS.ToBytes(), groupedPayloads.Count.ToBytes()); //metadata
-            
-            foreach (var groupedPayload in groupedPayloads)
+            using (var message = EncodeHeader(request)
+                .Pack(request.Acks)
+                .Pack(request.TimeoutMS)
+                .Pack(groupedPayloads.Count))
             {
-                var payloads = groupedPayload.ToList();
-                message.Pack(groupedPayload.Key.Topic.ToInt16SizedBytes(), payloads.Count.ToBytes());
-
-                byte[] messageSet;
-                switch (groupedPayload.Key.Codec)
+                foreach (var groupedPayload in groupedPayloads)
                 {
-                    case MessageCodec.CodecNone:
-                        messageSet = Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages));
-                        break;
-                    case MessageCodec.CodecGzip:
-                        messageSet = Message.EncodeMessageSet(CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages)));
-                        break;
-                    default:
-                        throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
+                    var payloads = groupedPayload.ToList();
+                    message.Pack(groupedPayload.Key.Topic, StringPrefixEncoding.Int16)
+                        .Pack(payloads.Count)
+                        .Pack(groupedPayload.Key.Partition);
+
+                    switch (groupedPayload.Key.Codec)
+                    {
+                        case MessageCodec.CodecNone:
+                            message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
+                            break;
+                        case MessageCodec.CodecGzip:
+                            message.Pack(Message.EncodeMessageSet(CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages))));
+                            break;
+                        default:
+                            throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
+                    }
                 }
 
-                message.Pack(groupedPayload.Key.Partition.ToBytes(), messageSet.Count().ToBytes(), messageSet);
+                return message.Payload();
             }
-            
-            //prepend final messages size and return
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
         }
 
         private IEnumerable<Message> CreateGzipCompressedMessage(IEnumerable<Message> messages)
@@ -97,39 +84,40 @@ namespace KafkaNet.Protocol
             var messageSet = Message.EncodeMessageSet(messages);
 
             var gZipBytes = Compression.Zip(messageSet);
-            
-            var compressedMessage = new Message
-                {
-                    Attribute = (byte) (0x00 | (ProtocolConstants.AttributeCodeMask & (byte) MessageCodec.CodecGzip)),
-                    Value = gZipBytes
-                };
 
-                return new[] { compressedMessage };
+            var compressedMessage = new Message
+            {
+                Attribute = (byte)(0x00 | (ProtocolConstants.AttributeCodeMask & (byte)MessageCodec.CodecGzip)),
+                Value = gZipBytes
+            };
+
+            return new[] { compressedMessage };
         }
 
         private IEnumerable<ProduceResponse> DecodeProduceResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
-
-            var correlationId = stream.ReadInt();
-
-            var topicCount = stream.ReadInt();
-            for (int i = 0; i < topicCount; i++)
+            using (var stream = new BigEndianBinaryReader(data))
             {
-                var topic = stream.ReadInt16String();
+                var correlationId = stream.ReadInt32();
 
-                var partitionCount = stream.ReadInt();
-                for (int j = 0; j < partitionCount; j++)
+                var topicCount = stream.ReadInt32();
+                for (int i = 0; i < topicCount; i++)
                 {
-                    var response = new ProduceResponse()
-                    {
-                        Topic = topic,
-                        PartitionId = stream.ReadInt(),
-                        Error = stream.ReadInt16(),
-                        Offset = stream.ReadLong()
-                    };
+                    var topic = stream.ReadInt16String();
 
-                    yield return response;
+                    var partitionCount = stream.ReadInt32();
+                    for (int j = 0; j < partitionCount; j++)
+                    {
+                        var response = new ProduceResponse()
+                        {
+                            Topic = topic,
+                            PartitionId = stream.ReadInt32(),
+                            Error = stream.ReadInt16(),
+                            Offset = stream.ReadInt64()
+                        };
+
+                        yield return response;
+                    }
                 }
             }
         }

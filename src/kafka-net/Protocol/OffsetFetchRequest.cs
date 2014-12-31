@@ -24,32 +24,32 @@ namespace KafkaNet.Protocol
 
         protected byte[] EncodeOffsetFetchRequest(OffsetFetchRequest request)
         {
-            var message = new WriteByteStream();
             if (request.Topics == null) request.Topics = new List<OffsetFetch>();
 
-            message.Pack(EncodeHeader(request));
-
-            var topicGroups = request.Topics.GroupBy(x => x.Topic).ToList();
-
-            message.Pack(ConsumerGroup.ToInt16SizedBytes(), topicGroups.Count.ToBytes());
-
-            foreach (var topicGroup in topicGroups)
+            using (var message = EncodeHeader(request))
             {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                message.Pack(topicGroup.Key.ToInt16SizedBytes(), partitions.Count.ToBytes());
+                var topicGroups = request.Topics.GroupBy(x => x.Topic).ToList();
 
-                foreach (var partition in partitions)
+                message.Pack(ConsumerGroup, StringPrefixEncoding.Int16)
+                    .Pack(topicGroups.Count);
+
+                foreach (var topicGroup in topicGroups)
                 {
-                    foreach (var offset in partition)
+                    var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                    message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
+                        .Pack(partitions.Count);
+
+                    foreach (var partition in partitions)
                     {
-                        message.Pack(offset.PartitionId.ToBytes());
+                        foreach (var offset in partition)
+                        {
+                            message.Pack(offset.PartitionId);
+                        }
                     }
                 }
+
+                return message.Payload();
             }
-
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
         }
 
         public IEnumerable<OffsetFetchResponse> Decode(byte[] payload)
@@ -60,26 +60,28 @@ namespace KafkaNet.Protocol
 
         protected IEnumerable<OffsetFetchResponse> DecodeOffsetFetchResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
-            var correlationId = stream.ReadInt();
-
-            var topicCount = stream.ReadInt();
-            for (int i = 0; i < topicCount; i++)
+            using (var stream = new BigEndianBinaryReader(data))
             {
-                var topic = stream.ReadInt16String();
+                var correlationId = stream.ReadInt32();
 
-                var partitionCount = stream.ReadInt();
-                for (int j = 0; j < partitionCount; j++)
+                var topicCount = stream.ReadInt32();
+                for (int i = 0; i < topicCount; i++)
                 {
-                    var response = new OffsetFetchResponse()
+                    var topic = stream.ReadInt16String();
+
+                    var partitionCount = stream.ReadInt32();
+                    for (int j = 0; j < partitionCount; j++)
                     {
-                        Topic = topic,
-                        PartitionId = stream.ReadInt(),
-                        Offset = stream.ReadLong(),
-                        MetaData = stream.ReadInt16String(),
-                        Error = stream.ReadInt16()
-                    };
-                    yield return response;
+                        var response = new OffsetFetchResponse()
+                        {
+                            Topic = topic,
+                            PartitionId = stream.ReadInt32(),
+                            Offset = stream.ReadInt64(),
+                            MetaData = stream.ReadInt16String(),
+                            Error = stream.ReadInt16()
+                        };
+                        yield return response;
+                    }
                 }
             }
         }

@@ -10,7 +10,7 @@ namespace KafkaNet.Protocol
         public string Name { get; set; }
         public List<Partition> Partitions { get; set; }
 
-        public static Topic FromStream(ReadByteStream stream)
+        public static Topic FromStream(BigEndianBinaryReader stream)
         {
             var topic = new Topic
                 {
@@ -19,7 +19,7 @@ namespace KafkaNet.Protocol
                     Partitions = new List<Partition>()
                 };
 
-            var numPartitions = stream.ReadInt();
+            var numPartitions = stream.ReadInt32();
             for (int i = 0; i < numPartitions; i++)
             {
                 topic.Partitions.Add(Partition.FromStream(stream));
@@ -52,26 +52,26 @@ namespace KafkaNet.Protocol
         /// </summary>
         public List<int> Isrs { get; set; }
 
-        public static Partition FromStream(ReadByteStream stream)
+        public static Partition FromStream(BigEndianBinaryReader stream)
         {
             var partition = new Partition {
                 ErrorCode = stream.ReadInt16(),
-                PartitionId = stream.ReadInt(),
-                LeaderId = stream.ReadInt(),
+                PartitionId = stream.ReadInt32(),
+                LeaderId = stream.ReadInt32(),
                 Replicas = new List<int>(),
                 Isrs = new List<int>()
             };
 
-            var numReplicas = stream.ReadInt();
+            var numReplicas = stream.ReadInt32();
             for (int i = 0; i < numReplicas; i++)
             {
-                partition.Replicas.Add(stream.ReadInt());
+                partition.Replicas.Add(stream.ReadInt32());
             }
 
-            var numIsr = stream.ReadInt();
+            var numIsr = stream.ReadInt32();
             for (int i = 0; i < numIsr; i++)
             {
-                partition.Isrs.Add(stream.ReadInt());
+                partition.Isrs.Add(stream.ReadInt32());
             }
 
             return partition;

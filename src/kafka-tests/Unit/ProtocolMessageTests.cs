@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using kafka_tests.Helpers;
 using KafkaNet.Common;
 using KafkaNet.Protocol;
@@ -68,6 +69,9 @@ namespace kafka_tests.Unit
             //This message set has a truncated message bytes at the end of it
             var result = Message.DecodeMessageSet(MessageHelper.FetchResponseMaxBytesOverflow).ToList();
 
+            var message = Encoding.UTF8.GetString(result.First().Value);
+            
+            Assert.That(message, Is.EqualTo("test"));
             Assert.That(result.Count, Is.EqualTo(529));
         }
 
@@ -94,7 +98,7 @@ namespace kafka_tests.Unit
         {
             // arrange
             var expectedPayloadBytes = new Byte[] { 1, 2, 3, 4 };
-            var payload = CreatePayload(0, 0, 0, new Byte[] { 0 }, expectedPayloadBytes);
+            var payload = MessageHelper.CreateMessage(0, new Byte[] { 0 }, expectedPayloadBytes);
 
             // act/assert
             var messages = Message.DecodeMessageSet(payload).ToList();
@@ -103,35 +107,6 @@ namespace kafka_tests.Unit
             // assert
             var expectedPayload = new Byte[] { 1, 2, 3, 4 };
             CollectionAssert.AreEqual(expectedPayload, actualPayload);
-        }
-
-        private static Byte[] CreatePayload(Int64 offset, Byte magicByte, Byte attributes, Byte[] key, Byte[] payload)
-        {
-            var crcContentStream = new MemoryStream();
-            var crcContentWriter = new BigEndianBinaryWriter(crcContentStream);
-            crcContentWriter.Write(magicByte);
-            crcContentWriter.Write(attributes);
-            crcContentWriter.Write((Int32)key.Length);
-            crcContentWriter.Write(key);
-            crcContentWriter.Write(payload.Length);
-            crcContentWriter.Write(payload);
-            var crcContentBytes = crcContentStream.ToArray();
-
-            var crc = Crc32Provider.Compute(crcContentBytes);
-
-            var messageStream = new MemoryStream();
-            var messageWriter = new BigEndianBinaryWriter(messageStream);
-            messageWriter.Write(crc);
-            messageWriter.Write(crcContentBytes);
-            var messageBytes = messageStream.ToArray();
-
-            var messageSetStream = new MemoryStream();
-            var messageSetWriter = new BigEndianBinaryWriter(messageSetStream);
-            var messageSize = messageBytes.Length;
-            messageSetWriter.Write(offset);
-            messageSetWriter.Write(messageSize);
-            messageSetWriter.Write(messageBytes);
-            return messageSetStream.ToArray();
         }
     }
 }

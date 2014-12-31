@@ -4,7 +4,6 @@
 // Originally published at http://damieng.com/blog/2006/08/08/calculating_crc32_in_c_and_net
 
 using System;
-using System.Collections.Generic;
 
 namespace KafkaNet.Common
 {
@@ -17,22 +16,31 @@ namespace KafkaNet.Common
     {
         public const UInt32 DefaultPolynomial = 0xedb88320u;
         public const UInt32 DefaultSeed = 0xffffffffu;
-        private static readonly UInt32[] _polynomialTable;
+        private static readonly UInt32[] PolynomialTable;
 
         static Crc32Provider()
         {
-            _polynomialTable = InitializeTable(DefaultPolynomial);
+            PolynomialTable = InitializeTable(DefaultPolynomial);
         }
-
 
         public static UInt32 Compute(byte[] buffer)
         {
-            return ~CalculateHash(_polynomialTable, DefaultSeed, buffer, 0, buffer.Length);
+            return ~CalculateHash(buffer, 0, buffer.Length);
+        }
+
+        public static UInt32 Compute(byte[] buffer, int offset, int length)
+        {
+            return ~CalculateHash(buffer, offset, length);
         }
 
         public static byte[] ComputeHash(byte[] buffer)
         {
             return UInt32ToBigEndianBytes(Compute(buffer));
+        }
+
+        public static byte[] ComputeHash(byte[] buffer, int offset, int length)
+        {
+            return UInt32ToBigEndianBytes(Compute(buffer, offset, length));
         }
 
         private static UInt32[] InitializeTable(UInt32 polynomial)
@@ -52,11 +60,13 @@ namespace KafkaNet.Common
             return createTable;
         }
 
-        private static UInt32 CalculateHash(UInt32[] table, UInt32 seed, IList<byte> buffer, int start, int size)
+        private static UInt32 CalculateHash(byte[] buffer, int offset, int length)
         {
-            var crc = seed;
-            for (var i = start; i < size - start; i++)
-                crc = (crc >> 8) ^ table[buffer[i] ^ crc & 0xff];
+            var crc = DefaultSeed;
+            for (var i = offset; i < length; i++)
+            {
+                crc = (crc >> 8) ^ PolynomialTable[buffer[i] ^ crc & 0xff];
+            }
             return crc;
         }
 

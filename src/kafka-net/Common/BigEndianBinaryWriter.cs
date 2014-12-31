@@ -16,6 +16,7 @@ namespace KafkaNet.Common
     /// <remarks>
     /// BigEndianBinaryWriter code provided by Zoltu
     /// https://github.com/Zoltu/Zoltu.EndianAwareBinaryReaderWriter
+    /// The code was modified to implement Kafka specific byte handling.
     /// </remarks>
     public class BigEndianBinaryWriter : BinaryWriter
     {
@@ -98,6 +99,54 @@ namespace KafkaNet.Common
             WriteBigEndian(bytes);
         }
 
+        public override void Write(string value)
+        {
+            throw new NotSupportedException("Kafka requires specific string length prefix encoding.");
+        }
+
+        public void Write(byte[] value, StringPrefixEncoding encoding)
+        {
+            if (value == null)
+            {
+                Write(-1);
+                return;
+            }
+
+            switch (encoding)
+            {
+                case StringPrefixEncoding.Int16:
+                    Write((Int16)value.Length);
+                    break;
+                case StringPrefixEncoding.Int32:
+                    Write(value.Length);
+                    break;
+            }
+           
+            Write(value);
+        }
+
+        public void Write(string value, StringPrefixEncoding encoding)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                Write(-1);
+                return;
+            }
+
+            switch (encoding)
+            {
+                case StringPrefixEncoding.Int16:
+                    Write((Int16)value.Length);
+                    break;
+                case StringPrefixEncoding.Int32:
+                    Write(value.Length);
+                    break;
+            }
+
+            Write(Encoding.UTF8.GetBytes(value));
+        }
+
+
         private void WriteBigEndian(Byte[] bytes)
         {
             Contract.Requires(bytes != null);
@@ -108,4 +157,11 @@ namespace KafkaNet.Common
             Write(bytes);
         }
     }
+
+    public enum StringPrefixEncoding
+    {
+        Int16,
+        Int32,
+        None
+    };
 }

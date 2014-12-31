@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
@@ -27,6 +28,7 @@ namespace KafkaNet.Protocol
     public class Message
     {
         private const int MessageHeaderSize = 12;
+        private const long InitialMessageOffset = 0;
 
         /// <summary>
         /// Metadata on source offset and partition location for this message.
@@ -66,7 +68,6 @@ namespace KafkaNet.Protocol
             Value = value.ToBytes();
         }
 
-
         /// <summary>
         /// Encodes a collection of messages into one byte[].  Encoded in order of list.
         /// </summary>
@@ -74,15 +75,16 @@ namespace KafkaNet.Protocol
         /// <returns>Encoded byte[] representing the collection of messages.</returns>
         public static byte[] EncodeMessageSet(IEnumerable<Message> messages)
         {
-            var messageSet = new WriteByteStream();
-
-            foreach (var message in messages)
+            using (var stream = new KafkaMessagePacker())
             {
-                var encodedMessage = EncodeMessage(message);
-                messageSet.Pack(((long)0).ToBytes(), encodedMessage.Length.ToBytes(), encodedMessage);
-            }
+                foreach (var message in messages)
+                {
+                    stream.Pack(InitialMessageOffset)
+                        .Pack(EncodeMessage(message));
+                }
 
-            return messageSet.Payload();
+                return stream.PayloadNoLength();
+            }
         }
 
         /// <summary>
@@ -92,29 +94,29 @@ namespace KafkaNet.Protocol
         /// <returns>Enumerable representing stream of messages decoded from byte[]</returns>
         public static IEnumerable<Message> DecodeMessageSet(byte[] messageSet)
         {
-            var stream = new ReadByteStream(messageSet);
-
-
-            while (stream.HasData)
+            using (var stream = new BigEndianBinaryReader(messageSet))
             {
-                //this checks that we have at least the minimum amount of data to retrieve a header
-                if (stream.Available(MessageHeaderSize) == false)
-                    yield break;
-
-                var offset = stream.ReadLong();
-                var messageSize = stream.ReadInt();
-               
-                //if messagessize is greater than payload, our max buffer is insufficient.
-                if ((stream.Payload.Length - MessageHeaderSize) < messageSize)
-                    throw new BufferUnderRunException(MessageHeaderSize, messageSize);
-
-                //if the stream does not have enough left in the payload, we got only a partial message
-                if (stream.Available(messageSize) == false)
-                    yield break;
-
-                foreach (var message in DecodeMessage(offset, stream.ReadBytesFromStream(messageSize)))
+                while (stream.HasData)
                 {
-                    yield return message;
+                    //this checks that we have at least the minimum amount of data to retrieve a header
+                    if (stream.Available(MessageHeaderSize) == false)
+                        yield break;
+
+                    var offset = stream.ReadInt64();
+                    var messageSize = stream.ReadInt32();
+
+                    //if messagessize is greater than the total payload, our max buffer is insufficient.
+                    if ((stream.Length - MessageHeaderSize) < messageSize)
+                        throw new BufferUnderRunException(MessageHeaderSize, messageSize);
+
+                    //if the stream does not have enough left in the payload, we got only a partial message
+                    if (stream.Available(messageSize) == false)
+                        yield break;
+
+                    foreach (var message in DecodeMessage(offset, stream.RawRead(messageSize)))
+                    {
+                        yield return message;
+                    }
                 }
             }
         }
@@ -130,17 +132,14 @@ namespace KafkaNet.Protocol
         /// </remarks>
         public static byte[] EncodeMessage(Message message)
         {
-            var body = new WriteByteStream();
-
-            body.Pack(new[] { message.MagicNumber },
-                      new[] { message.Attribute },
-                      message.Key.ToIntPrefixedBytes(),
-                      message.Value.ToIntPrefixedBytes());
-
-            var crc = Crc32Provider.ComputeHash(body.Payload());
-            body.Prepend(crc);
-
-            return body.Payload();
+            using(var stream = new KafkaMessagePacker())
+            {
+                return stream.Pack(message.MagicNumber)
+                    .Pack(message.Attribute)
+                    .Pack(message.Key)
+                    .Pack(message.Value)
+                    .CrcPayload();
+            }
         }
 
         /// <summary>
@@ -153,36 +152,36 @@ namespace KafkaNet.Protocol
         public static IEnumerable<Message> DecodeMessage(long offset, byte[] payload)
         {
             var crc = payload.Take(4).ToArray();
-            var stream = new ReadByteStream(payload.Skip(4));
-            var hash = Crc32Provider.ComputeHash(stream.Payload);
-            
-            if (crc.SequenceEqual(hash) == false)
-                throw new FailCrcCheckException("Payload did not match CRC validation.");
-
-            var message = new Message
+            using (var stream = new BigEndianBinaryReader(payload.Skip(4)))
             {
-                Meta = new MessageMetadata { Offset = offset },
-                MagicNumber = stream.ReadByte(),
-                Attribute = stream.ReadByte(),
-                Key = stream.ReadIntPrefixedBytes()
-            };
+                if (crc.SequenceEqual(stream.CrcHash()) == false)
+                    throw new FailCrcCheckException("Payload did not match CRC validation.");
 
-            var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
-            switch (codec)
-            {
-                case MessageCodec.CodecNone:
-                    message.Value = stream.ReadIntPrefixedBytes();
-                    yield return message;
-                    break;
-                case MessageCodec.CodecGzip:
-                    var gZipData = stream.ReadIntPrefixedBytes();
-                    foreach (var m in DecodeMessageSet(Compression.Unzip(gZipData)))
-                    {
-                        yield return m;
-                    }
-                    break;
-                default:
-                    throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
+                var message = new Message
+                {
+                    Meta = new MessageMetadata { Offset = offset },
+                    MagicNumber = stream.ReadByte(),
+                    Attribute = stream.ReadByte(),
+                    Key = stream.ReadIntPrefixedBytes()
+                };
+
+                var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
+                switch (codec)
+                {
+                    case MessageCodec.CodecNone:
+                        message.Value = stream.ReadIntPrefixedBytes();
+                        yield return message;
+                        break;
+                    case MessageCodec.CodecGzip:
+                        var gZipData = stream.ReadIntPrefixedBytes();
+                        foreach (var m in DecodeMessageSet(Compression.Unzip(gZipData)))
+                        {
+                            yield return m;
+                        }
+                        break;
+                    default:
+                        throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
+                }
             }
         }
     }

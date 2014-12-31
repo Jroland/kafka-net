@@ -37,61 +37,66 @@ namespace KafkaNet.Protocol
         }
 
         private byte[] EncodeFetchRequest(FetchRequest request)
-        {
-            var message = new WriteByteStream();
+        {          
             if (request.Fetches == null) request.Fetches = new List<Fetch>();
 
-            message.Pack(EncodeHeader(request));
-
-            var topicGroups = request.Fetches.GroupBy(x => x.Topic).ToList();
-            message.Pack(ReplicaId.ToBytes(), request.MaxWaitTime.ToBytes(), request.MinBytes.ToBytes(), topicGroups.Count.ToBytes());
-
-            foreach (var topicGroup in topicGroups)
+            using (var message = EncodeHeader(request))
             {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                message.Pack(topicGroup.Key.ToInt16SizedBytes(), partitions.Count.ToBytes());
+                var topicGroups = request.Fetches.GroupBy(x => x.Topic).ToList();
+                message.Pack(ReplicaId)
+                    .Pack(request.MaxWaitTime)
+                    .Pack(request.MinBytes)
+                    .Pack(topicGroups.Count);
 
-                foreach (var partition in partitions)
+                foreach (var topicGroup in topicGroups)
                 {
-                    foreach (var fetch in partition)
+                    var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                    message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
+                        .Pack(partitions.Count);
+
+                    foreach (var partition in partitions)
                     {
-                        message.Pack(partition.Key.ToBytes(), fetch.Offset.ToBytes(), fetch.MaxBytes.ToBytes());
+                        foreach (var fetch in partition)
+                        {
+                            message.Pack(partition.Key)
+                                .Pack(fetch.Offset)
+                                .Pack(fetch.MaxBytes);
+                        }
                     }
                 }
+
+                return message.Payload();
             }
-
-            message.Prepend(message.Length().ToBytes());
-
-            return message.Payload();
         }
 
         private IEnumerable<FetchResponse> DecodeFetchResponse(byte[] data)
         {
-            var stream = new ReadByteStream(data);
-
-            var correlationId = stream.ReadInt();
-
-            var topicCount = stream.ReadInt();
-            for (int i = 0; i < topicCount; i++)
+            using (var stream = new BigEndianBinaryReader(data))
             {
-                var topic = stream.ReadInt16String();
+                var correlationId = stream.ReadInt32();
 
-                var partitionCount = stream.ReadInt();
-                for (int j = 0; j < partitionCount; j++)
+                var topicCount = stream.ReadInt32();
+                for (int i = 0; i < topicCount; i++)
                 {
-                    var partitionId = stream.ReadInt();
-                    var response = new FetchResponse
+                    var topic = stream.ReadInt16String();
+
+                    var partitionCount = stream.ReadInt32();
+                    for (int j = 0; j < partitionCount; j++)
                     {
-                        Topic = topic,
-                        PartitionId = partitionId,
-                        Error = stream.ReadInt16(),
-                        HighWaterMark = stream.ReadLong()
-                    };
-                    //note: dont use initializer here as it breaks stream position.
-                    response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes())
-                        .Select(x => { x.Meta.PartitionId = partitionId; return x; })
-                        .ToList();
-                    yield return response;
+                        var partitionId = stream.ReadInt32();
+                        var response = new FetchResponse
+                        {
+                            Topic = topic,
+                            PartitionId = partitionId,
+                            Error = stream.ReadInt16(),
+                            HighWaterMark = stream.ReadInt64()
+                        };
+                        //note: dont use initializer here as it breaks stream position.
+                        response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes())
+                            .Select(x => { x.Meta.PartitionId = partitionId; return x; })
+                            .ToList();
+                        yield return response;
+                    }
                 }
             }
         }

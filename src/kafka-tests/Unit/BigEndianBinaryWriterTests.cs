@@ -121,17 +121,31 @@ namespace kafka_tests.Unit
             Assert.That(expectedBytes, Is.EqualTo(actualBytes));
         }
 
+        [Test]
+        [ExpectedException(typeof(NotSupportedException))]
+        public void StringNotSupportedTest()
+        {
+            // arrange
+            var memoryStream = new MemoryStream();
+            var binaryWriter = new BigEndianBinaryWriter(memoryStream);
+            binaryWriter.Write("test");
+        }
+
         [Theory]
-        [TestCase("0000", new Byte[] { 0x04, 0x30, 0x30, 0x30, 0x30 })]
-        [TestCase("€€€€", new Byte[] { 0x0C, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC })]
-        public void StringTests(String value, Byte[] expectedBytes)
+        [TestCase("0000", new Byte[] { 0x00, 0x04, 0x30, 0x30, 0x30, 0x30 }, StringPrefixEncoding.Int16)]
+        [TestCase("0000", new Byte[] { 0x00, 0x00, 0x00, 0x04, 0x30, 0x30, 0x30, 0x30 }, StringPrefixEncoding.Int32)]
+        [TestCase("0000", new Byte[] { 0x30, 0x30, 0x30, 0x30 }, StringPrefixEncoding.None)]
+        [TestCase("€€€€", new Byte[] { 0x00, 0x04, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.Int16)]
+        [TestCase("€€€€", new Byte[] { 0x00, 0x00, 0x00, 0x04, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.Int32)]
+        [TestCase("€€€€", new Byte[] { 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.None)]
+        public void StringTests(String value, Byte[] expectedBytes, StringPrefixEncoding encoding)
         {
             // arrange
             var memoryStream = new MemoryStream();
             var binaryWriter = new BigEndianBinaryWriter(memoryStream);
 
             // act
-            binaryWriter.Write(value);
+            binaryWriter.Write(value, encoding);
 
             // assert
             var actualBytes = memoryStream.ToArray();
