@@ -7,13 +7,6 @@ namespace KafkaNet.Protocol
 {
     public class ProduceRequest : BaseRequest, IKafkaRequest<ProduceResponse>
     {
-        private Func<MessageCodec, byte[], byte[]> compressionFunction;
-
-        public ProduceRequest(Func<MessageCodec, byte[], byte[]> compression = null)
-        {
-            compressionFunction = compression;    
-        }
-
         /// <summary>
         /// Indicates the type of kafka encoding this request is.
         /// </summary>
@@ -57,32 +50,33 @@ namespace KafkaNet.Protocol
                                    } into tpc
                                    select tpc).ToList();
 
-            var message = EncodeHeader(request)
+            using (var message = EncodeHeader(request)
                 .Pack(request.Acks)
                 .Pack(request.TimeoutMS)
-                .Pack(groupedPayloads.Count);
-
-            foreach (var groupedPayload in groupedPayloads)
+                .Pack(groupedPayloads.Count))
             {
-                var payloads = groupedPayload.ToList();
-                message.Pack(groupedPayload.Key.Topic, StringPrefixEncoding.Int16)
-                    .Pack(payloads.Count)
-                    .Pack(groupedPayload.Key.Partition);
-
-                switch (groupedPayload.Key.Codec)
+                foreach (var groupedPayload in groupedPayloads)
                 {
-                    case MessageCodec.CodecNone:
-                        message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
-                        break;
-                    case MessageCodec.CodecGzip:
-                        message.Pack(Message.EncodeMessageSet(CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages))));
-                        break;
-                    default:
-                        throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
-                }
-            }
+                    var payloads = groupedPayload.ToList();
+                    message.Pack(groupedPayload.Key.Topic, StringPrefixEncoding.Int16)
+                        .Pack(payloads.Count)
+                        .Pack(groupedPayload.Key.Partition);
 
-            return message.Payload();
+                    switch (groupedPayload.Key.Codec)
+                    {
+                        case MessageCodec.CodecNone:
+                            message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
+                            break;
+                        case MessageCodec.CodecGzip:
+                            message.Pack(Message.EncodeMessageSet(CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages))));
+                            break;
+                        default:
+                            throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
+                    }
+                }
+
+                return message.Payload();
+            }
         }
 
         private IEnumerable<Message> CreateGzipCompressedMessage(IEnumerable<Message> messages)

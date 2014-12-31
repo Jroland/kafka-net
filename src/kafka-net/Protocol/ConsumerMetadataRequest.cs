@@ -27,10 +27,10 @@ namespace KafkaNet.Protocol
 
         private byte[] EncodeConsumerMetadataRequest(ConsumerMetadataRequest request)
         {
-            var message = EncodeHeader(request)
-                .Pack(request.ConsumerGroup, StringPrefixEncoding.Int16);
-
-            return message.Payload();
+            using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
+            {
+                return message.Payload();
+            }
         }
 
         private IEnumerable<ConsumerMetadataResponse> DecodeConsumerMetadataResponse(byte[] data)

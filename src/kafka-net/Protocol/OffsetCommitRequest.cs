@@ -29,31 +29,31 @@ namespace KafkaNet.Protocol
         {
             if (request.OffsetCommits == null) request.OffsetCommits = new List<OffsetCommit>();
 
-            var message = EncodeHeader(request)
-                .Pack(request.ConsumerGroup, StringPrefixEncoding.Int16);
-
-            var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
-            message.Pack(topicGroups.Count);
-
-            foreach (var topicGroup in topicGroups)
+            using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
             {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
-                    .Pack(partitions.Count);
+                var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
+                message.Pack(topicGroups.Count);
 
-                foreach (var partition in partitions)
+                foreach (var topicGroup in topicGroups)
                 {
-                    foreach (var commit in partition)
+                    var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                    message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
+                        .Pack(partitions.Count);
+
+                    foreach (var partition in partitions)
                     {
-                        message.Pack(partition.Key)
-                        .Pack(commit.Offset)
-                        .Pack(commit.TimeStamp)
-                        .Pack(commit.Metadata, StringPrefixEncoding.Int16);
+                        foreach (var commit in partition)
+                        {
+                            message.Pack(partition.Key)
+                            .Pack(commit.Offset)
+                            .Pack(commit.TimeStamp)
+                            .Pack(commit.Metadata, StringPrefixEncoding.Int16);
+                        }
                     }
                 }
-            }
 
-            return message.Payload();
+                return message.Payload();
+            }
         }
 
         private IEnumerable<OffsetCommitResponse> DecodeOffsetCommitResponse(byte[] data)

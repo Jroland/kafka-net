@@ -26,30 +26,31 @@ namespace KafkaNet.Protocol
         private byte[] EncodeOffsetRequest(OffsetRequest request)
         {
             if (request.Offsets == null) request.Offsets = new List<Offset>();
-            var message = EncodeHeader(request);
-
-            var topicGroups = request.Offsets.GroupBy(x => x.Topic).ToList();
-            message.Pack(ReplicaId)
-                   .Pack(topicGroups.Count);
-
-            foreach (var topicGroup in topicGroups)
+            using (var message = EncodeHeader(request))
             {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
-                    .Pack(partitions.Count);
+                var topicGroups = request.Offsets.GroupBy(x => x.Topic).ToList();
+                message.Pack(ReplicaId)
+                       .Pack(topicGroups.Count);
 
-                foreach (var partition in partitions)
+                foreach (var topicGroup in topicGroups)
                 {
-                    foreach (var offset in partition)
+                    var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                    message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
+                        .Pack(partitions.Count);
+
+                    foreach (var partition in partitions)
                     {
-                        message.Pack(partition.Key)
-                            .Pack(offset.Time)
-                            .Pack(offset.MaxOffsets);
+                        foreach (var offset in partition)
+                        {
+                            message.Pack(partition.Key)
+                                .Pack(offset.Time)
+                                .Pack(offset.MaxOffsets);
+                        }
                     }
                 }
-            }
 
-            return message.Payload();
+                return message.Payload();
+            }
         }
 
 

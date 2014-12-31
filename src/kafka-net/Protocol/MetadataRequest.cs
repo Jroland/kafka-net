@@ -37,11 +37,12 @@ namespace KafkaNet.Protocol
         {
             if (request.Topics == null) request.Topics = new List<string>();
 
-            var message = EncodeHeader(request)
+            using (var message = EncodeHeader(request)
                 .Pack(request.Topics.Count)
-                .Pack(request.Topics, StringPrefixEncoding.Int16);
-
-            return message.Payload();
+                .Pack(request.Topics, StringPrefixEncoding.Int16))
+            {
+                return message.Payload();
+            }
         }
 
         /// <summary>

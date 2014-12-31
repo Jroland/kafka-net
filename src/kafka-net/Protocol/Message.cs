@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
@@ -74,15 +75,16 @@ namespace KafkaNet.Protocol
         /// <returns>Encoded byte[] representing the collection of messages.</returns>
         public static byte[] EncodeMessageSet(IEnumerable<Message> messages)
         {
-            var stream = new KafkaMessagePacker();
-
-            foreach (var message in messages)
+            using (var stream = new KafkaMessagePacker())
             {
-                stream.Pack(InitialMessageOffset)
-                    .Pack(EncodeMessage(message));
-            }
+                foreach (var message in messages)
+                {
+                    stream.Pack(InitialMessageOffset)
+                        .Pack(EncodeMessage(message));
+                }
 
-            return stream.PayloadNoLength();
+                return stream.PayloadNoLength();
+            }
         }
 
         /// <summary>
@@ -130,12 +132,14 @@ namespace KafkaNet.Protocol
         /// </remarks>
         public static byte[] EncodeMessage(Message message)
         {
-            return new KafkaMessagePacker()
-                .Pack(message.MagicNumber)
-                .Pack(message.Attribute)
-                .Pack(message.Key)
-                .Pack(message.Value)
-                .CrcPayload();
+            using(var stream = new KafkaMessagePacker())
+            {
+                return stream.Pack(message.MagicNumber)
+                    .Pack(message.Attribute)
+                    .Pack(message.Key)
+                    .Pack(message.Value)
+                    .CrcPayload();
+            }
         }
 
         /// <summary>
