@@ -1,5 +1,6 @@
 ﻿using System;
 using KafkaNet.Common;
+using KafkaNet.Protocol;
 
 namespace kafka_tests.Helpers
 {
@@ -9,17 +10,18 @@ namespace kafka_tests.Helpers
         
         public static byte[] CreateMessage(long offset, byte[] key, byte[] payload, byte magicByte = 0, byte attributes = 0)
         {
-            var message = new KafkaMessagePacker()
-                .Pack(magicByte)
-                .Pack(attributes)
-                .Pack(key)
-                .Pack(payload)
-                .CrcPayload();
+            var message = Message.EncodeMessage(new Message
+                {
+                    Attribute = attributes,
+                    MagicNumber = magicByte,
+                    Key = key,
+                    Value = payload
+                });
             
             return new KafkaMessagePacker()
                 .Pack(offset)
                 .Pack(message)
-                .Payload();
+                .PayloadNoLength();
         }
     }
 }
