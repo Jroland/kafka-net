@@ -21,7 +21,6 @@ namespace KafkaNet.Common
     {   
         private readonly BlockingCollection<T> _collection;
         private readonly SemaphoreSlim _dataAvailableSemaphore = new SemaphoreSlim(0);
-        private readonly CancellationTokenSource _disposeCancellationTokenSource = new CancellationTokenSource();
 
         public NagleBlockingCollection(int boundedCapacity)
         {
@@ -31,6 +30,14 @@ namespace KafkaNet.Common
         public bool IsComplete { get { return _collection.IsCompleted; } }
 
         public int Count { get { return _collection.Count; } }
+
+        public void AddRange(IEnumerable<T> data)
+        {
+            foreach (var item in data)
+            {
+                Add(item);
+            }
+        }
 
         public void Add(T data)
         {
@@ -47,17 +54,29 @@ namespace KafkaNet.Common
         /// <param name="batchSize">The amount of data to try and pull from the collection.</param>
         /// <param name="timeout">The maximum amount of time to wait until batchsize can be pulled from the collection.</param>
         /// <returns></returns>
-        public async Task<List<T>> TakeBatch(int batchSize, TimeSpan timeout)
+        public Task<List<T>> TakeBatch(int batchSize, TimeSpan timeout)
         {
-            await _dataAvailableSemaphore.WaitAsync(_disposeCancellationTokenSource.Token);
+            return TakeBatch(batchSize, timeout, new CancellationToken());
+        }
+
+        /// <summary>
+        /// Block until data arrives and then attempt to take batchSize amount of data with timeout.
+        /// </summary>
+        /// <param name="batchSize">The amount of data to try and pull from the collection.</param>
+        /// <param name="timeout">The maximum amount of time to wait until batchsize can be pulled from the collection.</param>
+        /// <param name="cancellationToken">Cancellation token to short cut the takebatch command.</param>
+        /// <returns></returns>
+        public async Task<List<T>> TakeBatch(int batchSize, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            await _dataAvailableSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
             var batch = new List<T>();
 
             do
             {
-                batch.Add(_collection.Take(_disposeCancellationTokenSource.Token));
+                batch.Add(_collection.Take(cancellationToken));
                 if (--batchSize == 0) break;
-            } while (await _dataAvailableSemaphore.WaitAsync(timeout, _disposeCancellationTokenSource.Token));
+            } while (await _dataAvailableSemaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false));
 
             return batch;
         }
@@ -66,7 +85,6 @@ namespace KafkaNet.Common
         public void Dispose()
         {
             _collection.CompleteAdding();
-            _disposeCancellationTokenSource.Cancel();
         }
     }
 }
