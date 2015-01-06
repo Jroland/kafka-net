@@ -1,11 +1,8 @@
-﻿using System.Net;
-using KafkaNet;
+﻿using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace kafka_tests.Fakes

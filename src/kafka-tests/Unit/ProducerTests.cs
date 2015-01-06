@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using KafkaNet;
-using KafkaNet.Model;
 using KafkaNet.Protocol;
 using Moq;
+using NSubstitute;
 using NUnit.Framework;
 using Ninject.MockingKernel.Moq;
 using System.Threading;
@@ -132,13 +131,147 @@ namespace kafka_tests.Unit
         }
         #endregion
 
+        #region Nagel Tests...
+        [Test]
+        public async void ProducesShouldBatchAndOnlySendOneProduceRequest()
+        {
+            var routerProxy = new FakeBrokerRouter();
+            var producer = new Producer(routerProxy.Create()) { BatchSize = 2 };
+            using (producer)
+            {
+                var calls = new[]
+                {
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message()}),
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message()})
+                };
+
+                await Task.WhenAll(calls);
+
+                Assert.That(routerProxy.BrokerConn0.ProduceRequestCallCount, Is.EqualTo(1));
+                Assert.That(routerProxy.BrokerConn1.ProduceRequestCallCount, Is.EqualTo(1));
+            }
+
+        }
+
+        [Test]
+        public async void ProducesShouldSendOneProduceRequestForEachBatchSize()
+        {
+            var routerProxy = new FakeBrokerRouter();
+            var producer = new Producer(routerProxy.Create()) { BatchSize = 2 };
+            using (producer)
+            {
+                var calls = new[]
+                {
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message()}),
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message()}),
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message()}),
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message()})
+                };
+
+                await Task.WhenAll(calls);
+
+                Assert.That(routerProxy.BrokerConn0.ProduceRequestCallCount, Is.EqualTo(2));
+                Assert.That(routerProxy.BrokerConn1.ProduceRequestCallCount, Is.EqualTo(2));
+            }
+
+        }
+
+        [Test]
+        [TestCase(1, 2, 100, 100, 2)]
+        [TestCase(1, 1, 100, 200, 2)]
+        [TestCase(1, 1, 100, 100, 1)]
+        public async void ProducesShouldSendExpectedProduceRequestForEachAckLevelAndTimeoutCombination(short ack1, short ack2, int time1, int time2, int expected)
+        {
+            var routerProxy = new FakeBrokerRouter();
+            var producer = new Producer(routerProxy.Create()) { BatchSize = 100 };
+            using (producer)
+            {
+                var calls = new[]
+                {
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message(), new Message()}, acks:ack1, timeout: TimeSpan.FromMilliseconds(time1)),
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message(), new Message()}, acks:ack2, timeout: TimeSpan.FromMilliseconds(time2))
+                };
+
+                await Task.WhenAll(calls);
+
+                Assert.That(routerProxy.BrokerConn0.ProduceRequestCallCount, Is.EqualTo(expected));
+                Assert.That(routerProxy.BrokerConn1.ProduceRequestCallCount, Is.EqualTo(expected));
+            }
+
+        }
+
+        [Test]
+        [TestCase(MessageCodec.CodecGzip, MessageCodec.CodecNone, 2)]
+        [TestCase(MessageCodec.CodecGzip, MessageCodec.CodecGzip, 1)]
+        [TestCase(MessageCodec.CodecNone, MessageCodec.CodecNone, 1)]
+        public async void ProducesShouldSendExpectedProduceRequestForEachCodecCombination(MessageCodec codec1, MessageCodec codec2, int expected)
+        {
+            var routerProxy = new FakeBrokerRouter();
+            var producer = new Producer(routerProxy.Create()) { BatchSize = 100 };
+            using (producer)
+            {
+                var calls = new[]
+                {
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message(), new Message()}, codec: codec1),
+                    producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] {new Message(), new Message()}, codec: codec2)
+                };
+
+                await Task.WhenAll(calls);
+
+                Assert.That(routerProxy.BrokerConn0.ProduceRequestCallCount, Is.EqualTo(expected));
+                Assert.That(routerProxy.BrokerConn1.ProduceRequestCallCount, Is.EqualTo(expected));
+            }
+
+        }
+
+        #endregion
+
+        #region Dispose Tests...
+        [Test]
+        [ExpectedException(typeof(ObjectDisposedException))]
+        public void SendingMessageWhenDisposedShouldThrow()
+        {
+            var router = Substitute.For<IBrokerRouter>();
+            var producer = new Producer(router);
+            using (producer) { }
+            producer.SendMessageAsync("Test", new[] { new Message() });
+        }
+
+        [Test]
+        public void DisposeShouldWaitUntilCollectionEmpty()
+        {
+            var router = Substitute.For<IBrokerRouter>();
+            var producer = new Producer(router) { BatchDelayTime = TimeSpan.FromMilliseconds(100) };
+
+            using (producer)
+            {
+                producer.SendMessageAsync("Test", new[] { new Message() });
+                Assert.That(producer.ActiveCount, Is.EqualTo(1));
+            }
+
+            Assert.That(producer.ActiveCount, Is.EqualTo(0));
+        }
+
+
         [Test]
         public void EnsureProducerDisposesRouter()
         {
-            var router = _kernel.GetMock<IBrokerRouter>();
-            var producer = new Producer(router.Object);
+            var router = Substitute.For<IBrokerRouter>();
+
+            var producer = new Producer(router);
             using (producer) { }
-            router.Verify(x => x.Dispose(), Times.Once());
+            router.Received(1).Dispose();
         }
+
+        [Test]
+        public void ProducerShouldInterruptWaitOnEmptyCollection()
+        {
+            //use the fake to actually cause loop to execute
+            var router = new FakeBrokerRouter().Create();
+
+            var producer = new Producer(router);
+            using (producer) { }
+        }
+        #endregion
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
 using KafkaNet.Protocol;
@@ -13,20 +14,22 @@ namespace KafkaNet
     /// </summary>
     public class Producer : IMetadataQueries
     {
+        private const int MaxDisposeWaitSeconds = 30;
         private const int DefaultAckTimeoutMS = 1000;
         private const int MaximumMessageBuffer = 100;
         private const int DefaultBatchDelayMS = 100;
         private const int DefaultBatchSize = 10;
 
+        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly IBrokerRouter _router;
         private readonly NagleBlockingCollection<TopicMessageBatch> _nagleBlockingCollection;
         private readonly IMetadataQueries _metadataQueries;
+        private readonly Task _postTask;
 
         /// <summary>
         /// Get the current message awaiting send
         /// </summary>
         public int ActiveCount { get { return _nagleBlockingCollection.Count; } }
-
         public int BatchSize { get; set; }
         public TimeSpan BatchDelayTime { get; set; }
 
@@ -53,9 +56,9 @@ namespace KafkaNet
             BatchSize = DefaultBatchSize;
             BatchDelayTime = TimeSpan.FromMilliseconds(DefaultBatchDelayMS);
 
-            Task.Run(async () =>
+            _postTask = Task.Run(async () =>
             {
-                await BatchSendAsync();
+                await BatchSendAsync().ConfigureAwait(false);
                 //TODO add log for ending the sending thread.
             });
         }
@@ -72,8 +75,9 @@ namespace KafkaNet
         public Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1,
             TimeSpan? timeout = null, MessageCodec codec = MessageCodec.CodecNone)
         {
+            if (_disposeToken.IsCancellationRequested) throw new ObjectDisposedException("Cannot send new documents as producer is disposing.");
             if (timeout == null) timeout = TimeSpan.FromMilliseconds(DefaultAckTimeoutMS);
-            
+
             var batch = new TopicMessageBatch
             {
                 Acks = acks,
@@ -99,6 +103,14 @@ namespace KafkaNet
 
         public void Dispose()
         {
+            //block incoming data
+            _disposeToken.Cancel();
+
+            //wait for the collection to drain
+            _postTask.Wait(TimeSpan.FromSeconds(MaxDisposeWaitSeconds));
+
+            //dispose
+            using (_disposeToken)
             using (_nagleBlockingCollection)
             using (_metadataQueries)
             {
@@ -111,9 +123,22 @@ namespace KafkaNet
         {
             while (_nagleBlockingCollection.IsComplete == false || _nagleBlockingCollection.Count > 0)
             {
-                var batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime);
-                //TODO handle exceptions
-                ProduceAndSendBatch(batch);
+                try
+                {
+                    if (_disposeToken.IsCancellationRequested && _nagleBlockingCollection.Count <= 0) break;
+
+                    var batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _disposeToken.Token);
+
+                    ProduceAndSendBatch(batch);
+                }
+                catch (OperationCanceledException ex)
+                {
+                    //TODO log that the operation was canceled, this only happens during a dispose
+                }
+                catch (Exception ex)
+                {
+                    //TODO log the failure and keep going
+                }
             }
         }
 
@@ -156,7 +181,7 @@ namespace KafkaNet
                 //match results to the sent batches and set the response
                 var results = sendTasks.SelectMany(x => x.Result).ToList();
 
-                var batchResponses = batchs.GroupJoin(results, batch => batch.Topic, response => response.Topic,
+                var batchResponses = ackBatch.GroupJoin(results, batch => batch.Topic, response => response.Topic,
                     (batch, responses) => new { Batch = batch, Responses = responses });
 
                 foreach (var batchResponse in batchResponses)
