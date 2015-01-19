@@ -5,6 +5,10 @@
         public string Topic { get; set; }
         public int PartitionId { get; set; }
         public IKafkaConnection Connection { get; set; }
+        public override string ToString()
+        {
+            return string.Format("{0} Topic:{1} PartitionId:{2}", Connection.Endpoint.ServeUri, Topic, PartitionId);
+        }
 
         #region Equals Override...
         protected bool Equals(BrokerRoute other)

@@ -58,7 +58,7 @@ namespace KafkaNet
 
             _postTask = Task.Run(async () =>
             {
-                await BatchSendAsync().ConfigureAwait(false);
+                await BatchSendAsync();
                 //TODO add log for ending the sending thread.
             });
         }
@@ -129,7 +129,7 @@ namespace KafkaNet
 
                     var batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _disposeToken.Token);
 
-                    ProduceAndSendBatch(batch);
+                    await ProduceAndSendBatchAsync(batch, _disposeToken.Token);
                 }
                 catch (OperationCanceledException ex)
                 {
@@ -142,7 +142,7 @@ namespace KafkaNet
             }
         }
 
-        private void ProduceAndSendBatch(List<TopicMessageBatch> batchs)
+        private async Task ProduceAndSendBatchAsync(List<TopicMessageBatch> batchs, CancellationToken cancellationToken)
         {
             //we must send a different produce request for each ack level and timeout combination.
             foreach (var ackBatch in batchs.GroupBy(batch => new { batch.Acks, batch.Timeout }))
@@ -151,12 +151,12 @@ namespace KafkaNet
                                             {
                                                 Topic = topicBatch.Topic,
                                                 Codec = topicBatch.Codec,
-                                                Router = _router.SelectBrokerRoute(topicBatch.Topic, message.Key),
+                                                Route = _router.SelectBrokerRoute(topicBatch.Topic, message.Key),
                                                 Message = message
                                             }))
-                                         .GroupBy(x => new { x.Router, x.Topic, x.Codec });
+                                         .GroupBy(x => new { Route = x.Route, x.Topic, x.Codec });
 
-                var sendTasks = new List<Task<List<ProduceResponse>>>();
+                var sendTasks = new List<BrokerRouteTaskTuple>();
                 foreach (var group in messageByRouter)
                 {
                     var request = new ProduceRequest
@@ -169,24 +169,42 @@ namespace KafkaNet
                                         {
                                             Codec = group.Key.Codec,
                                             Topic = group.Key.Topic,
-                                            Partition = group.Key.Router.PartitionId,
+                                            Partition = group.Key.Route.PartitionId,
                                             Messages = group.Select(x => x.Message).ToList()
                                         }
                                 }
                     };
 
-                    sendTasks.Add(group.Key.Router.Connection.SendAsync(request));
+                    sendTasks.Add(new BrokerRouteTaskTuple { Route = group.Key.Route, Task = group.Key.Route.Connection.SendAsync(request) });
                 }
 
-                //match results to the sent batches and set the response
-                var results = sendTasks.SelectMany(x => x.Result).ToList();
-
-                var batchResponses = ackBatch.GroupJoin(results, batch => batch.Topic, response => response.Topic,
-                    (batch, responses) => new { Batch = batch, Responses = responses });
-
-                foreach (var batchResponse in batchResponses)
+                try
                 {
-                    batchResponse.Batch.Tcs.TrySetResult(batchResponse.Responses.ToList());
+                    await Task.WhenAll(sendTasks.Select(x => x.Task));
+
+                    //match results to the sent batches and set the response
+                    var results = sendTasks.SelectMany(x => x.Task.Result).ToList();
+
+                    var batchResponses = ackBatch.GroupJoin(results, batch => batch.Topic, response => response.Topic,
+                        (batch, responses) => new { Batch = batch, Responses = responses });
+
+                    foreach (var batchResponse in batchResponses)
+                    {
+                        batchResponse.Batch.Tcs.TrySetResult(batchResponse.Responses.ToList());
+                    }
+                }
+                catch
+                {
+                    //if an error occurs here, all we know is some or all of the messages in this ackBatch failed.
+                    var failedTask = sendTasks.FirstOrDefault(t => t.Task.IsFaulted);
+                    if (failedTask != null)
+                    {
+                        foreach (var topicMessageBatch in ackBatch)
+                        {
+                            topicMessageBatch.Tcs.TrySetException(new KafkaApplicationException("An exception occured while executing a send operation against {0}.  Exception:{1}",
+                                failedTask.Route, failedTask.Task.Exception));
+                        }
+                    }
                 }
             }
         }
@@ -206,5 +224,11 @@ namespace KafkaNet
         {
             Tcs = new TaskCompletionSource<List<ProduceResponse>>();
         }
+    }
+
+    class BrokerRouteTaskTuple
+    {
+        public BrokerRoute Route { get; set; }
+        public Task<List<ProduceResponse>> Task { get; set; } 
     }
 }
