@@ -121,7 +121,7 @@ namespace KafkaNet.Common
                     Write(value.Length);
                     break;
             }
-           
+
             Write(value);
         }
 
@@ -129,8 +129,15 @@ namespace KafkaNet.Common
         {
             if (string.IsNullOrEmpty(value))
             {
-                Write(-1);
-                return;
+                switch (encoding)
+                {
+                    case StringPrefixEncoding.Int16:
+                        Write((Int16)(-1));
+                        return;
+                    default:
+                        Write(-1);
+                        return;
+                }
             }
 
             switch (encoding)

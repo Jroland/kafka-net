@@ -56,6 +56,26 @@ namespace kafka_tests.Unit
         }
 
         [Theory]
+        [TestCase((Int16)0, new Byte[] { 0x00, 0x00 })]
+        [TestCase((Int16)1, new Byte[] { 0x00, 0x01 })]
+        [TestCase((Int16)(-1), new Byte[] { 0xFF, 0xFF })]
+        [TestCase(Int16.MinValue, new Byte[] { 0x80, 0x00 })]
+        [TestCase(Int16.MaxValue, new Byte[] { 0x7F, 0xFF })]
+        public void Int16Tests(Int16 number, Byte[] expectedBytes)
+        {
+            // arrange
+            var memoryStream = new MemoryStream();
+            var binaryWriter = new BigEndianBinaryWriter(memoryStream);
+
+            // act
+            binaryWriter.Write(number);
+
+            // assert
+            var actualBytes = memoryStream.ToArray();
+            Assert.That(expectedBytes, Is.EqualTo(actualBytes));
+        }
+
+        [Theory]
         [TestCase((UInt32)0, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((UInt32)1, new Byte[] { 0x00, 0x00, 0x00, 0x01 })]
         [TestCase((UInt32)123456789, new Byte[] { 0x07, 0x5B, 0xCD, 0x15 })]
@@ -138,8 +158,12 @@ namespace kafka_tests.Unit
         [TestCase("€€€€", new Byte[] { 0x00, 0x04, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.Int16)]
         [TestCase("€€€€", new Byte[] { 0x00, 0x00, 0x00, 0x04, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.Int32)]
         [TestCase("€€€€", new Byte[] { 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.None)]
+        [TestCase(null, new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF }, StringPrefixEncoding.None)]
+        [TestCase(null, new Byte[] { 0xFF, 0xFF }, StringPrefixEncoding.Int16)]
+        [TestCase(null, new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF }, StringPrefixEncoding.Int32)]
         public void StringTests(String value, Byte[] expectedBytes, StringPrefixEncoding encoding)
         {
+
             // arrange
             var memoryStream = new MemoryStream();
             var binaryWriter = new BigEndianBinaryWriter(memoryStream);
