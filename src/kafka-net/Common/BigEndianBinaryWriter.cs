@@ -127,7 +127,7 @@ namespace KafkaNet.Common
 
         public void Write(string value, StringPrefixEncoding encoding)
         {
-            if (string.IsNullOrEmpty(value))
+            if (value == null)
             {
                 switch (encoding)
                 {
