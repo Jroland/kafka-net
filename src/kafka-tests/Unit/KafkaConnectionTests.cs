@@ -9,6 +9,7 @@ using Moq;
 using NUnit.Framework;
 using Ninject.MockingKernel.Moq;
 using kafka_tests.Helpers;
+using System.Threading;
 
 namespace kafka_tests.Unit
 {
@@ -123,6 +124,8 @@ namespace kafka_tests.Unit
                 //wait for connection
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
+
+				Thread.Sleep(1);
 
                 //should log a warning and keep going
                 mockLog.Verify(x => x.WarnFormat(It.IsAny<string>(), It.Is<int>(o => o == correlationId)));
