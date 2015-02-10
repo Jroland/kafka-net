@@ -36,7 +36,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public async void ShouldSendAsyncToAllConnectionsEvenWhenExceptionOccursOnOne()
+        public void ShouldSendAsyncToAllConnectionsEvenWhenExceptionOccursOnOne()
         {
             var routerProxy = new FakeBrokerRouter();
             routerProxy.BrokerConn1.ProduceResponseFunction = () => { throw new ApplicationException("some exception"); };
@@ -49,7 +49,11 @@ namespace kafka_tests.Unit
                     new Message("1"), new Message("2")
                 };
 
-                var result = await producer.SendMessageAsync("UnitTest", messages).ConfigureAwait(false);
+				Assert.Throws<KafkaApplicationException>(async () =>
+				{
+					await producer.SendMessageAsync("UnitTest", messages).ConfigureAwait(false);
+				});
+
                 //Assert.That(t.IsFaulted, Is.True);
                 //Assert.That(t.Exception, Is.Not.Null);
                 //Assert.That(t.Exception.ToString(), Is.StringContaining("ApplicationException"));
@@ -75,17 +79,24 @@ namespace kafka_tests.Unit
                     new Message("1"), new Message("2")
                 };
 
-                Task.Factory.StartNew(() =>
-                {
-                    producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
-                    count++;
-                    producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
-                    count++;
-                });
+				Task.Factory.StartNew(async () =>
+				{
+					var t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+					count++;
+					await t;
 
-                TaskTest.WaitFor(() => count > 0);
+					t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+					count++;
+					await t;
+				});
+
+				TaskTest.WaitFor(() => count > 0);
                 Assert.That(count, Is.EqualTo(1), "Only one SendMessageAsync should continue.");
-                Assert.That(producer.ActiveCount, Is.EqualTo(1), "One async call shoud be active.");
+
+				//This doesn't work, because the message has been pulled out of the NagleCollection's internal BlockingCollection (which is where this count comes from)
+				//Instead it's sitting inside a local List<T> inside NagleBlockingCollection.TakeBatch()
+				//Assert.That(producer.ActiveCount, Is.EqualTo(1), "One async call shoud be active."); 
+
                 semaphore.Release();
                 TaskTest.WaitFor(() => count > 1);
                 Assert.That(count, Is.EqualTo(2), "The second SendMessageAsync should continue after semaphore is released.");
@@ -117,7 +128,7 @@ namespace kafka_tests.Unit
         }
         #endregion
 
-        #region Nagel Tests...
+        #region Nagle Tests...
         [Test]
         public async void ProducesShouldBatchAndOnlySendOneProduceRequest()
         {

@@ -27,7 +27,8 @@ namespace KafkaNet
         private readonly Task _postTask;
 
         /// <summary>
-        /// Get the current message awaiting send
+        /// Get the lower bound of the message batches waiting to be sent. 
+		/// Some messages may have been pulled into a send queue already, but not actually sent yet.
         /// </summary>
         public int ActiveCount { get { return _nagleBlockingCollection.Count; } }
         public int BatchSize { get; set; }
