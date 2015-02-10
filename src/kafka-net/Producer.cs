@@ -20,8 +20,8 @@ namespace KafkaNet
         private const int DefaultBatchDelayMS = 100;
         private const int DefaultBatchSize = 10;
 
-        private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
-        private readonly IBrokerRouter _router;
+        private readonly CancellationTokenSource _stopToken = new CancellationTokenSource();
+		private readonly IBrokerRouter _router;
         private readonly NagleBlockingCollection<TopicMessageBatch> _nagleBlockingCollection;
         private readonly IMetadataQueries _metadataQueries;
         private readonly Task _postTask;
@@ -76,7 +76,7 @@ namespace KafkaNet
         public Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1,
             TimeSpan? timeout = null, MessageCodec codec = MessageCodec.CodecNone)
         {
-            if (_disposeToken.IsCancellationRequested) throw new ObjectDisposedException("Cannot send new documents as producer is disposing.");
+            if (_stopToken.IsCancellationRequested) throw new ObjectDisposedException("Cannot send new documents as producer is disposing.");
             if (timeout == null) timeout = TimeSpan.FromMilliseconds(DefaultAckTimeoutMS);
 
             var batch = new TopicMessageBatch
@@ -102,21 +102,34 @@ namespace KafkaNet
             return _metadataQueries.GetTopicOffsetAsync(topic, maxOffsets, time);
         }
 
+		/// <summary>
+		/// Stops the producer from accepting new messages, and optionally waits for in-flight messages to be sent before returning.
+		/// </summary>
+		/// <param name="waitForRequestsToComplete">True to wait for in-flight requests to complete, false otherwise.</param>
+		/// <param name="maxWait">Maximum time to wait for in-flight requests to complete. Has no effect if <c>waitForRequestsToComplete</c> is false</param>
+		public void Stop(bool waitForRequestsToComplete, TimeSpan? maxWait = null)
+		{
+			//block incoming data
+			_stopToken.Cancel();
+			_nagleBlockingCollection.CompleteAdding();
+
+			if (waitForRequestsToComplete)
+			{
+				//wait for the collection to drain
+				_postTask.Wait(maxWait ?? TimeSpan.FromSeconds(MaxDisposeWaitSeconds));
+			}
+		}
+
         public void Dispose()
         {
-            //block incoming data
-            _disposeToken.Cancel();
-
-            //wait for the collection to drain
-            _postTask.Wait(TimeSpan.FromSeconds(MaxDisposeWaitSeconds));
+			//Clients really should call Stop() first, but just in case they didn't...
+			this.Stop(false);
 
             //dispose
-            using (_disposeToken)
+            using (_stopToken)
             using (_nagleBlockingCollection)
             using (_metadataQueries)
             {
-
-
             }
         }
 
@@ -126,11 +139,11 @@ namespace KafkaNet
             {
                 try
                 {
-                    if (_disposeToken.IsCancellationRequested && _nagleBlockingCollection.Count <= 0) break;
+                    if (_stopToken.IsCancellationRequested && _nagleBlockingCollection.Count <= 0) break;
 
-                    var batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _disposeToken.Token);
+                    var batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _stopToken.Token);
 
-                    await ProduceAndSendBatchAsync(batch, _disposeToken.Token);
+                    await ProduceAndSendBatchAsync(batch, _stopToken.Token);
                 }
                 catch (OperationCanceledException ex)
                 {
@@ -210,7 +223,6 @@ namespace KafkaNet
             }
         }
     }
-
 
     class TopicMessageBatch
     {

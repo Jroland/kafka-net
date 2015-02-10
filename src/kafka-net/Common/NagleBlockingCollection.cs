@@ -70,21 +70,27 @@ namespace KafkaNet.Common
         {
             await _dataAvailableSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-            var batch = new List<T>();
+            var batch = new List<T>(Math.Max(_collection.Count, 10));
 
             do
             {
                 batch.Add(_collection.Take(cancellationToken));
                 if (--batchSize == 0) break;
-            } while (await _dataAvailableSemaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false));
+            } while (await _dataAvailableSemaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false) || _collection.Count > 0);
 
             return batch;
         }
 
+		public void CompleteAdding()
+		{
+			_collection.CompleteAdding();
+		}
 
-        public void Dispose()
-        {
-            _collection.CompleteAdding();
-        }
+		public void Dispose()
+		{
+			using (_collection)
+			using (_dataAvailableSemaphore)
+			{ }
+		}
     }
 }

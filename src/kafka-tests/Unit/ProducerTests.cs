@@ -234,19 +234,32 @@ namespace kafka_tests.Unit
             producer.SendMessageAsync("Test", new[] { new Message() });
         }
 
+		[Test]
+		[ExpectedException(typeof(ObjectDisposedException))]
+		public void SendingMessageWhenStoppedShouldThrow()
+		{
+			var router = Substitute.For<IBrokerRouter>();
+			using (var producer = new Producer(router))
+			{
+				producer.Stop(false);
+				producer.SendMessageAsync("Test", new[] { new Message() });
+			}
+		}
+
         [Test]
-        public void DisposeShouldWaitUntilCollectionEmpty()
+        public void StopShouldWaitUntilCollectionEmpty()
         {
             var router = Substitute.For<IBrokerRouter>();
-            var producer = new Producer(router) { BatchDelayTime = TimeSpan.FromMilliseconds(100) };
+			using (var producer = new Producer(router) { BatchDelayTime = TimeSpan.FromMilliseconds(100) })
+			{
 
-            using (producer)
-            {
-                producer.SendMessageAsync("Test", new[] { new Message() });
-                Assert.That(producer.ActiveCount, Is.EqualTo(1));
-            }
+				producer.SendMessageAsync("Test", new[] { new Message() });
+				Assert.That(producer.ActiveCount, Is.EqualTo(1));
 
-            Assert.That(producer.ActiveCount, Is.EqualTo(0));
+				producer.Stop(true);
+
+				Assert.That(producer.ActiveCount, Is.EqualTo(0));
+			}
         }
 
 
