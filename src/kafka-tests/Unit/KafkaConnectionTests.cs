@@ -99,6 +99,9 @@ namespace kafka_tests.Unit
                 TaskTest.WaitFor(() => server.DisconnectionEventCount > 0);
                 Assert.That(server.DisconnectionEventCount, Is.EqualTo(1));
 
+				//Wait a while for the client to notice the disconnect and log
+				Thread.Sleep(15);
+
                 //should log an exception and keep going
                 mockLog.Verify(x => x.ErrorFormat(It.IsAny<string>(), It.IsAny<Exception>()));
 
@@ -125,7 +128,7 @@ namespace kafka_tests.Unit
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
 
-				Thread.Sleep(1);
+				Thread.Sleep(10);
 
                 //should log a warning and keep going
                 mockLog.Verify(x => x.WarnFormat(It.IsAny<string>(), It.Is<int>(o => o == correlationId)));
