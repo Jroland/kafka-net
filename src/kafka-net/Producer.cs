@@ -25,13 +25,14 @@ namespace KafkaNet
         private readonly NagleBlockingCollection<TopicMessageBatch> _nagleBlockingCollection;
         private readonly IMetadataQueries _metadataQueries;
         private readonly Task _postTask;
+		private int _activeCount;
 
         /// <summary>
-        /// Get the lower bound of the message batches waiting to be sent. 
-		/// Some messages may have been pulled into a send queue already, but not actually sent yet.
+        /// Get the number of messages waiting to be sent. 
         /// </summary>
-        public int ActiveCount { get { return _nagleBlockingCollection.Count; } }
-        public int BatchSize { get; set; }
+		public int ActiveCount { get { return Thread.VolatileRead(ref _activeCount); } }
+
+		public int BatchSize { get; set; }
         public TimeSpan BatchDelayTime { get; set; }
 
         /// <summary>
@@ -53,6 +54,7 @@ namespace KafkaNet
             _router = brokerRouter;
             _metadataQueries = new MetadataQueries(_router);
             _nagleBlockingCollection = new NagleBlockingCollection<TopicMessageBatch>(maximumMessageBuffer);
+			_activeCount = 0;
 
             BatchSize = DefaultBatchSize;
             BatchDelayTime = TimeSpan.FromMilliseconds(DefaultBatchDelayMS);
@@ -60,7 +62,7 @@ namespace KafkaNet
             _postTask = Task.Run(async () =>
             {
                 await BatchSendAsync();
-                //TODO add log for ending the sending thread.
+				//TODO add log for ending the sending thread.
             });
         }
 
@@ -89,6 +91,7 @@ namespace KafkaNet
             };
 
             _nagleBlockingCollection.Add(batch);
+			Interlocked.Add(ref _activeCount, batch.Messages.Count);
             return batch.Tcs.Task;
         }
 
@@ -110,8 +113,8 @@ namespace KafkaNet
 		public void Stop(bool waitForRequestsToComplete, TimeSpan? maxWait = null)
 		{
 			//block incoming data
-			_stopToken.Cancel();
 			_nagleBlockingCollection.CompleteAdding();
+			_stopToken.Cancel();
 
 			if (waitForRequestsToComplete)
 			{
@@ -135,19 +138,36 @@ namespace KafkaNet
 
         private async Task BatchSendAsync()
         {
-            while (_nagleBlockingCollection.IsComplete == false || _nagleBlockingCollection.Count > 0)
+            while (!_nagleBlockingCollection.IsCompleted)
             {
                 try
                 {
-                    if (_stopToken.IsCancellationRequested && _nagleBlockingCollection.Count <= 0) break;
+					List<TopicMessageBatch> batch = null;
 
-                    var batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _stopToken.Token);
+					try
+					{
+						batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _stopToken.Token);
+					}
+					catch (OperationCanceledException ex)
+					{
+						//TODO log that the operation was canceled, this only happens during a dispose
+					}
+
+					if (_nagleBlockingCollection.IsAddingCompleted && _nagleBlockingCollection.Count > 0)
+					{
+						//Drain any messages remaining in the queue and add them to the send batch
+						var finalMessages = _nagleBlockingCollection.Drain();
+						if (batch == null)
+						{
+							batch = finalMessages;
+						}
+						else
+						{
+							batch.AddRange(finalMessages);
+						}
+					}
 
                     await ProduceAndSendBatchAsync(batch, _stopToken.Token);
-                }
-                catch (OperationCanceledException ex)
-                {
-                    //TODO log that the operation was canceled, this only happens during a dispose
                 }
                 catch (Exception ex)
                 {
@@ -173,23 +193,24 @@ namespace KafkaNet
                 var sendTasks = new List<BrokerRouteTaskTuple>();
                 foreach (var group in messageByRouter)
                 {
-                    var request = new ProduceRequest
-                    {
-                        Acks = ackBatch.Key.Acks,
-                        TimeoutMS = (int)ackBatch.Key.Timeout.TotalMilliseconds,
-                        Payload = new List<Payload>
-                                {
-                                    new Payload
-                                        {
-                                            Codec = group.Key.Codec,
-                                            Topic = group.Key.Topic,
-                                            Partition = group.Key.Route.PartitionId,
-                                            Messages = group.Select(x => x.Message).ToList()
-                                        }
-                                }
-                    };
+					var payload = new Payload {
+											Codec = group.Key.Codec,
+											Topic = group.Key.Topic,
+											Partition = group.Key.Route.PartitionId,
+											Messages = group.Select(x => x.Message).ToList()
+										};
+
+					var request = new ProduceRequest
+					{
+						Acks = ackBatch.Key.Acks,
+						TimeoutMS = (int)ackBatch.Key.Timeout.TotalMilliseconds,
+						Payload = new List<Payload> { payload }
+					};
 
                     sendTasks.Add(new BrokerRouteTaskTuple { Route = group.Key.Route, Task = group.Key.Route.Connection.SendAsync(request) });
+					
+					var msgCount = request.Payload.Sum(p => p.Messages.Count);
+					Interlocked.Add(ref _activeCount, -1 * msgCount);
                 }
 
                 try

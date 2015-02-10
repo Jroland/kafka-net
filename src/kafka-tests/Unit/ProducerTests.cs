@@ -249,14 +249,14 @@ namespace kafka_tests.Unit
         [Test]
         public void StopShouldWaitUntilCollectionEmpty()
         {
-            var router = Substitute.For<IBrokerRouter>();
-			using (var producer = new Producer(router) { BatchDelayTime = TimeSpan.FromMilliseconds(100) })
-			{
+			var fakeRouter = new FakeBrokerRouter();
 
-				producer.SendMessageAsync("Test", new[] { new Message() });
+			using (var producer = new Producer(fakeRouter.Create()) { BatchDelayTime = TimeSpan.FromMilliseconds(100) })
+			{
+				producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message() });
 				Assert.That(producer.ActiveCount, Is.EqualTo(1));
 
-				producer.Stop(true);
+				producer.Stop(true, TimeSpan.FromSeconds(5));
 
 				Assert.That(producer.ActiveCount, Is.EqualTo(0));
 			}

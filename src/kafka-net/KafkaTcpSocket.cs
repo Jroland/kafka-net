@@ -21,6 +21,7 @@ namespace KafkaNet
 
         private const int DefaultReconnectionTimeout = 500;
         private const int DefaultReconnectionTimeoutMultiplier = 2;
+		private const int MaxReconnectionTimeout = 10000;
 
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly IKafkaLog _log;
@@ -194,6 +195,8 @@ namespace KafkaNet
                 catch
                 {
                     reconnectionDelay = reconnectionDelay * DefaultReconnectionTimeoutMultiplier;
+					reconnectionDelay = Math.Min(reconnectionDelay, MaxReconnectionTimeout);
+
                     _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", _endpoint, reconnectionDelay);
                 }
 
