@@ -44,7 +44,6 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        [ExpectedException(typeof(OperationCanceledException))]
         public async void CollectonTakeShouldBeAbleToCancel()
         {
             var cancelSource = new CancellationTokenSource();
@@ -52,7 +51,11 @@ namespace kafka_tests.Unit
 
             Task.Delay(TimeSpan.FromMilliseconds(100)).ContinueWith(t => cancelSource.Cancel());
 
+			var sw = Stopwatch.StartNew();
             var data = await collection.TakeBatch(10, TimeSpan.FromMilliseconds(500), cancelSource.Token);
+			sw.Stop();
+
+			Assert.That(sw.ElapsedMilliseconds, Is.LessThan(300));
         }
 
         [Test]
@@ -86,16 +89,30 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void DisposingCollectionShouldMarkAsComplete()
+        public void StoppingCollectionShouldMarkAsComplete()
         {
             var collection = new NagleBlockingCollection<int>(100);
             using(collection)
             {
-                Assert.That(collection.IsComplete, Is.False);
-            }
-
-            Assert.That(collection.IsComplete, Is.True);
+                Assert.That(collection.IsCompleted, Is.False);	
+				collection.CompleteAdding();
+				Assert.That(collection.IsCompleted, Is.True);
+			}
         }
+
+		[Test]
+		[ExpectedException(typeof(ObjectDisposedException))]
+		public void StoppingCollectionShouldPreventMoreItemsAdded()
+		{
+			var collection = new NagleBlockingCollection<int>(100);
+			using (collection)
+			{
+				collection.Add(1);
+				Assert.That(collection.Count, Is.EqualTo(1));
+				collection.CompleteAdding();
+				collection.Add(1);
+			}
+		}
 
         [Test]
         [ExpectedException(typeof(ObjectDisposedException))]

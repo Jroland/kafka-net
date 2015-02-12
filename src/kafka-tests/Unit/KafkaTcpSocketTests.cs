@@ -393,7 +393,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void WriteAndReadShouldBeAsyncronous()
+        public void WriteAndReadShouldBeAsynchronous()
         {
             var write = new List<int>();
             var read = new List<int>();
@@ -420,7 +420,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void WriteShouldHandleLargeVolumeSendAsyncronously()
+        public void WriteShouldHandleLargeVolumeSendAsynchronously()
         {
             var write = new List<int>();
             
