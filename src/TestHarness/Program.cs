@@ -30,7 +30,7 @@ namespace TestHarness
 
             //create a producer to send messages with
             var producer = new Producer(new BrokerRouter(options));
-
+           
             Console.WriteLine("Type a message and press enter...");
             while (true)
             {
@@ -39,9 +39,10 @@ namespace TestHarness
                 if (string.IsNullOrEmpty(message))
                 {
                     //special case, send multi messages quickly
-                    for (int i = 0; i < 20; i++)
+                    for (int i = 0; i < 10; i++)
                     {
-                        producer.SendMessageAsync("TestHarness", new[] { new Message(i.ToString()) })
+                        producer
+                            .SendMessageAsync("TestHarness", new[] { new Message(i.ToString()) })
                             .ContinueWith(t =>
                             {
                                 t.Result.ForEach(x => Console.WriteLine("Complete: {0}, Offset: {1}", x.PartitionId, x.Offset));

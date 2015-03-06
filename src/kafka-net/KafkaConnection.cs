@@ -68,7 +68,7 @@ namespace KafkaNet
         /// Provides the unique ip/port endpoint for this connection
         /// </summary>
         public KafkaEndpoint Endpoint { get { return _client.Endpoint; } }
-        
+
         /// <summary>
         /// Send raw byte[] payload to the kafka server with a task indicating upload is complete.
         /// </summary>
@@ -91,16 +91,26 @@ namespace KafkaNet
             //assign unique correlationId
             request.CorrelationId = NextCorrelationId();
 
-            var asyncRequest = new AsyncRequestItem(request.CorrelationId);
+            //if response is expected, register a receive data task and send request
+            if (request.ExpectResponse)
+            {
+                var asyncRequest = new AsyncRequestItem(request.CorrelationId);
 
-            if (_requestIndex.TryAdd(request.CorrelationId, asyncRequest) == false)
-                throw new ApplicationException("Failed to register request for async response.");
+                if (_requestIndex.TryAdd(request.CorrelationId, asyncRequest) == false)
+                    throw new ApplicationException("Failed to register request for async response.");
 
+                await SendAsync(request.Encode()).ConfigureAwait(false);
+
+                var response = await asyncRequest.ReceiveTask.Task.ConfigureAwait(false);
+
+                return request.Decode(response).ToList();
+            }
+
+
+            //no response needed, just send
             await SendAsync(request.Encode()).ConfigureAwait(false);
-
-            var response = await asyncRequest.ReceiveTask.Task.ConfigureAwait(false);
-
-            return request.Decode(response).ToList();
+            //TODO should this return a response of success for request?
+            return new List<T>();
         }
 
         #region Equals Override...
@@ -133,7 +143,7 @@ namespace KafkaNet
                     {
                         //only allow one reader to execute, dump out all other requests
                         if (Interlocked.Increment(ref _ensureOneActiveReader) != 1) return;
-                        
+
                         while (_disposeToken.IsCancellationRequested == false)
                         {
                             try
@@ -148,7 +158,7 @@ namespace KafkaNet
                                 CorrelatePayloadToRequest(message);
                             }
                             catch (Exception ex)
-                            { 
+                            {
                                 //don't record the exception if we are disposing
                                 if (_disposeToken.IsCancellationRequested == false)
                                 {
@@ -163,7 +173,7 @@ namespace KafkaNet
                     {
                         Interlocked.Decrement(ref _ensureOneActiveReader);
                         _log.DebugFormat("Closed down connection to: {0}", _client.Endpoint);
-                    }   
+                    }
                 }, TaskCreationOptions.LongRunning);
         }
 
@@ -230,15 +240,15 @@ namespace KafkaNet
         public void Dispose()
         {
             //skip multiple calls to dispose
-            if (Interlocked.Increment(ref _disposeCount) != 1) return; 
-            
+            if (Interlocked.Increment(ref _disposeCount) != 1) return;
+
             _responseTimeoutTimer.End();
-            
+
             _disposeToken.Cancel();
 
             if (_connectionReadPollingTask != null) _connectionReadPollingTask.Wait(TimeSpan.FromSeconds(1));
-            
-            using(_disposeToken)
+
+            using (_disposeToken)
             {
                 ResponseTimeoutCheck();
             }

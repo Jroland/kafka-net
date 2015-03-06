@@ -11,6 +11,10 @@ namespace KafkaNet
     public interface IKafkaRequest<out T>
     {
         /// <summary>
+        /// Indicates this request should wait for a response from the broker
+        /// </summary>
+        bool ExpectResponse { get; }
+        /// <summary>
         /// Descriptive name used to identify the source of this request. 
         /// </summary>
         string ClientId { get; set; }
