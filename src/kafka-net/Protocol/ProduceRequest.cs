@@ -8,10 +8,13 @@ namespace KafkaNet.Protocol
     public class ProduceRequest : BaseRequest, IKafkaRequest<ProduceResponse>
     {
         /// <summary>
+        /// Provide a hint to the broker call not to expect a response for requests without Acks.
+        /// </summary>
+        public override bool ExpectResponse { get { return Acks > 0; } }
+        /// <summary>
         /// Indicates the type of kafka encoding this request is.
         /// </summary>
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Produce; } }
-
         /// <summary>
         /// Time kafka will wait for requested ack level before returning.
         /// </summary>

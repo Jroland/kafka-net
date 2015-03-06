@@ -30,6 +30,11 @@ namespace KafkaNet.Protocol
         public int CorrelationId { get { return _correlationId; } set { _correlationId = value; } }
 
         /// <summary>
+        /// Flag which tells the broker call to expect a response for this request.
+        /// </summary>
+        public virtual bool ExpectResponse { get { return true; } }
+
+        /// <summary>
         /// Encode the common head for kafka request.
         /// </summary>
         /// <returns>KafkaMessagePacker with header populated</returns>

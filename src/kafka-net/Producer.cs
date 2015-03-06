@@ -32,7 +32,14 @@ namespace KafkaNet
         /// </summary>
 		public int ActiveCount { get { return Thread.VolatileRead(ref _activeCount); } }
 
+        /// <summary>
+        /// The number of message to wait for before sending to kafka.  Will wait <see cref="BatchDelayTime"/> before sending whats received.
+        /// </summary>
 		public int BatchSize { get; set; }
+
+        /// <summary>
+        /// The time to wait for a batch size of <see cref="BatchSize"/> before sending messages to kafka.
+        /// </summary>
         public TimeSpan BatchDelayTime { get; set; }
 
         /// <summary>
@@ -67,7 +74,7 @@ namespace KafkaNet
         }
 
         /// <summary>
-        /// Send a enumerable of message objects to a given topic.
+        /// Send an enumerable of message objects to a given topic.
         /// </summary>
         /// <param name="topic">The name of the kafka topic to send the messages to.</param>
         /// <param name="messages">The enumerable of messages that will be sent to the given topic.</param>
