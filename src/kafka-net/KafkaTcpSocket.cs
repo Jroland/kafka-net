@@ -21,12 +21,15 @@ namespace KafkaNet
 
         private const int DefaultReconnectionTimeout = 500;
         private const int DefaultReconnectionTimeoutMultiplier = 2;
+		private const int MaxReconnectionTimeout = 10000;
 
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly IKafkaLog _log;
         private readonly KafkaEndpoint _endpoint;
 
-        private readonly SemaphoreSlim _clientSemaphoreSlim = new SemaphoreSlim(1, 1);
+		private readonly AsyncLock _clientLock = new AsyncLock();
+		private readonly AsyncLock _writeLock = new AsyncLock();
+		private readonly AsyncLock _readLock = new AsyncLock();
         private TcpClient _client;
         private int _disposeCount;
         private readonly Task _clientConnectingTask = null;
@@ -96,9 +99,11 @@ namespace KafkaNet
         {
             try
             {
-                var client = await GetClientAsync();
-                await client.GetStream().WriteAsync(buffer, offset, count, cancellationToken)
-                    .ConfigureAwait(false);
+                var netStream = await GetStreamAsync();
+				using (await _writeLock.LockAsync(cancellationToken))
+				{
+					await netStream.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+				}
             }
             catch
             {
@@ -109,7 +114,6 @@ namespace KafkaNet
 
         private async Task<byte[]> EnsureReadAsync(int readSize, CancellationToken token)
         {
-            var cancelTaskToken = new CancellationTokenRegistration();
             try
             {
                 var result = new List<byte>();
@@ -120,17 +124,20 @@ namespace KafkaNet
                     readSize = readSize - bytesReceived;
                     var buffer = new byte[readSize];
 
-                    var client = await GetClientAsync();
+					var netStream = await GetStreamAsync();
 
-                    bytesReceived = await client.GetStream().ReadAsync(buffer, 0, readSize, token).WithCancellation(token);
+					using (await _readLock.LockAsync(token))
+					{
+						bytesReceived = await netStream.ReadAsync(buffer, 0, readSize, token).WithCancellation(token);
 
-                    if (bytesReceived <= 0)
-                    {
-                        Disconnect(); //_client is dead, clean it up and throw
-                        throw new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _endpoint));
-                    }
+						if (bytesReceived <= 0)
+						{
+							await Disconnect(); //_client is dead, clean it up and throw
+							throw new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _endpoint));
+						}
 
-                    result.AddRange(buffer.Take(bytesReceived));
+						result.AddRange(buffer.Take(bytesReceived));
+					}
                 }
 
                 return result.ToArray();
@@ -138,29 +145,31 @@ namespace KafkaNet
             catch
             {
                 if (_disposeToken.IsCancellationRequested) throw new ObjectDisposedException("Object is disposing.");
-                //if an exception made us lose a connection throw disconnected exception
+                
+				//if an exception made us lose a connection throw disconnected exception
                 if (_client != null && _client.Connected == false) throw new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _endpoint));
 
                 throw;
             }
-            finally
-            {
-                using (cancelTaskToken) { }
-            }
         }
 
-        private async Task<TcpClient> GetClientAsync()
-        {
-            //using a semaphore here to allow async waiting rather than blocking locks
-            await _clientSemaphoreSlim.WaitAsync(_disposeToken.Token);
-            if (_client == null || _client.Connected == false)
-            {
-                _client = await ReEstablishConnectionAsync();
-            }
-            _clientSemaphoreSlim.Release();
-            return _client;
-        }
+		private async Task<NetworkStream> GetStreamAsync()
+		{
+			//using a semaphore here to allow async waiting rather than blocking locks
+			using (await _clientLock.LockAsync(_disposeToken.Token))
+			{
+				if ((_client == null || _client.Connected == false) && !_disposeToken.IsCancellationRequested)
+				{
+					_client = await ReEstablishConnectionAsync();
+				}
+				return _client.GetStream();
+			}
+		}
 
+		/// <summary>
+		/// (Re-)establish the Kafka server connection.
+		/// Assumes that the caller has already obtained the <c>_clientLock</c>
+		/// </summary>
         private async Task<TcpClient> ReEstablishConnectionAsync()
         {
             var attempts = 1;
@@ -168,7 +177,10 @@ namespace KafkaNet
             _log.WarnFormat("No connection to:{0}.  Attempting to re-connect...", _endpoint);
 
             //clean up existing client
-            Disconnect();
+			using (_client)
+			{
+				_client = null;
+			}
 
             while (_disposeToken.IsCancellationRequested == false)
             {
@@ -176,13 +188,15 @@ namespace KafkaNet
                 {
                     if (OnReconnectionAttempt != null) OnReconnectionAttempt(attempts++);
                     _client = new TcpClient();
-                    await _client.ConnectAsync(_endpoint.Endpoint.Address, _endpoint.Endpoint.Port);
+                    await _client.ConnectAsync(_endpoint.Endpoint.Address, _endpoint.Endpoint.Port).ConfigureAwait(false);
                     _log.WarnFormat("Connection established to:{0}.", _endpoint);
                     return _client;
                 }
                 catch
                 {
                     reconnectionDelay = reconnectionDelay * DefaultReconnectionTimeoutMultiplier;
+					reconnectionDelay = Math.Min(reconnectionDelay, MaxReconnectionTimeout);
+
                     _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", _endpoint, reconnectionDelay);
                 }
 
@@ -192,10 +206,14 @@ namespace KafkaNet
             return _client;
         }
 
-        private void Disconnect()
-        {
-            using (_client) { _client = null; }
-        }
+		private async Task Disconnect()
+		{
+			using (await _clientLock.LockAsync(_disposeToken.Token))
+			using (_client)
+			{
+				_client = null;
+			}
+		}
 
         public void Dispose()
         {
@@ -204,12 +222,14 @@ namespace KafkaNet
 
             using (_disposeToken)
             using (_client)
-            {
-                if (_clientConnectingTask != null)
-                {
-                    _clientConnectingTask.Wait(TimeSpan.FromSeconds(5));
-                }
-            }
+			using (_readLock)
+			using (_writeLock)
+			{
+				if (_clientConnectingTask != null)
+				{
+					_clientConnectingTask.Wait(TimeSpan.FromSeconds(5));
+				}
+			}
         }
     }
 }

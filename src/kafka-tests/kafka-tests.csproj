@@ -60,6 +60,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Fakes\FakeBrokerRouter.cs" />
     <Compile Include="Fakes\BrokerRouterProxy.cs" />
     <Compile Include="Fakes\FakeKafkaConnection.cs" />
     <Compile Include="Fakes\FakeTcpServer.cs" />
@@ -70,6 +71,7 @@
     <Compile Include="Integration\KafkaMetadataProviderUnitTests.cs" />
     <Compile Include="Integration\OffsetManagementTests.cs" />
     <Compile Include="Integration\ProducerConsumerIntegrationTests.cs" />
+    <Compile Include="Integration\ProducerIntegrationTests.cs" />
     <Compile Include="Unit\BigEndianBinaryReaderTests.cs" />
     <Compile Include="Unit\BigEndianBinaryWriterTests.cs" />
     <Compile Include="Unit\FakeTcpServerTests.cs" />
@@ -83,6 +85,7 @@
     <Compile Include="Unit\MetadataQueriesTests.cs" />
     <Compile Include="Unit\ConsumerTests.cs" />
     <Compile Include="Unit\DefaultPartitionSelectorTests.cs" />
+    <Compile Include="Unit\NagleBlockingCollectionTests.cs" />
     <Compile Include="Unit\ProducerTests.cs" />
     <Compile Include="Unit\ProtocolBaseRequestTests.cs" />
     <Compile Include="Unit\ProtocolMessageTests.cs" />

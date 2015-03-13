@@ -34,10 +34,10 @@ namespace KafkaNet.Common
         {
             if (value == null) return (-1).ToBytes();
 
-			return value.Length.ToBytes()
-						.Concat(value)
-						.ToArray();
-		}
+            return value.Length.ToBytes()
+                        .Concat(value)
+                        .ToArray();
+        }
 
         public static string ToUtf8String(this byte[] value)
         {
@@ -45,7 +45,7 @@ namespace KafkaNet.Common
 
             return Encoding.UTF8.GetString(value);
         }
-        
+
         public static byte[] ToBytes(this string value)
         {
             if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
@@ -117,7 +117,6 @@ namespace KafkaNet.Common
             return await task;
         }
 
-
         /// <summary>
         /// Splits a collection into given batch sizes and returns as an enumerable of batches.
         /// </summary>
@@ -136,6 +135,5 @@ namespace KafkaNet.Common
             if (nextbatch.Count > 0)
                 yield return nextbatch;
         }
-
     }
 }
