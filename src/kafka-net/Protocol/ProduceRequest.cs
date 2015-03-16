@@ -27,7 +27,7 @@ namespace KafkaNet.Protocol
         /// Collection of payloads to post to kafka
         /// </summary>
         public List<Payload> Payload = new List<Payload>();
-       
+
 
         public byte[] Encode()
         {
@@ -138,9 +138,37 @@ namespace KafkaNet.Protocol
         /// </summary>
         public int PartitionId { get; set; }
         /// <summary>
-        /// The offset number to commit as completed.
+        /// Error response code.  0 is success.
         /// </summary>
         public Int16 Error { get; set; }
+        /// <summary>
+        /// The offset number to commit as completed.
+        /// </summary>
         public long Offset { get; set; }
+
+        public override bool Equals(object obj)
+        {
+            if (ReferenceEquals(null, obj)) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != this.GetType()) return false;
+            return Equals((ProduceResponse)obj);
+        }
+
+        protected bool Equals(ProduceResponse other)
+        {
+            return string.Equals(Topic, other.Topic) && PartitionId == other.PartitionId && Error == other.Error && Offset == other.Offset;
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hashCode = (Topic != null ? Topic.GetHashCode() : 0);
+                hashCode = (hashCode * 397) ^ PartitionId;
+                hashCode = (hashCode * 397) ^ Error.GetHashCode();
+                hashCode = (hashCode * 397) ^ Offset.GetHashCode();
+                return hashCode;
+            }
+        }
     }
 }

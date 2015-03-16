@@ -22,7 +22,7 @@ namespace kafka_tests.Integration
         public void SendAsyncShouldHandleHighVolumeOfMessages(int amount, int maxAsync)
         {
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
-            using (var producer = new Producer(router, maxAsync))
+            using (var producer = new Producer(router, maxAsync) { BatchSize = amount / 2 })
             {
                 var tasks = new Task<List<ProduceResponse>>[amount];
 
