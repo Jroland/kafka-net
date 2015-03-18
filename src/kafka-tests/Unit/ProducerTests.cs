@@ -49,10 +49,10 @@ namespace kafka_tests.Unit
                     new Message("1"), new Message("2")
                 };
 
-				Assert.Throws<KafkaApplicationException>(async () =>
-				{
-					await producer.SendMessageAsync("UnitTest", messages).ConfigureAwait(false);
-				});
+                Assert.Throws<KafkaApplicationException>(async () =>
+                {
+                    await producer.SendMessageAsync("UnitTest", messages).ConfigureAwait(false);
+                });
 
                 //Assert.That(t.IsFaulted, Is.True);
                 //Assert.That(t.Exception, Is.Not.Null);
@@ -72,30 +72,26 @@ namespace kafka_tests.Unit
             routerProxy.BrokerConn0.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
 
             var router = routerProxy.Create();
-            using (var producer = new Producer(router, 1))
+            using (var producer = new Producer(router, 1) { BatchSize = 1 })
             {
                 var messages = new List<Message>
                 {
-                    new Message("1"), new Message("2")
+                    new Message("1")
                 };
 
-				Task.Factory.StartNew(async () =>
-				{
-					var t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
-					count++;
-					await t;
+                Task.Factory.StartNew(async () =>
+                {
+                    var t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+                    Interlocked.Increment(ref count);
+                    await t;
 
-					t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
-					count++;
-					await t;
-				});
+                    t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+                    Interlocked.Increment(ref count);
+                    await t;
+                });
 
-				TaskTest.WaitFor(() => count > 0);
+                TaskTest.WaitFor(() => count > 0);
                 Assert.That(count, Is.EqualTo(1), "Only one SendMessageAsync should continue.");
-
-				//This doesn't work, because the message has been pulled out of the NagleCollection's internal BlockingCollection (which is where this count comes from)
-				//Instead it's sitting inside a local List<T> inside NagleBlockingCollection.TakeBatch()
-				//Assert.That(producer.ActiveCount, Is.EqualTo(1), "One async call shoud be active."); 
 
                 semaphore.Release();
                 TaskTest.WaitFor(() => count > 1);
@@ -226,40 +222,41 @@ namespace kafka_tests.Unit
         #region Dispose Tests...
         [Test]
         [ExpectedException(typeof(ObjectDisposedException))]
-        public void SendingMessageWhenDisposedShouldThrow()
+        public async void SendingMessageWhenDisposedShouldThrow()
         {
             var router = Substitute.For<IBrokerRouter>();
             var producer = new Producer(router);
             using (producer) { }
-            producer.SendMessageAsync("Test", new[] { new Message() });
+            await producer.SendMessageAsync("Test", new[] {new Message()});
         }
 
-		[Test]
-		[ExpectedException(typeof(ObjectDisposedException))]
-		public void SendingMessageWhenStoppedShouldThrow()
-		{
-			var router = Substitute.For<IBrokerRouter>();
-			using (var producer = new Producer(router))
-			{
-				producer.Stop(false);
-				producer.SendMessageAsync("Test", new[] { new Message() });
-			}
-		}
+        [Test]
+        [ExpectedException(typeof(ObjectDisposedException))]
+        public async void SendingMessageWhenStoppedShouldThrow()
+        {
+            var router = Substitute.For<IBrokerRouter>();
+            using (var producer = new Producer(router))
+            {
+                producer.Stop(false);
+                await producer.SendMessageAsync("Test", new[] { new Message() });
+            }
+        }
 
         [Test]
-        public void StopShouldWaitUntilCollectionEmpty()
+        public async void StopShouldWaitUntilCollectionEmpty()
         {
-			var fakeRouter = new FakeBrokerRouter();
+            var fakeRouter = new FakeBrokerRouter();
 
-			using (var producer = new Producer(fakeRouter.Create()) { BatchDelayTime = TimeSpan.FromMilliseconds(100) })
-			{
-				producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message() });
-				Assert.That(producer.ActiveCount, Is.EqualTo(1));
+            using (var producer = new Producer(fakeRouter.Create()) { BatchDelayTime = TimeSpan.FromMilliseconds(500) })
+            {
+                var sendTask = producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message() });
+                Assert.That(producer.ActiveCount, Is.EqualTo(1));
 
-				producer.Stop(true, TimeSpan.FromSeconds(5));
+                producer.Stop(true, TimeSpan.FromSeconds(5));
 
-				Assert.That(producer.ActiveCount, Is.EqualTo(0));
-			}
+                await sendTask;
+                Assert.That(producer.ActiveCount, Is.EqualTo(0));
+            }
         }
 
 
