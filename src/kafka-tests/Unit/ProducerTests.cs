@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Remoting.Channels;
 using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Protocol;
+using Moq;
 using NSubstitute;
 using NUnit.Framework;
 using System.Threading;
@@ -54,11 +56,35 @@ namespace kafka_tests.Unit
                     await producer.SendMessageAsync("UnitTest", messages).ConfigureAwait(false);
                 });
 
-                //Assert.That(t.IsFaulted, Is.True);
-                //Assert.That(t.Exception, Is.Not.Null);
-                //Assert.That(t.Exception.ToString(), Is.StringContaining("ApplicationException"));
                 Assert.That(routerProxy.BrokerConn0.ProduceRequestCallCount, Is.EqualTo(1));
                 Assert.That(routerProxy.BrokerConn1.ProduceRequestCallCount, Is.EqualTo(1));
+            }
+        }
+
+        [Test]
+        public void ProducerShouldReportCorrectAmountOfAsyncRequests()
+        {
+            var semaphore = new SemaphoreSlim(0);
+            var routerProxy = new FakeBrokerRouter();
+            //block the second call returning from send message async
+            routerProxy.BrokerConn0.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
+
+            var router = routerProxy.Create();
+            using (var producer = new Producer(router, maximumAsyncRequests: 1) { BatchSize = 1 })
+            {
+                var messages = new[] { new Message("1") };
+
+                Assert.That(producer.AsyncCount, Is.EqualTo(0));
+
+                var sendTask = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+                
+                TaskTest.WaitFor(() => producer.AsyncCount > 0);
+                Assert.That(producer.AsyncCount, Is.EqualTo(1), "One async operation should be sending.");
+
+                semaphore.Release();
+                sendTask.Wait(TimeSpan.FromMilliseconds(500));
+
+                Assert.That(producer.AsyncCount, Is.EqualTo(0), "Async should have completed.");
             }
         }
 
@@ -72,12 +98,9 @@ namespace kafka_tests.Unit
             routerProxy.BrokerConn0.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
 
             var router = routerProxy.Create();
-            using (var producer = new Producer(router, 1) { BatchSize = 1 })
+            using (var producer = new Producer(router, maximumAsyncRequests: 1) { BatchSize = 1 })
             {
-                var messages = new List<Message>
-                {
-                    new Message("1")
-                };
+                var messages = new[] { new Message("1") };
 
                 Task.Factory.StartNew(async () =>
                 {
@@ -90,6 +113,7 @@ namespace kafka_tests.Unit
                     await t;
                 });
 
+                TaskTest.WaitFor(() => producer.AsyncCount > 0);
                 TaskTest.WaitFor(() => count > 0);
                 Assert.That(count, Is.EqualTo(1), "Only one SendMessageAsync should continue.");
 
@@ -217,6 +241,55 @@ namespace kafka_tests.Unit
 
         }
 
+        [Test]
+        public void ProducerShouldAllowFullBatchSizeOfMessagesToQueue()
+        {
+            var routerProxy = new FakeBrokerRouter();
+            var producer = new Producer(routerProxy.Create()) { BatchSize = 1001, BatchDelayTime = TimeSpan.FromSeconds(10) };
+            using (producer)
+            {
+                var senderTask = Task.Factory.StartNew(() =>
+                {
+                    for (int i = 0; i < 1000; i++)
+                    {
+                        producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message(i.ToString()) });
+                    }
+                });
+
+                senderTask.Wait();
+
+                Assert.That(senderTask.IsCompleted);
+                Assert.That(producer.BufferCount, Is.EqualTo(1000));
+            }
+        }
+
+        [Test]
+        public void ProducerShouldBlockWhenFullBufferReached()
+        {
+            int count = 0;
+            //with max buffer set below the batch size, this should cause the producer to block until batch delay time.
+            var routerProxy = new FakeBrokerRouter();
+            var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 1) { BatchSize = 10, BatchDelayTime = TimeSpan.FromMilliseconds(500) };
+            using (producer)
+            {
+                var senderTask = Task.Factory.StartNew(() =>
+                {
+                    for (int i = 0; i < 2; i++)
+                    {
+                        producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message(i.ToString()) });
+                        Interlocked.Increment(ref count);
+                    }
+                });
+
+                TaskTest.WaitFor(() => count > 0);
+                Assert.That(producer.BufferCount, Is.EqualTo(1));
+
+                senderTask.Wait();
+
+                Assert.That(senderTask.IsCompleted);
+                Assert.That(producer.BufferCount, Is.EqualTo(1), "One message should be left in the buffer.");
+            }
+        }
         #endregion
 
         #region Dispose Tests...
@@ -227,7 +300,7 @@ namespace kafka_tests.Unit
             var router = Substitute.For<IBrokerRouter>();
             var producer = new Producer(router);
             using (producer) { }
-            await producer.SendMessageAsync("Test", new[] {new Message()});
+            await producer.SendMessageAsync("Test", new[] { new Message() });
         }
 
         [Test]
@@ -250,12 +323,13 @@ namespace kafka_tests.Unit
             using (var producer = new Producer(fakeRouter.Create()) { BatchDelayTime = TimeSpan.FromMilliseconds(500) })
             {
                 var sendTask = producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message() });
-                Assert.That(producer.ActiveCount, Is.EqualTo(1));
+                Assert.That(producer.BufferCount, Is.EqualTo(1));
 
                 producer.Stop(true, TimeSpan.FromSeconds(5));
 
                 await sendTask;
-                Assert.That(producer.ActiveCount, Is.EqualTo(0));
+                Assert.That(producer.BufferCount, Is.EqualTo(0));
+                Assert.That(sendTask.IsCompleted, Is.True);
             }
         }
 

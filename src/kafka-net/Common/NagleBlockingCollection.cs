@@ -18,19 +18,23 @@ namespace KafkaNet.Common
     /// collection of send items can be batched together before sending.
     /// </summary>
     public class NagleBlockingCollection<T> : IDisposable
-    {   
+    {
+        private readonly int _boundedCapacity;
         private readonly BlockingCollection<T> _collection;
         private readonly SemaphoreSlim _dataAvailableSemaphore = new SemaphoreSlim(0);
+        private readonly SemaphoreSlim _boundedCapacitySemaphore;
 
         public NagleBlockingCollection(int boundedCapacity)
         {
-            _collection = new BlockingCollection<T>(boundedCapacity);
+            _boundedCapacity = boundedCapacity;
+            _collection = new BlockingCollection<T>();
+            _boundedCapacitySemaphore = new SemaphoreSlim(boundedCapacity, boundedCapacity);
         }
 
-		public bool IsAddingCompleted { get { return _collection.IsAddingCompleted; } }
-		public bool IsCompleted { get { return _collection.IsCompleted; } }
+        public bool IsAddingCompleted { get { return _collection.IsAddingCompleted; } }
+        public bool IsCompleted { get { return _collection.IsCompleted; } }
 
-        public int Count { get { return _collection.Count; } }
+        public int Count { get { return _boundedCapacity - _boundedCapacitySemaphore.CurrentCount; } }
 
         public void AddRange(IEnumerable<T> data)
         {
@@ -42,11 +46,11 @@ namespace KafkaNet.Common
 
         public void Add(T data)
         {
-			if (_collection.IsAddingCompleted)
-			{
-				throw new ObjectDisposedException("NagleBlockingCollection is currently being disposed.  Cannot add documents.");
-			}
-
+            if (_collection.IsAddingCompleted)
+            {
+                throw new ObjectDisposedException("NagleBlockingCollection is currently being disposed.  Cannot add documents.");
+            }
+            _boundedCapacitySemaphore.Wait();
             _collection.Add(data);
             _dataAvailableSemaphore.Release();
         }
@@ -71,55 +75,57 @@ namespace KafkaNet.Common
         /// <returns></returns>
         public async Task<List<T>> TakeBatch(int batchSize, TimeSpan timeout, CancellationToken cancellationToken)
         {
-			var batch = new List<T>(Math.Max(_collection.Count, 10));
-			try
-			{
-				await _dataAvailableSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+            var batch = new List<T>(Math.Max(_collection.Count, 10));
+            try
+            {
+                await _dataAvailableSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-				do
-				{
-					batch.Add(_collection.Take(cancellationToken));
-					if (--batchSize == 0) break;
-				} while (await _dataAvailableSemaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false) || _collection.Count > 0);
-			}
-			catch (OperationCanceledException)
-			{
-				//bury these so that we can return whatever messages we've already dequeued, instead of throwing them away
-			}
+                do
+                {
+                    batch.Add(_collection.Take(cancellationToken));
+                    if (--batchSize == 0) break;
+                } while (await _dataAvailableSemaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false) || _collection.Count > 0);
+            }
+            catch (OperationCanceledException)
+            {
+                //bury these so that we can return whatever messages we've already dequeued, instead of throwing them away
+            }
+
+            if (batch.Count > 0) _boundedCapacitySemaphore.Release(batch.Count);
             return batch;
         }
 
-		/// <summary>
-		/// Immediately drains and returns any remaining messages in the queue 
-		/// </summary>
-		/// <returns></returns>
-		public List<T> Drain()
-		{
-			if (!_collection.IsAddingCompleted)
-			{
-				throw new InvalidOperationException("Should not try to drain the collection unless adding is complete");
-			}
+        /// <summary>
+        /// Immediately drains and returns any remaining messages in the queue 
+        /// </summary>
+        /// <returns></returns>
+        public List<T> Drain()
+        {
+            if (!_collection.IsAddingCompleted)
+            {
+                throw new InvalidOperationException("Should not try to drain the collection unless adding is complete");
+            }
 
-			T msg;
-			var batch = new List<T>(_collection.Count);
-			while (_collection.TryTake(out msg))
-			{
-				batch.Add(msg);
-			}
+            T msg;
+            var batch = new List<T>(_collection.Count);
+            while (_collection.TryTake(out msg))
+            {
+                batch.Add(msg);
+            }
 
-			return batch;
-		}
+            return batch;
+        }
 
-		public void CompleteAdding()
-		{
-			_collection.CompleteAdding();
-		}
+        public void CompleteAdding()
+        {
+            _collection.CompleteAdding();
+        }
 
-		public void Dispose()
-		{
-			using (_collection)
-			using (_dataAvailableSemaphore)
-			{ }
-		}
+        public void Dispose()
+        {
+            using (_collection)
+            using (_dataAvailableSemaphore)
+            { }
+        }
     }
 }

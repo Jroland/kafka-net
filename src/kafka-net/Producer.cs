@@ -17,19 +17,27 @@ namespace KafkaNet
         private const int MaxDisposeWaitSeconds = 30;
         private const int DefaultAckTimeoutMS = 1000;
         private const int MaximumAsyncRequests = 100;
+        private const int MaximumMessageBuffer = 1000;
         private const int DefaultBatchDelayMS = 100;
         private const int DefaultBatchSize = 100;
 
         private readonly CancellationTokenSource _stopToken = new CancellationTokenSource();
         private readonly IBrokerRouter _router;
+        private readonly int _maximumAsyncRequests;
         private readonly NagleBlockingCollection<TopicMessage> _nagleBlockingCollection;
+        private readonly SemaphoreSlim _semaphoreMaximumAsync;
         private readonly IMetadataQueries _metadataQueries;
         private readonly Task _postTask;
 
         /// <summary>
-        /// Get the number of messages waiting to be sent. 
+        /// Get the number of messages sitting in the buffer waiting to be sent. 
         /// </summary>
-        public int ActiveCount { get { return _nagleBlockingCollection.Count; } }
+        public int BufferCount { get { return _nagleBlockingCollection.Count; } }
+
+        /// <summary>
+        /// Get the number of active async threads sending messages.
+        /// </summary>
+        public int AsyncCount { get { return _maximumAsyncRequests - _semaphoreMaximumAsync.CurrentCount; } }
 
         /// <summary>
         /// The number of messages to wait for before sending to kafka.  Will wait <see cref="BatchDelayTime"/> before sending whats received.
@@ -46,20 +54,27 @@ namespace KafkaNet
         /// </summary>
         /// <param name="brokerRouter">The router used to direct produced messages to the correct partition.</param>
         /// <param name="maximumAsyncRequests">The maximum async calls allowed before blocking new requests.  -1 indicates unlimited.</param>
+        /// <param name="maximumMessageBuffer">The maximum amount of messages to buffer if the async calls are blocking from sending.</param>
         /// <remarks>
         /// The maximumAsyncRequests parameter provides a mechanism for minimizing the amount of async requests in flight at any one time
         /// by blocking the caller requesting the async call.  This affectively puts an upper limit on the amount of times a caller can 
         /// call SendMessageAsync before the caller is blocked.
         /// 
+        /// The MaximumMessageBuffer parameter provides a way to limit the max amount of memory the driver uses should the send pipeline get
+        /// overwhelmed and the buffer starts to fill up.  This is an inaccurate limiting memory use as the amount of memory actually used is 
+        /// dependant on the general message size being buffered.
+        /// 
         /// A message will start its timeout countdown as soon as it is added to the producer async queue.  If there are a large number of 
         /// messages sitting in the async queue then a message may spend its entire timeout cycle waiting in this queue and never getting
         /// attempted to send to Kafka before a timeout exception is thrown.
         /// </remarks>
-        public Producer(IBrokerRouter brokerRouter, int maximumAsyncRequests = MaximumAsyncRequests)
+        public Producer(IBrokerRouter brokerRouter, int maximumAsyncRequests = MaximumAsyncRequests, int maximumMessageBuffer = MaximumMessageBuffer)
         {
             _router = brokerRouter;
+            _maximumAsyncRequests = maximumAsyncRequests;
             _metadataQueries = new MetadataQueries(_router);
-            _nagleBlockingCollection = new NagleBlockingCollection<TopicMessage>(maximumAsyncRequests);
+            _nagleBlockingCollection = new NagleBlockingCollection<TopicMessage>(maximumMessageBuffer);
+            _semaphoreMaximumAsync = new SemaphoreSlim(maximumAsyncRequests, maximumAsyncRequests);
 
             BatchSize = DefaultBatchSize;
             BatchDelayTime = TimeSpan.FromMilliseconds(DefaultBatchDelayMS);
@@ -131,13 +146,14 @@ namespace KafkaNet
         {
             //block incoming data
             _nagleBlockingCollection.CompleteAdding();
-            _stopToken.Cancel();
 
             if (waitForRequestsToComplete)
             {
                 //wait for the collection to drain
                 _postTask.Wait(maxWait ?? TimeSpan.FromSeconds(MaxDisposeWaitSeconds));
             }
+
+            _stopToken.Cancel();
         }
 
         public void Dispose()
@@ -223,6 +239,7 @@ namespace KafkaNet
                         Payload = new List<Payload> { payload }
                     };
 
+                    await _semaphoreMaximumAsync.WaitAsync(cancellationToken);
                     sendTasks.Add(new BrokerRouteSendBatch
                     {
                         Route = group.Key.Route,
@@ -233,8 +250,11 @@ namespace KafkaNet
 
                 try
                 {
+                    //release the async limit for each task as soon as they are complete.
+                    sendTasks.ForEach(x => x.Task.ContinueWith(t => _semaphoreMaximumAsync.Release(), cancellationToken));
+                    
                     await Task.WhenAll(sendTasks.Select(x => x.Task));
-
+                    
                     foreach (var task in sendTasks)
                     {
                         task.MessagesSent.ForEach(x => x.Tcs.TrySetResult(task.Task.Result.FirstOrDefault()));

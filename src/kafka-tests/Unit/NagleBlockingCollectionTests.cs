@@ -89,6 +89,23 @@ namespace kafka_tests.Unit
         }
 
         [Test]
+        public async void CollectionShouldReportCorrectBufferCount()
+        {
+            var collection = new NagleBlockingCollection<int>(100);
+
+            var dataTask = collection.TakeBatch(10, TimeSpan.FromSeconds(5));
+
+            collection.AddRange(Enumerable.Range(0, 9));
+            Assert.That(collection.Count, Is.EqualTo(9));
+            
+            collection.Add(1);
+            var data = await dataTask;
+            Assert.That(data.Count, Is.EqualTo(10));
+            Assert.That(collection.Count, Is.EqualTo(0));
+        }
+
+
+        [Test]
         public void StoppingCollectionShouldMarkAsComplete()
         {
             var collection = new NagleBlockingCollection<int>(100);
@@ -127,5 +144,7 @@ namespace kafka_tests.Unit
             Assert.That(collection.Count, Is.EqualTo(1));
             collection.Add(1);
         }
+
+
     }
 }
