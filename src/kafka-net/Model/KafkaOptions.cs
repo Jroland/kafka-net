@@ -53,9 +53,9 @@ namespace KafkaNet.Model
         /// </summary>
         public IKafkaLog Log { get; set; }
         /// <summary>
-        /// Maximum reconnection timeout.
+        /// The maximum time to wait when backing off on reconnection attempts.
         /// </summary>
-        public int? MaximumReconnectionTimeout { get; set; }
+        public TimeSpan? MaximumReconnectionTimeout { get; set; }
 
         public KafkaOptions(params Uri[] kafkaServerUri)
         {

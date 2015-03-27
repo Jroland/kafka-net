@@ -9,7 +9,7 @@ namespace KafkaNet
 {
     public class DefaultKafkaConnectionFactory : IKafkaConnectionFactory
     {
-        public IKafkaConnection Create(KafkaEndpoint endpoint, TimeSpan responseTimeoutMs, IKafkaLog log, int? maximumReconnectionTimeout = null)
+        public IKafkaConnection Create(KafkaEndpoint endpoint, TimeSpan responseTimeoutMs, IKafkaLog log, TimeSpan? maximumReconnectionTimeout = null)
         {
             return new KafkaConnection(new KafkaTcpSocket(log, endpoint, maximumReconnectionTimeout), responseTimeoutMs, log);
         }

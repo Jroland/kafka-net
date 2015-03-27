@@ -21,12 +21,12 @@ namespace KafkaNet
 
         private const int DefaultReconnectionTimeout = 500;
         private const int DefaultReconnectionTimeoutMultiplier = 2;
-		private const int MaxReconnectionTimeout = 10000;
+		private const int MaxReconnectionTimeoutMinutes = 5;
 
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly IKafkaLog _log;
         private readonly KafkaEndpoint _endpoint;
-        private readonly int _maximumReconnectionTimeoutMs;
+        private readonly TimeSpan _maximumReconnectionTimeout;
 
 		private readonly AsyncLock _clientLock = new AsyncLock();
 		private readonly AsyncLock _writeLock = new AsyncLock();
@@ -40,12 +40,12 @@ namespace KafkaNet
         /// </summary>
         /// <param name="log">Logging facility for verbose messaging of actions.</param>
         /// <param name="endpoint">The IP endpoint to connect to.</param>
-        /// <param name="maximumReconnectionTimeoutMs">Maxmimum reconnection timeout</param>
-        public KafkaTcpSocket(IKafkaLog log, KafkaEndpoint endpoint, int? maximumReconnectionTimeoutMs = null)
+        /// <param name="maximumReconnectionTimeout">The maximum time to wait when backing off on reconnection attempts.</param>
+        public KafkaTcpSocket(IKafkaLog log, KafkaEndpoint endpoint, TimeSpan? maximumReconnectionTimeout = null)
         {
             _log = log;
             _endpoint = endpoint;
-            _maximumReconnectionTimeoutMs = maximumReconnectionTimeoutMs ?? MaxReconnectionTimeout;
+            _maximumReconnectionTimeout = maximumReconnectionTimeout ?? TimeSpan.FromMinutes(MaxReconnectionTimeoutMinutes);
         }
 
         #region Interface Implementation...
@@ -198,7 +198,7 @@ namespace KafkaNet
                 catch
                 {
                     reconnectionDelay = reconnectionDelay * DefaultReconnectionTimeoutMultiplier;
-                    reconnectionDelay = Math.Min(reconnectionDelay, _maximumReconnectionTimeoutMs);
+                    reconnectionDelay = Math.Min(reconnectionDelay, (int)_maximumReconnectionTimeout.TotalMilliseconds);
 
                     _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", _endpoint, reconnectionDelay);
                 }
