@@ -133,13 +133,15 @@ namespace KafkaNet
                                 Topic = topic,
                                 PartitionId = partitionId,
                                 Offset = offset,
-                                MaxBytes = bufferSizeHighWatermark
+                                MaxBytes = bufferSizeHighWatermark,
                             };
 
                             var fetches = new List<Fetch> { fetch };
 
                             var fetchRequest = new FetchRequest
                                 {
+                                    MaxWaitTime = (int)_options.MaxWaitTimeForMinimumBytes.TotalMilliseconds,
+                                    MinBytes = _options.MinimumBytes,
                                     Fetches = fetches
                                 };
 

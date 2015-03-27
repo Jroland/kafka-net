@@ -9,7 +9,7 @@ namespace KafkaNet.Protocol
     {
         internal const int DefaultMinBlockingByteBufferSize = 4096;
         internal const int DefaultBufferSize = DefaultMinBlockingByteBufferSize * 8;
-        private const int DefaultMaxBlockingWaitTime = 5000;
+        internal const int DefaultMaxBlockingWaitTime = 5000;
 
         /// <summary>
         /// Indicates the type of kafka encoding this request is

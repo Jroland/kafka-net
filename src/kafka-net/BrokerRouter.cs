@@ -34,7 +34,7 @@ namespace KafkaNet
 
             foreach (var endpoint in _kafkaOptions.KafkaServerEndpoints)
             {
-                var conn = _kafkaOptions.KafkaConnectionFactory.Create(endpoint, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log);
+                var conn = _kafkaOptions.KafkaConnectionFactory.Create(endpoint, _kafkaOptions.ResponseTimeoutMs, _kafkaOptions.Log, _kafkaOptions.MaximumReconnectionTimeout);
                 _defaultConnectionIndex.AddOrUpdate(endpoint, e => conn, (e, c) => conn);
             }
 

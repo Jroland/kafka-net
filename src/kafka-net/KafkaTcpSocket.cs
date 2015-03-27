@@ -26,6 +26,7 @@ namespace KafkaNet
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly IKafkaLog _log;
         private readonly KafkaEndpoint _endpoint;
+        private readonly int _maximumReconnectionTimeoutMs;
 
 		private readonly AsyncLock _clientLock = new AsyncLock();
 		private readonly AsyncLock _writeLock = new AsyncLock();
@@ -39,10 +40,12 @@ namespace KafkaNet
         /// </summary>
         /// <param name="log">Logging facility for verbose messaging of actions.</param>
         /// <param name="endpoint">The IP endpoint to connect to.</param>
-        public KafkaTcpSocket(IKafkaLog log, KafkaEndpoint endpoint)
+        /// <param name="maximumReconnectionTimeoutMs">Maxmimum reconnection timeout</param>
+        public KafkaTcpSocket(IKafkaLog log, KafkaEndpoint endpoint, int? maximumReconnectionTimeoutMs = null)
         {
             _log = log;
             _endpoint = endpoint;
+            _maximumReconnectionTimeoutMs = maximumReconnectionTimeoutMs ?? MaxReconnectionTimeout;
         }
 
         #region Interface Implementation...
@@ -195,7 +198,7 @@ namespace KafkaNet
                 catch
                 {
                     reconnectionDelay = reconnectionDelay * DefaultReconnectionTimeoutMultiplier;
-					reconnectionDelay = Math.Min(reconnectionDelay, MaxReconnectionTimeout);
+                    reconnectionDelay = Math.Min(reconnectionDelay, _maximumReconnectionTimeoutMs);
 
                     _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", _endpoint, reconnectionDelay);
                 }

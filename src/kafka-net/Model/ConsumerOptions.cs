@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using KafkaNet.Protocol;
 
 namespace KafkaNet.Model
 {
@@ -38,6 +39,19 @@ namespace KafkaNet.Model
         /// </summary>
         public TimeSpan BackoffInterval { get; set; }
         /// <summary>
+        /// The max wait time is the maximum amount of time in milliseconds to block waiting if insufficient data is available at the time the request is issued.
+        /// </summary>
+        public TimeSpan MaxWaitTimeForMinimumBytes { get; set; }
+        /// <summary>
+        /// This is the minimum number of bytes of messages that must be available to give a response. If the client sets this to 0 the server will always respond immediately, 
+        /// however if there is no new data since their last request they will just get back empty message sets. If this is set to 1, the server will respond as soon as at least 
+        /// one partition has at least 1 byte of data or the specified timeout occurs. By setting higher values in combination with the timeout the consumer can tune for throughput 
+        /// and trade a little additional latency for reading only large chunks of data (e.g. setting MaxWaitTime to 100 ms and setting MinBytes to 64k would allow the server to wait 
+        /// up to 100ms to try to accumulate 64k of data before responding).
+        /// </summary>
+        public int MinimumBytes { get; set; }
+
+        /// <summary>
         /// In the event of a buffer under run, this multiplier will allow padding the new buffer size.
         /// </summary>
         public double FetchBufferMultiplier { get; set; }
@@ -52,6 +66,8 @@ namespace KafkaNet.Model
             ConsumerBufferSize = DefaultMaxConsumerBufferSize;
             BackoffInterval = TimeSpan.FromMilliseconds(DefaultBackoffIntervalMS);
             FetchBufferMultiplier = DefaulFetchBufferMultiplier;
+            MaxWaitTimeForMinimumBytes = TimeSpan.FromMilliseconds(FetchRequest.DefaultMaxBlockingWaitTime);
+            MinimumBytes = FetchRequest.DefaultMinBlockingByteBufferSize;
         }
     }
 }
