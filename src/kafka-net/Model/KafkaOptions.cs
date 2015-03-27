@@ -52,6 +52,10 @@ namespace KafkaNet.Model
         /// Log object to record operational messages.
         /// </summary>
         public IKafkaLog Log { get; set; }
+        /// <summary>
+        /// Maximum reconnection timeout.
+        /// </summary>
+        public int? MaximumReconnectionTimeout { get; set; }
 
         public KafkaOptions(params Uri[] kafkaServerUri)
         {
