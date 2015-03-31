@@ -6,7 +6,7 @@
     <authors>James Roland</authors>
     <owners>James Roland</owners>
     <licenseUrl>https://github.com/Jroland/kafka-net/blob/master/LICENSE</licenseUrl>
-    <projectUrl>http://jroland.github.io/kafka-net/</projectUrl>
+    <projectUrl>https://github.com/Jroland/kafka-net</projectUrl>
     <iconUrl>http://kafka.apache.org/images/kafka_logo.png</iconUrl>
     <title>kafka-net</title>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
