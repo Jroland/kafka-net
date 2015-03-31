@@ -91,6 +91,7 @@ namespace KafkaNet
             {
                 try
                 {
+                    //TODO remove blocking result here!
                     var response = conn.SendAsync(request).Result;
                     if (response != null && response.Count > 0)
                     {
