@@ -79,7 +79,7 @@ namespace kafka_tests.Unit
 
             Task.Factory.StartNew(async () =>
             {
-                using (await alock.LockAsync())
+                using (await alock.LockAsync().ConfigureAwait(false))
                 {
                     Console.WriteLine("Enter lock id: {0}", Thread.CurrentThread.ManagedThreadId);
                     Interlocked.Increment(ref count);
@@ -94,7 +94,7 @@ namespace kafka_tests.Unit
             Task.Factory.StartNew(async () =>
             {
                 Console.WriteLine("Second call waiting Id:{0}", Thread.CurrentThread.ManagedThreadId);
-                using (await alock.LockAsync())
+                using (await alock.LockAsync().ConfigureAwait(false))
                 {
                     Console.WriteLine("Past lock Id:{0}", Thread.CurrentThread.ManagedThreadId);
                     Interlocked.Increment(ref count);

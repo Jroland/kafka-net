@@ -13,7 +13,7 @@ namespace kafka_tests.Helpers
             {
                 if (sw.ElapsedMilliseconds > milliSeconds)
                     return false;
-                Thread.Sleep(10);
+                Thread.Sleep(100);
             }
             return true;
         }
