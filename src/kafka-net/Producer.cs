@@ -174,10 +174,10 @@ namespace KafkaNet
             var outstandingSendTasks = new System.Collections.Concurrent.ConcurrentDictionary<Task, Task>();
             while (!_nagleBlockingCollection.IsCompleted)
             {
+                List<TopicMessage> batch = null;
+
                 try
                 {
-                    List<TopicMessage> batch = null;
-
                     try
                     {
                         batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _stopToken.Token);
@@ -206,9 +206,9 @@ namespace KafkaNet
 
                     var sendTaskCleanup = sendTask.ContinueWith(result =>
                     {
-                        if (result.IsFaulted)
+                        if (result.IsFaulted && batch != null)
                         {
-                            //TODO log exception of failure here;
+                            batch.ForEach(x => x.Tcs.TrySetException(result.ExtractException()));
                         }
 
                         //TODO add statistics tracking
@@ -219,7 +219,10 @@ namespace KafkaNet
                 }
                 catch (Exception ex)
                 {
-                    //TODO log the failure and keep going
+                    if (batch != null)
+                    {
+                        batch.ForEach(x => x.Tcs.TrySetException(ex));
+                    }
                 }
             }
 

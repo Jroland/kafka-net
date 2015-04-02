@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -134,6 +135,18 @@ namespace KafkaNet.Common
             }
             if (nextbatch.Count > 0)
                 yield return nextbatch;
+        }
+
+        /// <summary>
+        /// Extracts a concrete exception out of a Continue with result.
+        /// </summary>
+        public static Exception ExtractException(this Task task)
+        {
+            if (task.IsFaulted == false) return null;
+            if (task.Exception != null)
+                return task.Exception.Flatten();
+            
+            return new ApplicationException("Unknown exception occured.");
         }
     }
 }
