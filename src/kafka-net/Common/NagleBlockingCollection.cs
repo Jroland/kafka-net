@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -36,21 +37,19 @@ namespace KafkaNet.Common
 
         public int Count { get { return _boundedCapacity - _boundedCapacitySemaphore.CurrentCount; } }
 
-        public void AddRange(IEnumerable<T> data)
+        public Task AddRangeAsync(IEnumerable<T> data)
         {
-            foreach (var item in data)
-            {
-                Add(item);
-            }
+            return Task.WhenAll(data.Select(AddAsync));
         }
 
-        public void Add(T data)
+        public async Task AddAsync(T data)
         {
             if (_collection.IsAddingCompleted)
             {
                 throw new ObjectDisposedException("NagleBlockingCollection is currently being disposed.  Cannot add documents.");
             }
-            _boundedCapacitySemaphore.Wait();
+
+            await _boundedCapacitySemaphore.WaitAsync();
             _collection.Add(data);
             _dataAvailableSemaphore.Release();
         }
@@ -75,24 +74,35 @@ namespace KafkaNet.Common
         /// <returns></returns>
         public async Task<List<T>> TakeBatch(int batchSize, TimeSpan timeout, CancellationToken cancellationToken)
         {
-            var batch = new List<T>(Math.Max(_collection.Count, 10));
+            var batch = new List<T>(batchSize);
             try
             {
                 await _dataAvailableSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-
+                
                 do
                 {
-                    batch.Add(_collection.Take(cancellationToken));
-                    if (--batchSize == 0) break;
-                } while (await _dataAvailableSemaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false) || _collection.Count > 0);
-            }
-            catch (OperationCanceledException)
-            {
-                //bury these so that we can return whatever messages we've already dequeued, instead of throwing them away
-            }
+                    T item;
+                    while (_collection.TryTake(out item))
+                    {
+                        if (_dataAvailableSemaphore.CurrentCount > 0)
+                        {
+                            _dataAvailableSemaphore.Wait(cancellationToken); //we removed an item
+                        }
+                        batch.Add(item);
+                        if (--batchSize <= 0) return batch;
+                    }
+                } while (await _dataAvailableSemaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false));
 
-            if (batch.Count > 0) _boundedCapacitySemaphore.Release(batch.Count);
-            return batch;
+                return batch;
+            }
+            catch
+            {
+                return batch;  //just return what we have collected
+            }
+            finally
+            {
+                if (batch.Count > 0) _boundedCapacitySemaphore.Release(batch.Count);
+            }
         }
 
         /// <summary>

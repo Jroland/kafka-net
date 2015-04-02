@@ -27,7 +27,7 @@ namespace kafka_tests.Unit
 
             var collection = new NagleBlockingCollection<int>(blockingCount);
 
-            var addTask = Task.Factory.StartNew(() => collection.AddRange(Enumerable.Range(0, blockingCount + expectedCount)));
+            var addTask = Task.Factory.StartNew(() => collection.AddRangeAsync(Enumerable.Range(0, blockingCount + expectedCount)).Wait());
 
             TaskTest.WaitFor(() => collection.Count >= blockingCount);
 
@@ -64,7 +64,7 @@ namespace kafka_tests.Unit
             const int expectedCount = 10;
 
             var collection = new NagleBlockingCollection<int>(100);
-            collection.AddRange(Enumerable.Range(0, expectedCount));
+            await collection.AddRangeAsync(Enumerable.Range(0, expectedCount));
 
             var data = await collection.TakeBatch(expectedCount, TimeSpan.FromMilliseconds(100));
 
@@ -79,7 +79,7 @@ namespace kafka_tests.Unit
             const int expectedCount = 10;
 
             var collection = new NagleBlockingCollection<int>(100);
-            collection.AddRange(Enumerable.Range(0, expectedCount));
+            await collection.AddRangeAsync(Enumerable.Range(0, expectedCount));
 
             var sw = Stopwatch.StartNew();
             var data = await collection.TakeBatch(expectedCount + 1, TimeSpan.FromMilliseconds(expectedDelay));
@@ -95,13 +95,59 @@ namespace kafka_tests.Unit
 
             var dataTask = collection.TakeBatch(10, TimeSpan.FromSeconds(5));
 
-            collection.AddRange(Enumerable.Range(0, 9));
+            await collection.AddRangeAsync(Enumerable.Range(0, 9));
             Assert.That(collection.Count, Is.EqualTo(9));
             
-            collection.Add(1);
+            collection.AddAsync(1);
             var data = await dataTask;
             Assert.That(data.Count, Is.EqualTo(10));
             Assert.That(collection.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public async void TakeAsyncShouldReturnAsSoonAsBatchSizeArrived()
+        {
+            var collection = new NagleBlockingCollection<int>(100);
+
+            var dataTask = collection.TakeBatch(10, TimeSpan.FromSeconds(5));
+
+            collection.AddRangeAsync(Enumerable.Range(0, 10));
+
+            await dataTask;
+
+            Assert.That(collection.Count, Is.EqualTo(0));
+            
+        }
+
+        [Test]
+        public async void TakeAsyncShouldReturnEvenWhileMoreDataArrives()
+        {
+            var exit = false;
+            var collection = new NagleBlockingCollection<int>(10000000);
+
+            var sw = Stopwatch.StartNew();
+            var dataTask = collection.TakeBatch(10, TimeSpan.FromMilliseconds(5000));
+
+
+            var highVolumeAdding = Task.Factory.StartNew(async () =>
+            {
+                //high volume of data adds
+                while (exit == false)
+                {
+                    await collection.AddAsync(1); 
+                    Thread.Sleep(5);
+                }
+            });
+
+            Console.WriteLine("Awaiting data...");
+            await dataTask;
+
+            Assert.That(dataTask.Result.Count, Is.EqualTo(10));
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(5000));
+            exit = true;
+
+            Console.WriteLine("Waiting to unwind test...");
+            await highVolumeAdding;
         }
 
 
@@ -119,32 +165,32 @@ namespace kafka_tests.Unit
 
 		[Test]
 		[ExpectedException(typeof(ObjectDisposedException))]
-		public void StoppingCollectionShouldPreventMoreItemsAdded()
+		public async void StoppingCollectionShouldPreventMoreItemsAdded()
 		{
 			var collection = new NagleBlockingCollection<int>(100);
 			using (collection)
 			{
-				collection.Add(1);
+                await collection.AddAsync(1);
 				Assert.That(collection.Count, Is.EqualTo(1));
 				collection.CompleteAdding();
-				collection.Add(1);
+                await collection.AddAsync(1);
 			}
 		}
 
         [Test]
         [ExpectedException(typeof(ObjectDisposedException))]
-        public void DisposingCollectionShouldPreventMoreItemsAdded()
+        public async void DisposingCollectionShouldPreventMoreItemsAdded()
         {
             var collection = new NagleBlockingCollection<int>(100);
             using (collection)
             {
-                collection.Add(1);
+                await collection.AddAsync(1);
             }
 
             Assert.That(collection.Count, Is.EqualTo(1));
-            collection.Add(1);
+            await collection.AddAsync(1);
         }
 
-
+       
     }
 }
