@@ -14,9 +14,14 @@ namespace KafkaNet.Protocol
         /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
         /// </summary>
         protected const int ReplicaId = -1;
-        protected const Int16 ApiVersion = 0;
+        private readonly short _apiVersion;
         private string _clientId = "Kafka-Net";
         private int _correlationId = 1;
+
+        protected BaseRequest(short apiVersion = 0)
+        {
+            _apiVersion = apiVersion;
+        }
 
         /// <summary>
         /// Descriptive name of the source of the messages sent to kafka
@@ -28,6 +33,11 @@ namespace KafkaNet.Protocol
         /// It is useful for matching request and response between the client and server. 
         /// </summary>
         public int CorrelationId { get { return _correlationId; } set { _correlationId = value; } }
+
+        /// <summary>
+        /// Get the API Version for this request
+        /// </summary>
+        public short ApiVersion { get { return _apiVersion; } }
 
         /// <summary>
         /// Flag which tells the broker call to expect a response for this request.
@@ -43,7 +53,7 @@ namespace KafkaNet.Protocol
         {
             return new KafkaMessagePacker()
                  .Pack(((Int16)request.ApiKey))
-                 .Pack(ApiVersion)
+                 .Pack(request.ApiVersion)
                  .Pack(request.CorrelationId)
                  .Pack(request.ClientId, StringPrefixEncoding.Int16);
         }

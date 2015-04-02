@@ -6,13 +6,20 @@ using KafkaNet.Common;
 namespace KafkaNet.Protocol
 {
     /// <summary>
+    /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetFetchRequest
     /// Class that represents the api call to commit a specific set of offsets for a given topic.  The offset is saved under the 
     /// arbitrary ConsumerGroup name provided by the call.
+    /// This now supports version 0 and 1 of the protocol
     /// </summary>
     public class OffsetCommitRequest : BaseRequest, IKafkaRequest<OffsetCommitResponse>
     {
+        public OffsetCommitRequest(Int16 version = 1) : base(version)
+        {
+        }
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetCommit; } }
         public string ConsumerGroup { get; set; }
+        public int ConsumerGroupGenerationId { get; set; }
+        public string ConsumerId { get; set; }
         public List<OffsetCommit> OffsetCommits { get; set; }
 
         public byte[] Encode()
@@ -31,6 +38,12 @@ namespace KafkaNet.Protocol
 
             using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
             {
+                if (ApiVersion == 1)
+                {
+                    message
+                        .Pack(ConsumerGroupGenerationId)
+                        .Pack(ConsumerId, StringPrefixEncoding.Int16);
+                }
                 var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
                 message.Pack(topicGroups.Count);
 
@@ -44,10 +57,17 @@ namespace KafkaNet.Protocol
                     {
                         foreach (var commit in partition)
                         {
-                            message.Pack(partition.Key)
-                            .Pack(commit.Offset)
-                            .Pack(commit.TimeStamp)
-                            .Pack(commit.Metadata, StringPrefixEncoding.Int16);
+                            message
+                                .Pack(partition.Key)
+                                .Pack(commit.Offset);
+
+                            if (ApiVersion == 1)
+                            {
+                                message.Pack(commit.TimeStamp);
+                            }
+
+                            message
+                                .Pack(commit.Metadata, StringPrefixEncoding.Int16);
                         }
                     }
                 }

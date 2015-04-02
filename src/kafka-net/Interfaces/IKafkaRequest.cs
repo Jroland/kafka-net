@@ -19,6 +19,10 @@ namespace KafkaNet
         /// </summary>
         string ClientId { get; set; }
         /// <summary>
+        /// The API Version used for this request
+        /// </summary>
+        short ApiVersion { get; }
+        /// <summary>
         /// Id which will be echoed back by Kafka to correlate responses to this request.  Usually automatically assigned by driver.
         /// </summary>
         int CorrelationId { get; set; }

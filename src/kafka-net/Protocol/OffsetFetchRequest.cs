@@ -10,9 +10,14 @@ namespace KafkaNet.Protocol
     /// Class that represents both the request and the response from a kafka server of requesting a stored offset value
     /// for a given consumer group.  Essentially this part of the api allows a user to save/load a given offset position
     /// under any abritrary name.
+    /// This now supports version 1 of the protocol
     /// </summary>
     public class OffsetFetchRequest : BaseRequest, IKafkaRequest<OffsetFetchResponse>
     {
+        public OffsetFetchRequest(short version = 1) : base(version)
+        {
+
+        }
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetFetch; } }
         public string ConsumerGroup { get; set; }
         public List<OffsetFetch> Topics { get; set; }
