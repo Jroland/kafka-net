@@ -18,7 +18,7 @@ namespace KafkaNet.Protocol
         private string _clientId = "Kafka-Net";
         private int _correlationId = 1;
 
-        protected BaseRequest(short apiVersion = 0)
+        protected BaseRequest(short apiVersion = SupportedApiVersion.ApiV0)
         {
             _apiVersion = apiVersion;
         }

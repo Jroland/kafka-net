@@ -14,7 +14,7 @@ namespace KafkaNet.Protocol
     /// </summary>
     public class OffsetFetchRequest : BaseRequest, IKafkaRequest<OffsetFetchResponse>
     {
-        public OffsetFetchRequest(short version = 1) : base(version)
+        public OffsetFetchRequest(short version = SupportedApiVersion.ApiV1) : base(version)
         {
 
         }

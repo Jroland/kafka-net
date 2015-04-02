@@ -7,19 +7,34 @@ namespace KafkaNet.Protocol
 {
     /// <summary>
     /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetFetchRequest
+    /// https://cwiki.apache.org/confluence/display/KAFKA/Kafka+0.9+Consumer+Rewrite+Design
     /// Class that represents the api call to commit a specific set of offsets for a given topic.  The offset is saved under the 
     /// arbitrary ConsumerGroup name provided by the call.
     /// This now supports version 0 and 1 of the protocol
     /// </summary>
     public class OffsetCommitRequest : BaseRequest, IKafkaRequest<OffsetCommitResponse>
     {
-        public OffsetCommitRequest(Int16 version = 1) : base(version)
+        public OffsetCommitRequest(Int16 version = SupportedApiVersion.ApiV1)
+            : base(version)
         {
         }
+
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetCommit; } }
+        /// <summary>
+        /// Name for the entire consumer group cluster.
+        /// </summary>
         public string ConsumerGroup { get; set; }
+        /// <summary>
+        /// The Generation number received by JoinGroupResponse which indicates the version of the assigned consumer partitions. 
+        /// </summary>
         public int ConsumerGroupGenerationId { get; set; }
+        /// <summary>
+        /// The unique id of the individual consumer within the group received by a JoinGroupResponse.
+        /// </summary>
         public string ConsumerId { get; set; }
+        /// <summary>
+        /// The offset information to commit to the brokers.
+        /// </summary>
         public List<OffsetCommit> OffsetCommits { get; set; }
 
         public byte[] Encode()
@@ -38,7 +53,7 @@ namespace KafkaNet.Protocol
 
             using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
             {
-                if (ApiVersion == 1)
+                if (ApiVersion == SupportedApiVersion.ApiV1)
                 {
                     message
                         .Pack(ConsumerGroupGenerationId)
@@ -61,7 +76,7 @@ namespace KafkaNet.Protocol
                                 .Pack(partition.Key)
                                 .Pack(commit.Offset);
 
-                            if (ApiVersion == 1)
+                            if (ApiVersion == SupportedApiVersion.ApiV1)
                             {
                                 message.Pack(commit.TimeStamp);
                             }

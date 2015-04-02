@@ -37,7 +37,7 @@ namespace kafka_tests.Integration
                 var response = conn.Connection.SendAsync(request).Result.FirstOrDefault();
 
                 Assert.That(response, Is.Not.Null);
-                if (version == 0)
+                if (version == SupportedApiVersion.ApiV0)
                 {
                     // Version 0 (storing in zookeeper) results in unknown topic or partition as the consumer group
                     // and partition are used to make up the string, and when it is missing it results in an error
@@ -52,7 +52,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public void OffsetCommitShouldStoreAndReturnSuccess([Values(0, 1)] int version)
+        public void OffsetCommitShouldStoreAndReturnSuccess([Values(SupportedApiVersion.ApiV0, SupportedApiVersion.ApiV0)] int version)
         {
             const int partitionId = 0;
             using (var router = new BrokerRouter(Options))
@@ -68,7 +68,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public void OffsetCommitShouldStoreOffsetValue([Values(0, 1)] int version)
+        public void OffsetCommitShouldStoreOffsetValue([Values(SupportedApiVersion.ApiV0, SupportedApiVersion.ApiV0)] int version)
         {
             const int partitionId = 0;
             const long offset = 99;
@@ -94,7 +94,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public void OffsetCommitShouldStoreMetadata([Values(0, 1)] int version)
+        public void OffsetCommitShouldStoreMetadata([Values(SupportedApiVersion.ApiV0, SupportedApiVersion.ApiV0)] int version)
         {
             const int partitionId = 0;
             const long offset = 101;
@@ -118,7 +118,7 @@ namespace kafka_tests.Integration
                 Assert.That(fetchResponse.Offset, Is.EqualTo(offset));
 
                 // metadata is only stored with version 1. Zookeeper doesn't store metadata
-                if (version == 1)
+                if (version == SupportedApiVersion.ApiV1)
                 {
                     Assert.That(fetchResponse.MetaData, Is.EqualTo(metadata));
                 }

@@ -50,6 +50,15 @@ namespace KafkaNet.Protocol
     }
 
     /// <summary>
+    /// Enumeration representing the supported API versions of this driver.
+    /// </summary>
+    public struct SupportedApiVersion
+    {
+        public const int ApiV0 = 0;
+        public const int ApiV1 = 1;
+    }
+
+    /// <summary>
     /// Enumeration of error codes that might be returned from a Kafka server
     /// </summary>
     public enum ErrorResponseCode : short
