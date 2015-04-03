@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -74,35 +75,35 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public async void OnDataAvailableWithTimeoutShouldCancelAndReturnFalse()
+        public async void TakeAsyncShouldOnlyWaitTimeoutAndReturnWhatItHas()
         {
+            const int size = 20;
             var aq = new AsyncCollection<bool>();
-            var cancelToken = new CancellationTokenSource();
-            Task.Delay(TimeSpan.FromMilliseconds(100)).ContinueWith(t => cancelToken.Cancel());
 
-            var result = await aq.OnDataAvailable(TimeSpan.FromSeconds(10), cancelToken.Token);
+            Task.Factory.StartNew(() =>
+            {
+                //this should take 2000ms to complete
+                for (int i = 0; i < size; i++)
+                {
+                    aq.Add(true);
+                    Thread.Sleep(100);
+                }
+            });
 
-            Assert.That(result, Is.EqualTo(false), "Cancelled on data available should return false.");
+            var result = await aq.TakeAsync(size, TimeSpan.FromMilliseconds(100), CancellationToken.None);
+
+            Assert.That(result.Count, Is.LessThan(size));
         }
 
         [Test]
-        public async void OnDataAvailableWithTimeoutShouldReturnFalse()
+        public async void TakeAsyncShouldReturnEmptyListIfNothingFound()
         {
             var aq = new AsyncCollection<bool>();
 
-            var result = await aq.OnDataAvailable(TimeSpan.FromMilliseconds(10), CancellationToken.None);
+            var result = await aq.TakeAsync(100, TimeSpan.FromMilliseconds(100), CancellationToken.None);
 
-            Assert.That(result, Is.False, "Timeout call should return false.");
-        }
-
-        [Test]
-        public async void OnDataAvailableWithNoTimeoutShouldReturnTrue()
-        {
-            var aq = new AsyncCollection<bool>();
-            Task.Delay(TimeSpan.FromMilliseconds(100)).ContinueWith(t => aq.Add(true));
-            var result = await aq.OnDataAvailable(TimeSpan.FromSeconds(1), CancellationToken.None);
-
-            Assert.That(result, Is.True, "Should return true when data arrives before timeout.");
+            Assert.That(result, Is.Not.Null);
+            Assert.That(result.Count, Is.EqualTo(0));
         }
     }
 }

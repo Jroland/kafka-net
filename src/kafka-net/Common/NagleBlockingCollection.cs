@@ -74,30 +74,22 @@ namespace KafkaNet.Common
         /// <returns></returns>
         public async Task<List<T>> TakeBatch(int batchSize, TimeSpan timeout, CancellationToken cancellationToken)
         {
-            var batch = new List<T>(batchSize);
+            List<T> batch = null;
             try
             {
                 await _collection.OnDataAvailable(cancellationToken).ConfigureAwait(false);
-                
-                do
-                {
-                    T data;
-                    while (_collection.TryTake(out data))
-                    {
-                        batch.Add(data);
-                        if (--batchSize <= 0) return batch;
-                    }
-                } while (await _collection.OnDataAvailable(timeout, cancellationToken).ConfigureAwait(false));
 
+                batch = await _collection.TakeAsync(batchSize, timeout, cancellationToken).ConfigureAwait(false);
+               
                 return batch;
             }
             catch
             {
-                return batch;  //just return what we have collected
+                return batch ?? new List<T>();  //just return what we have collected
             }
             finally
             {
-                if (batch.Count > 0) _boundedCapacitySemaphore.Release(batch.Count);
+                if (batch != null && batch.Count > 0) _boundedCapacitySemaphore.Release(batch.Count);
             }
         }
 

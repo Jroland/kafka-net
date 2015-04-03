@@ -22,12 +22,6 @@ namespace KafkaNet.Common
             return _dataAvailableEvent.WaitAsync().WithCancellation(token);
         }
 
-        public async Task<bool> OnDataAvailable(TimeSpan timeout, CancellationToken token)
-        {
-            var waitTask = _dataAvailableEvent.WaitAsync();
-            return await Task.WhenAny(waitTask, Task.Delay(timeout, token)) == waitTask;
-        }
-
         public void Add(T data)
         {
             _bag.Add(data);
@@ -41,6 +35,31 @@ namespace KafkaNet.Common
                 _bag.Add(item);
             }
             TriggerDataAvailability();
+        }
+
+        public async Task<List<T>> TakeAsync(int count, TimeSpan timeout, CancellationToken token)
+        {
+            var batch = new List<T>(count);
+            var timeoutTask = Task.Delay(timeout, token);
+
+            try
+            {
+                do
+                {
+                    T data;
+                    while (TryTake(out data))
+                    {
+                        batch.Add(data);
+                        if (--count <= 0) return batch;
+                    }
+                } while (await Task.WhenAny(OnDataAvailable(token), timeoutTask) != timeoutTask);
+
+                return batch;
+            }
+            catch
+            {
+                return batch;
+            }
         }
 
         public bool TryTake(out T data)
