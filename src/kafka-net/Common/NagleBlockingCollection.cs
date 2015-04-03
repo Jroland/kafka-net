@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -21,21 +20,23 @@ namespace KafkaNet.Common
     public class NagleBlockingCollection<T> : IDisposable
     {
         private readonly int _boundedCapacity;
-        private readonly BlockingCollection<T> _collection;
-        private readonly SemaphoreSlim _dataAvailableSemaphore = new SemaphoreSlim(0);
+        private readonly AsyncCollection<T> _collection = new AsyncCollection<T>();
         private readonly SemaphoreSlim _boundedCapacitySemaphore;
 
         public NagleBlockingCollection(int boundedCapacity)
         {
             _boundedCapacity = boundedCapacity;
-            _collection = new BlockingCollection<T>();
             _boundedCapacitySemaphore = new SemaphoreSlim(boundedCapacity, boundedCapacity);
         }
 
-        public bool IsAddingCompleted { get { return _collection.IsAddingCompleted; } }
-        public bool IsCompleted { get { return _collection.IsCompleted; } }
+        public bool IsCompleted { get; private set; }
 
         public int Count { get { return _boundedCapacity - _boundedCapacitySemaphore.CurrentCount; } }
+
+        public void CompleteAdding()
+        {
+            IsCompleted = true;
+        }
 
         public Task AddRangeAsync(IEnumerable<T> data)
         {
@@ -44,14 +45,13 @@ namespace KafkaNet.Common
 
         public async Task AddAsync(T data)
         {
-            if (_collection.IsAddingCompleted)
+            if (IsCompleted)
             {
                 throw new ObjectDisposedException("NagleBlockingCollection is currently being disposed.  Cannot add documents.");
             }
 
-            await _boundedCapacitySemaphore.WaitAsync();
+            await _boundedCapacitySemaphore.WaitAsync().ConfigureAwait(false);
             _collection.Add(data);
-            _dataAvailableSemaphore.Release();
         }
 
         /// <summary>
@@ -77,21 +77,17 @@ namespace KafkaNet.Common
             var batch = new List<T>(batchSize);
             try
             {
-                await _dataAvailableSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+                await _collection.OnDataAvailable(cancellationToken).ConfigureAwait(false);
                 
                 do
                 {
-                    T item;
-                    while (_collection.TryTake(out item))
+                    T data;
+                    while (_collection.TryTake(out data))
                     {
-                        if (_dataAvailableSemaphore.CurrentCount > 0)
-                        {
-                            _dataAvailableSemaphore.Wait(cancellationToken); //we removed an item
-                        }
-                        batch.Add(item);
+                        batch.Add(data);
                         if (--batchSize <= 0) return batch;
                     }
-                } while (await _dataAvailableSemaphore.WaitAsync(timeout, cancellationToken).ConfigureAwait(false));
+                } while (await _collection.OnDataAvailable(timeout, cancellationToken).ConfigureAwait(false));
 
                 return batch;
             }
@@ -109,33 +105,17 @@ namespace KafkaNet.Common
         /// Immediately drains and returns any remaining messages in the queue 
         /// </summary>
         /// <returns></returns>
-        public List<T> Drain()
+        public IEnumerable<T> Drain()
         {
-            if (!_collection.IsAddingCompleted)
-            {
-                throw new InvalidOperationException("Should not try to drain the collection unless adding is complete");
-            }
-
-            T msg;
-            var batch = new List<T>(_collection.Count);
-            while (_collection.TryTake(out msg))
-            {
-                batch.Add(msg);
-            }
-
-            return batch;
-        }
-
-        public void CompleteAdding()
-        {
-            _collection.CompleteAdding();
+            return _collection.Drain();
         }
 
         public void Dispose()
         {
-            using (_collection)
-            using (_dataAvailableSemaphore)
-            { }
+            using (_boundedCapacitySemaphore)
+            {
+                IsCompleted = true;
+            }
         }
     }
 }

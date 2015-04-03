@@ -148,7 +148,7 @@ namespace KafkaNet
                             //make request and post to queue
                             var route = _options.Router.SelectBrokerRoute(topic, partitionId);
 
-                            var responses = await route.Connection.SendAsync(fetchRequest);
+                            var responses = await route.Connection.SendAsync(fetchRequest).ConfigureAwait(false);
 
                             if (responses.Count > 0)
                             {

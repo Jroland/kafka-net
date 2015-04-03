@@ -138,7 +138,7 @@ namespace KafkaNet
 
                         if (bytesReceived <= 0)
                         {
-                            await Disconnect(); //_client is dead, clean it up and throw
+                            await Disconnect().ConfigureAwait(false); //_client is dead, clean it up and throw
                             throw new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _endpoint));
                         }
 
@@ -202,7 +202,7 @@ namespace KafkaNet
                     _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", _endpoint, reconnectionDelay);
                 }
 
-                await Task.Delay(TimeSpan.FromMilliseconds(reconnectionDelay), _disposeToken.Token);
+                await Task.Delay(TimeSpan.FromMilliseconds(reconnectionDelay), _disposeToken.Token).ConfigureAwait(false);
             }
 
             return _client;
@@ -210,7 +210,7 @@ namespace KafkaNet
 
         private async Task Disconnect()
         {
-            using (await _clientLock.LockAsync(_disposeToken.Token))
+            using (await _clientLock.LockAsync(_disposeToken.Token).ConfigureAwait(false))
             using (_client)
             {
                 _client = null;

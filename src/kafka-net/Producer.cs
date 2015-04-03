@@ -80,7 +80,7 @@ namespace KafkaNet
 
             _postTask = Task.Run(async () =>
             {
-                await BatchSendAsync();
+                await BatchSendAsync().ConfigureAwait(false);
                 //TODO add log for ending the sending thread.
             });
 
@@ -180,25 +180,19 @@ namespace KafkaNet
                 {
                     try
                     {
-                        batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _stopToken.Token);
+                        batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _stopToken.Token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException ex)
                     {
                         //TODO log that the operation was canceled, this only happens during a dispose
                     }
 
-                    if (_nagleBlockingCollection.IsAddingCompleted && _nagleBlockingCollection.Count > 0)
+                    if (_nagleBlockingCollection.IsCompleted && _nagleBlockingCollection.Count > 0)
                     {
+                        batch = batch ?? new List<TopicMessage>(_nagleBlockingCollection.Count);
+
                         //Drain any messages remaining in the queue and add them to the send batch
-                        var finalMessages = _nagleBlockingCollection.Drain();
-                        if (batch == null)
-                        {
-                            batch = finalMessages;
-                        }
-                        else
-                        {
-                            batch.AddRange(finalMessages);
-                        }
+                        batch.AddRange(_nagleBlockingCollection.Drain());
                     }
 
                     //we want to fire the batch without blocking and then move on to fire another one
@@ -226,7 +220,7 @@ namespace KafkaNet
                 }
             }
 
-            await Task.WhenAll(outstandingSendTasks.Values);
+            await Task.WhenAll(outstandingSendTasks.Values).ConfigureAwait(false);
         }
 
         private async Task ProduceAndSendBatchAsync(List<TopicMessage> batchs, CancellationToken cancellationToken)
