@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
 using kafka_tests.Helpers;
+using NSubstitute.Core;
 using NUnit.Framework;
 
 namespace kafka_tests.Unit
@@ -38,7 +39,7 @@ namespace kafka_tests.Unit
             await collection.TakeBatch(blockingCount, TimeSpan.FromMilliseconds(100));
 
             await addTask;
-            
+
             Assert.That(collection.Count, Is.EqualTo(expectedCount));
             Assert.That(addTask.Status, Is.EqualTo(TaskStatus.RanToCompletion));
         }
@@ -51,11 +52,11 @@ namespace kafka_tests.Unit
 
             Task.Delay(TimeSpan.FromMilliseconds(100)).ContinueWith(t => cancelSource.Cancel());
 
-			var sw = Stopwatch.StartNew();
+            var sw = Stopwatch.StartNew();
             var data = await collection.TakeBatch(10, TimeSpan.FromMilliseconds(500), cancelSource.Token);
-			sw.Stop();
+            sw.Stop();
 
-			Assert.That(sw.ElapsedMilliseconds, Is.LessThan(300));
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(300));
         }
 
         [Test]
@@ -97,7 +98,7 @@ namespace kafka_tests.Unit
 
             await collection.AddRangeAsync(Enumerable.Range(0, 9));
             Assert.That(collection.Count, Is.EqualTo(9));
-            
+
             collection.AddAsync(1);
             var data = await dataTask;
             Assert.That(data.Count, Is.EqualTo(10));
@@ -116,7 +117,7 @@ namespace kafka_tests.Unit
             await dataTask;
 
             Assert.That(collection.Count, Is.EqualTo(0));
-            
+
         }
 
         [Test]
@@ -134,7 +135,7 @@ namespace kafka_tests.Unit
                 //high volume of data adds
                 while (exit == false)
                 {
-                    await collection.AddAsync(1); 
+                    await collection.AddAsync(1);
                     Thread.Sleep(5);
                 }
             });
@@ -152,30 +153,71 @@ namespace kafka_tests.Unit
 
 
         [Test]
+        public async void TakeAsyncShouldPlayNiceWithTPL()
+        {
+            const int expected = 50;
+            const int max = 100;
+            var exit = false;
+            var collection = new NagleBlockingCollection<int>(10000000);
+
+            var sw = Stopwatch.StartNew();
+            var dataTask = collection.TakeBatch(expected, TimeSpan.FromMilliseconds(5000));
+
+            var tplAddingTask = Task.Factory.StartNew(() =>
+            {
+                Parallel.ForEach(Enumerable.Range(0, max),
+                    new ParallelOptions {MaxDegreeOfParallelism = 20},
+                    x =>
+                    {
+                        while (exit == false)
+                        {
+                            collection.AddAsync(x).Wait();
+                            Console.WriteLine("Added {0}", x);
+                            Thread.Sleep(100);
+                        }
+                    });
+            });
+
+            Console.WriteLine("Awaiting data...");
+            await dataTask;
+
+            Assert.That(dataTask.Result.Count, Is.EqualTo(expected));
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(5000));
+            Assert.That(collection.Count, Is.LessThan(max - expected));
+            Console.WriteLine("Left in collection: {0}", collection.Count);
+            exit = true;
+
+            Console.WriteLine("Waiting to unwind test...");
+            await tplAddingTask;
+        }
+
+        #region Stop/Dispose Tests...
+
+        [Test]
         public void StoppingCollectionShouldMarkAsComplete()
         {
             var collection = new NagleBlockingCollection<int>(100);
-            using(collection)
+            using (collection)
             {
-                Assert.That(collection.IsCompleted, Is.False);	
-				collection.CompleteAdding();
-				Assert.That(collection.IsCompleted, Is.True);
-			}
+                Assert.That(collection.IsCompleted, Is.False);
+                collection.CompleteAdding();
+                Assert.That(collection.IsCompleted, Is.True);
+            }
         }
 
-		[Test]
-		[ExpectedException(typeof(ObjectDisposedException))]
-		public async void StoppingCollectionShouldPreventMoreItemsAdded()
-		{
-			var collection = new NagleBlockingCollection<int>(100);
-			using (collection)
-			{
+        [Test]
+        [ExpectedException(typeof(ObjectDisposedException))]
+        public async void StoppingCollectionShouldPreventMoreItemsAdded()
+        {
+            var collection = new NagleBlockingCollection<int>(100);
+            using (collection)
+            {
                 await collection.AddAsync(1);
-				Assert.That(collection.Count, Is.EqualTo(1));
-				collection.CompleteAdding();
+                Assert.That(collection.Count, Is.EqualTo(1));
+                collection.CompleteAdding();
                 await collection.AddAsync(1);
-			}
-		}
+            }
+        }
 
         [Test]
         [ExpectedException(typeof(ObjectDisposedException))]
@@ -191,6 +233,7 @@ namespace kafka_tests.Unit
             await collection.AddAsync(1);
         }
 
-       
+        #endregion
+
     }
 }
