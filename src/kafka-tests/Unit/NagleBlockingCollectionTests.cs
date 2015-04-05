@@ -195,7 +195,7 @@ namespace kafka_tests.Unit
 
             dataTask.ContinueWith(x => exit = true);
 
-            Parallel.ForEach(Enumerable.Range(0, max),
+            Parallel.ForEach(Enumerable.Range(0, max).ToList(),
                    new ParallelOptions { MaxDegreeOfParallelism = 20 },
                    async x =>
                    {
@@ -228,7 +228,7 @@ namespace kafka_tests.Unit
             take3.ContinueWith(t => Console.WriteLine("Take3 done..."));
             Task.WhenAll(take1, take2, take3).ContinueWith(x => exit = true);
 
-            Parallel.ForEach(Enumerable.Range(0, max),
+            Parallel.ForEach(Enumerable.Range(0, max).ToList(),
                    new ParallelOptions { MaxDegreeOfParallelism = 20 },
                    async x =>
                    {
