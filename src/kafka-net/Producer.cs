@@ -268,7 +268,8 @@ namespace KafkaNet
                     };
 
                     //ensure the async is released as soon as each task is completed
-                    brokerSendTask.Task.ContinueWith(t => { _semaphoreMaximumAsync.Release(); }, cancellationToken);
+                    brokerSendTask.Task.ContinueWith(t => { _semaphoreMaximumAsync.Release(); }, cancellationToken, 
+                        TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
 
                     sendTasks.Add(brokerSendTask);
                 }
