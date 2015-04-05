@@ -1,6 +1,15 @@
 kafka-net Release Notes
 =========
 
+Version 0.9.0.14
+-------
+Fix memory leak in NagleBlockingCollection.
+Timeout does not reset when new data is added.
+Fix thread contention when producer has many threads loading data into it's buffer.
+Fix many deadlock senarios on cancelling and disposing.
+More unit tests around threading.
+
+
 Version 0.9.0.1
 -------
 

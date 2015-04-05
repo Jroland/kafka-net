@@ -149,11 +149,11 @@ namespace KafkaNet
                             try
                             {
                                 _log.DebugFormat("Awaiting message from: {0}", _client.Endpoint);
-                                var messageSizeResult = await _client.ReadAsync(4, _disposeToken.Token);
+                                var messageSizeResult = await _client.ReadAsync(4, _disposeToken.Token).ConfigureAwait(false);
                                 var messageSize = messageSizeResult.ToInt32();
 
                                 _log.DebugFormat("Received message of size: {0} From: {1}", messageSize, _client.Endpoint);
-                                var message = await _client.ReadAsync(messageSize, _disposeToken.Token);
+                                var message = await _client.ReadAsync(messageSize, _disposeToken.Token).ConfigureAwait(false);
 
                                 CorrelatePayloadToRequest(message);
                             }

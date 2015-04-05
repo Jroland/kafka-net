@@ -16,13 +16,12 @@ namespace KafkaNet
     {
         private const int MaxDisposeWaitSeconds = 30;
         private const int DefaultAckTimeoutMS = 1000;
-        private const int MaximumAsyncRequests = 100;
+        private const int MaximumAsyncRequests = 20;
         private const int MaximumMessageBuffer = 1000;
         private const int DefaultBatchDelayMS = 100;
         private const int DefaultBatchSize = 100;
 
         private readonly CancellationTokenSource _stopToken = new CancellationTokenSource();
-        private readonly IBrokerRouter _router;
         private readonly int _maximumAsyncRequests;
         private readonly NagleBlockingCollection<TopicMessage> _nagleBlockingCollection;
         private readonly SemaphoreSlim _semaphoreMaximumAsync;
@@ -70,9 +69,9 @@ namespace KafkaNet
         /// </remarks>
         public Producer(IBrokerRouter brokerRouter, int maximumAsyncRequests = MaximumAsyncRequests, int maximumMessageBuffer = MaximumMessageBuffer)
         {
-            _router = brokerRouter;
+            BrokerRouter = brokerRouter;
             _maximumAsyncRequests = maximumAsyncRequests;
-            _metadataQueries = new MetadataQueries(_router);
+            _metadataQueries = new MetadataQueries(BrokerRouter);
             _nagleBlockingCollection = new NagleBlockingCollection<TopicMessage>(maximumMessageBuffer);
             _semaphoreMaximumAsync = new SemaphoreSlim(maximumAsyncRequests, maximumAsyncRequests);
 
@@ -81,9 +80,10 @@ namespace KafkaNet
 
             _postTask = Task.Run(async () =>
             {
-                await BatchSendAsync();
+                await BatchSendAsync().ConfigureAwait(false);
                 //TODO add log for ending the sending thread.
             });
+
         }
 
         /// <summary>
@@ -110,12 +110,12 @@ namespace KafkaNet
                 Message = message
             }).ToList();
 
-            _nagleBlockingCollection.AddRange(batch);
+            await _nagleBlockingCollection.AddRangeAsync(batch, _stopToken.Token).ConfigureAwait(false);
 
             var results = new List<ProduceResponse>();
             foreach (var topicMessage in batch)
             {
-                results.Add(await topicMessage.Tcs.Task);
+                results.Add(await topicMessage.Tcs.Task.ConfigureAwait(false));
             }
 
             return results.Distinct().ToList();
@@ -131,7 +131,7 @@ namespace KafkaNet
             return _metadataQueries.GetTopic(topic);
         }
 
-        
+
         public Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
         {
             return _metadataQueries.GetTopicOffsetAsync(topic, maxOffsets, time);
@@ -142,7 +142,7 @@ namespace KafkaNet
         /// </summary>
         /// <param name="waitForRequestsToComplete">True to wait for in-flight requests to complete, false otherwise.</param>
         /// <param name="maxWait">Maximum time to wait for in-flight requests to complete. Has no effect if <c>waitForRequestsToComplete</c> is false</param>
-        public void Stop(bool waitForRequestsToComplete, TimeSpan? maxWait = null)
+        public void Stop(bool waitForRequestsToComplete = true, TimeSpan? maxWait = null)
         {
             //block incoming data
             _nagleBlockingCollection.CompleteAdding();
@@ -171,41 +171,60 @@ namespace KafkaNet
 
         private async Task BatchSendAsync()
         {
-            while (!_nagleBlockingCollection.IsCompleted)
+            var outstandingSendTasks = new System.Collections.Concurrent.ConcurrentDictionary<Task, Task>();
+            while (_nagleBlockingCollection.IsCompleted == false || _nagleBlockingCollection.Count > 0)
             {
+                List<TopicMessage> batch = null;
+
                 try
                 {
-                    List<TopicMessage> batch = null;
-
                     try
                     {
-                        batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _stopToken.Token);
+                        batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _stopToken.Token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException ex)
                     {
                         //TODO log that the operation was canceled, this only happens during a dispose
                     }
 
-                    if (_nagleBlockingCollection.IsAddingCompleted && _nagleBlockingCollection.Count > 0)
+                    if (_nagleBlockingCollection.IsCompleted && _nagleBlockingCollection.Count > 0)
                     {
+                        batch = batch ?? new List<TopicMessage>(_nagleBlockingCollection.Count);
+
                         //Drain any messages remaining in the queue and add them to the send batch
-                        var finalMessages = _nagleBlockingCollection.Drain();
-                        if (batch == null)
-                        {
-                            batch = finalMessages;
-                        }
-                        else
-                        {
-                            batch.AddRange(finalMessages);
-                        }
+                        batch.AddRange(_nagleBlockingCollection.Drain());
                     }
 
-                    await ProduceAndSendBatchAsync(batch, _stopToken.Token);
+                    //we want to fire the batch without blocking and then move on to fire another one
+                    var sendTask = ProduceAndSendBatchAsync(batch, _stopToken.Token);
+
+                    outstandingSendTasks.TryAdd(sendTask, sendTask);
+
+                    var sendTaskCleanup = sendTask.ContinueWith(result =>
+                    {
+                        if (result.IsFaulted && batch != null)
+                        {
+                            batch.ForEach(x => x.Tcs.TrySetException(result.ExtractException()));
+                        }
+
+                        //TODO add statistics tracking
+                        outstandingSendTasks.TryRemove(sendTask, out sendTask);
+                    });
+
                 }
                 catch (Exception ex)
                 {
-                    //TODO log the failure and keep going
+                    if (batch != null)
+                    {
+                        batch.ForEach(x => x.Tcs.TrySetException(ex));
+                    }
                 }
+            }
+
+            var referenceToOutstanding = outstandingSendTasks.Values.ToList();
+            if (referenceToOutstanding.Count > 0)
+            {
+                await Task.WhenAll(referenceToOutstanding).ConfigureAwait(false);
             }
         }
 
@@ -216,8 +235,8 @@ namespace KafkaNet
             {
                 var messageByRouter = ackLevelBatch.Select(batch => new
                                             {
-                                                TopicMessage = batch,  
-                                                Route = _router.SelectBrokerRoute(batch.Topic, batch.Message.Key),
+                                                TopicMessage = batch,
+                                                Route = BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Message.Key),
                                             })
                                          .GroupBy(x => new { x.Route, x.TopicMessage.Topic, x.TopicMessage.Codec });
 
@@ -239,22 +258,26 @@ namespace KafkaNet
                         Payload = new List<Payload> { payload }
                     };
 
-                    await _semaphoreMaximumAsync.WaitAsync(cancellationToken);
-                    sendTasks.Add(new BrokerRouteSendBatch
+                    await _semaphoreMaximumAsync.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+                    var brokerSendTask = new BrokerRouteSendBatch
                     {
                         Route = group.Key.Route,
                         Task = group.Key.Route.Connection.SendAsync(request),
                         MessagesSent = group.Select(x => x.TopicMessage).ToList()
-                    });
+                    };
+
+                    //ensure the async is released as soon as each task is completed
+                    brokerSendTask.Task.ContinueWith(t => { _semaphoreMaximumAsync.Release(); }, cancellationToken, 
+                        TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+
+                    sendTasks.Add(brokerSendTask);
                 }
 
                 try
                 {
-                    //release the async limit for each task as soon as they are complete.
-                    sendTasks.ForEach(x => x.Task.ContinueWith(t => _semaphoreMaximumAsync.Release(), cancellationToken));
-                    
-                    await Task.WhenAll(sendTasks.Select(x => x.Task));
-                    
+                    await Task.WhenAll(sendTasks.Select(x => x.Task)).ConfigureAwait(false);
+
                     foreach (var task in sendTasks)
                     {
                         task.MessagesSent.ForEach(x => x.Tcs.TrySetResult(task.Task.Result.FirstOrDefault()));
@@ -275,6 +298,8 @@ namespace KafkaNet
                 }
             }
         }
+
+        public IBrokerRouter BrokerRouter { get; private set; }
     }
 
     class TopicMessage

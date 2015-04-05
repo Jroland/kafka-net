@@ -44,7 +44,7 @@ namespace kafka_tests.Helpers
             {
                 await _semaphoreSlim.WaitAsync();
                 Console.WriteLine("FakeTcpServer: writing {0} bytes.", data.Length);
-                await _client.GetStream().WriteAsync(data, 0, data.Length);
+                await _client.GetStream().WriteAsync(data, 0, data.Length).ConfigureAwait(false);
             }
             finally
             {
