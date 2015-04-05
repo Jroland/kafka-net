@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
@@ -122,38 +124,22 @@ namespace KafkaNet.Common
         /// Execute an await task while monitoring a given cancellation token.  Use with non-cancelable async operations.
         /// </summary>
         /// <remarks>
-        /// Throws an OperationCanceledException when canceled.
-        /// </remarks>
-        public static async Task WithCancellation(this Task task, CancellationToken cancellationToken)
-        {
-            if (await WithCancellationResult(task, cancellationToken) == false)
-                throw new OperationCanceledException(cancellationToken);
-        }
-
-        /// <summary>
-        /// Execute an await task while monitoring a given cancellation token.  Use with non-cancelable async operations.
-        /// </summary>
-        /// <remarks>
         /// This extension method will only cancel the await and not the actual IO operation.  The status of the IO opperation will still
         /// need to be considered after the operation is cancelled.
         /// See <see cref="http://blogs.msdn.com/b/pfxteam/archive/2012/10/05/how-do-i-cancel-non-cancelable-async-operations.aspx"/>
         /// </remarks>
-        public static async Task<bool> WithCancellationResult(this Task task, CancellationToken cancellationToken)
+        public static async Task WithCancellation(this Task task, CancellationToken cancellationToken)
         {
             var tcs = new TaskCompletionSource<bool>();
 
-            using (cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs))
+            using (cancellationToken.Register(source => ((TaskCompletionSource<bool>) source).TrySetResult(true), tcs))
             {
-                return task == await Task.WhenAny(task, tcs.Task).ConfigureAwait(false);
+                if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
             }
         }
-
-        public static async Task<bool> WithTimeout(this Task task, TimeSpan timeout)
-        {
-            var timeoutCancellation = new CancellationTokenSource(timeout);
-            return await WithCancellationResult(task, timeoutCancellation.Token);
-        }
-
 
 
         /// <summary>
@@ -185,7 +171,7 @@ namespace KafkaNet.Common
                         // We take a lock here to make sure the outer method has completed setting the local variable callbackHandle.
                         lock (localVariableInitLock)
                         {
-                            if (callbackHandle != null) callbackHandle.Unregister(null);
+                            if (callbackHandle!= null) callbackHandle.Unregister(null);
                         }
                     },
                     state: null,
@@ -223,7 +209,7 @@ namespace KafkaNet.Common
             if (task.IsFaulted == false) return null;
             if (task.Exception != null)
                 return task.Exception.Flatten();
-
+            
             return new ApplicationException("Unknown exception occured.");
         }
     }
