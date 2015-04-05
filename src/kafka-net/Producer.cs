@@ -110,7 +110,7 @@ namespace KafkaNet
                 Message = message
             }).ToList();
 
-            await _nagleBlockingCollection.AddRangeAsync(batch).ConfigureAwait(false);
+            await _nagleBlockingCollection.AddRangeAsync(batch, _stopToken.Token).ConfigureAwait(false);
 
             var results = new List<ProduceResponse>();
             foreach (var topicMessage in batch)
@@ -142,7 +142,7 @@ namespace KafkaNet
         /// </summary>
         /// <param name="waitForRequestsToComplete">True to wait for in-flight requests to complete, false otherwise.</param>
         /// <param name="maxWait">Maximum time to wait for in-flight requests to complete. Has no effect if <c>waitForRequestsToComplete</c> is false</param>
-        public void Stop(bool waitForRequestsToComplete, TimeSpan? maxWait = null)
+        public void Stop(bool waitForRequestsToComplete = true, TimeSpan? maxWait = null)
         {
             //block incoming data
             _nagleBlockingCollection.CompleteAdding();
@@ -172,7 +172,7 @@ namespace KafkaNet
         private async Task BatchSendAsync()
         {
             var outstandingSendTasks = new System.Collections.Concurrent.ConcurrentDictionary<Task, Task>();
-            while (!_nagleBlockingCollection.IsCompleted)
+            while (_nagleBlockingCollection.IsCompleted == false || _nagleBlockingCollection.Count > 0)
             {
                 List<TopicMessage> batch = null;
 
@@ -198,6 +198,8 @@ namespace KafkaNet
                     //we want to fire the batch without blocking and then move on to fire another one
                     var sendTask = ProduceAndSendBatchAsync(batch, _stopToken.Token);
 
+                    outstandingSendTasks.TryAdd(sendTask, sendTask);
+
                     var sendTaskCleanup = sendTask.ContinueWith(result =>
                     {
                         if (result.IsFaulted && batch != null)
@@ -209,7 +211,6 @@ namespace KafkaNet
                         outstandingSendTasks.TryRemove(sendTask, out sendTask);
                     });
 
-                    outstandingSendTasks.TryAdd(sendTask, sendTaskCleanup);
                 }
                 catch (Exception ex)
                 {
@@ -220,7 +221,11 @@ namespace KafkaNet
                 }
             }
 
-            await Task.WhenAll(outstandingSendTasks.Values).ConfigureAwait(false);
+            var referenceToOutstanding = outstandingSendTasks.Values.ToList();
+            if (referenceToOutstanding.Count > 0)
+            {
+                await Task.WhenAll(referenceToOutstanding).ConfigureAwait(false);
+            }
         }
 
         private async Task ProduceAndSendBatchAsync(List<TopicMessage> batchs, CancellationToken cancellationToken)

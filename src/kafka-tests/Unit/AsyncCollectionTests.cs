@@ -100,7 +100,7 @@ namespace kafka_tests.Unit
         {
             var aq = new AsyncCollection<bool>();
 
-            var result = await aq.TakeAsync(100, TimeSpan.FromMilliseconds(100), CancellationToken.None);
+            var result = await aq.TakeAsync(100, TimeSpan.FromMilliseconds(100), CancellationToken.None).ConfigureAwait(false);
 
             Assert.That(result, Is.Not.Null);
             Assert.That(result.Count, Is.EqualTo(0));

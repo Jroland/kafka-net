@@ -272,11 +272,12 @@ namespace kafka_tests.Unit
             var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 1) { BatchSize = 10, BatchDelayTime = TimeSpan.FromMilliseconds(500) };
             using (producer)
             {
-                var senderTask = Task.Factory.StartNew(() =>
+                var senderTask = Task.Factory.StartNew(async () =>
                 {
-                    for (int i = 0; i < 2; i++)
+                    for (int i = 0; i < 3; i++)
                     {
-                        producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message(i.ToString()) });
+                        await producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message(i.ToString()) });
+                        Console.WriteLine("Await: {0}", producer.BufferCount);
                         Interlocked.Increment(ref count);
                     }
                 });
@@ -284,10 +285,13 @@ namespace kafka_tests.Unit
                 TaskTest.WaitFor(() => count > 0);
                 Assert.That(producer.BufferCount, Is.EqualTo(1));
 
-                senderTask.Wait();
+                Console.WriteLine("Waiting for the rest...");
+                senderTask.Wait(TimeSpan.FromSeconds(5));
 
                 Assert.That(senderTask.IsCompleted);
                 Assert.That(producer.BufferCount, Is.EqualTo(1), "One message should be left in the buffer.");
+
+                Console.WriteLine("Unwinding...");
             }
         }
         #endregion
@@ -326,10 +330,12 @@ namespace kafka_tests.Unit
                 Assert.That(producer.BufferCount, Is.EqualTo(1));
 
                 producer.Stop(true, TimeSpan.FromSeconds(5));
-
+                
                 await sendTask;
                 Assert.That(producer.BufferCount, Is.EqualTo(0));
                 Assert.That(sendTask.IsCompleted, Is.True);
+
+                Console.WriteLine("Unwinding test...");
             }
         }
 

@@ -38,31 +38,20 @@ namespace KafkaNet.Common
             IsCompleted = true;
         }
 
-        public Task AddRangeAsync(IEnumerable<T> data)
+        public Task AddRangeAsync(IEnumerable<T> data, CancellationToken token)
         {
-            return Task.WhenAll(data.Select(AddAsync));
+            return Task.WhenAll(data.Select(x => AddAsync(x, token)));
         }
 
-        public async Task AddAsync(T data)
+        public async Task AddAsync(T data, CancellationToken token)
         {
             if (IsCompleted)
             {
                 throw new ObjectDisposedException("NagleBlockingCollection is currently being disposed.  Cannot add documents.");
             }
 
-            await _boundedCapacitySemaphore.WaitAsync().ConfigureAwait(false);
+            await _boundedCapacitySemaphore.WaitAsync(token).ConfigureAwait(false);
             _collection.Add(data);
-        }
-
-        /// <summary>
-        /// Block until data arrives and then attempt to take batchSize amount of data with timeout.
-        /// </summary>
-        /// <param name="batchSize">The amount of data to try and pull from the collection.</param>
-        /// <param name="timeout">The maximum amount of time to wait until batchsize can be pulled from the collection.</param>
-        /// <returns></returns>
-        public Task<List<T>> TakeBatch(int batchSize, TimeSpan timeout)
-        {
-            return TakeBatch(batchSize, timeout, new CancellationToken());
         }
 
         /// <summary>
