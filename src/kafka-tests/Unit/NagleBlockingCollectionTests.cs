@@ -153,42 +153,66 @@ namespace kafka_tests.Unit
 
 
         [Test]
-        public async void TakeAsyncShouldPlayNiceWithTPL()
+        public void TakeAsyncShouldPlayNiceWithTPL()
         {
-            const int expected = 50;
+            const int expected = 200;
+            const int max = 300;
+            var exit = false;
+            var collection = new NagleBlockingCollection<int>(10000000);
+
+            var dataTask = collection.TakeBatch(expected, TimeSpan.FromSeconds(10));
+
+            dataTask.ContinueWith(x => exit = true);
+
+            Parallel.ForEach(Enumerable.Range(0, max),
+                   new ParallelOptions { MaxDegreeOfParallelism = 20 },
+                   async x =>
+                   {
+                       while (exit == false)
+                       {
+                           await collection.AddAsync(x);
+                           Thread.Sleep(100);
+                       }
+                   });
+
+            Console.WriteLine("Left in collection: {0}", collection.Count);
+            Assert.That(dataTask.Result.Count, Is.EqualTo(expected));
+            Assert.That(collection.Count, Is.LessThan(max - expected));
+        }
+
+        [Test]
+        public void TakeAsyncShouldBeThreadSafe()
+        {
+            const int expected = 10;
             const int max = 100;
             var exit = false;
             var collection = new NagleBlockingCollection<int>(10000000);
 
-            var sw = Stopwatch.StartNew();
-            var dataTask = collection.TakeBatch(expected, TimeSpan.FromMilliseconds(5000));
+            var take1 = collection.TakeBatch(expected, TimeSpan.FromSeconds(10));
+            var take2 = collection.TakeBatch(expected, TimeSpan.FromSeconds(10));
+            var take3 = collection.TakeBatch(expected, TimeSpan.FromSeconds(10));
 
-            var tplAddingTask = Task.Factory.StartNew(() =>
-            {
-                Parallel.ForEach(Enumerable.Range(0, max),
-                    new ParallelOptions {MaxDegreeOfParallelism = 20},
-                    x =>
-                    {
-                        while (exit == false)
-                        {
-                            collection.AddAsync(x).Wait();
-                            Console.WriteLine("Added {0}", x);
-                            Thread.Sleep(100);
-                        }
-                    });
-            });
+            take1.ContinueWith(t => Console.WriteLine("Take1 done..."));
+            take2.ContinueWith(t => Console.WriteLine("Take2 done..."));
+            take3.ContinueWith(t => Console.WriteLine("Take3 done..."));
+            Task.WhenAll(take1, take2, take3).ContinueWith(x => exit = true);
 
-            Console.WriteLine("Awaiting data...");
-            await dataTask;
+            Parallel.ForEach(Enumerable.Range(0, max),
+                   new ParallelOptions { MaxDegreeOfParallelism = 20 },
+                   async x =>
+                   {
+                       while (exit == false)
+                       {
+                           await collection.AddAsync(x);
+                           Thread.Sleep(100);
+                       }
+                   });
 
-            Assert.That(dataTask.Result.Count, Is.EqualTo(expected));
-            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(5000));
-            Assert.That(collection.Count, Is.LessThan(max - expected));
             Console.WriteLine("Left in collection: {0}", collection.Count);
-            exit = true;
-
-            Console.WriteLine("Waiting to unwind test...");
-            await tplAddingTask;
+            Assert.That(take1.Result.Count, Is.EqualTo(expected));
+            Assert.That(take2.Result.Count, Is.EqualTo(expected));
+            Assert.That(take3.Result.Count, Is.EqualTo(expected));
+            Assert.That(collection.Count, Is.LessThan(max - (expected*3)));
         }
 
         #region Stop/Dispose Tests...
