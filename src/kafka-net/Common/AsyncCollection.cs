@@ -11,10 +11,11 @@ namespace KafkaNet.Common
         private readonly object _lock = new object();
         private readonly AsyncManualResetEvent _dataAvailableEvent = new AsyncManualResetEvent();
         private readonly ConcurrentBag<T> _bag = new ConcurrentBag<T>();
+        private long _dataInBufferCount = 0;
 
         public int Count
         {
-            get { return _bag.Count; }
+            get { return _bag.Count + (int)Interlocked.Read(ref _dataInBufferCount); }
         }
 
         public bool IsCompleted { get; private set; }
@@ -61,6 +62,7 @@ namespace KafkaNet.Common
                     while (TryTake(out data))
                     {
                         batch.Add(data);
+                        Interlocked.Increment(ref _dataInBufferCount);
                         if (--count <= 0) return batch;
                     }
                 } while (await Task.WhenAny(_dataAvailableEvent.WaitAsync(), timeoutTask) != timeoutTask);
@@ -71,6 +73,21 @@ namespace KafkaNet.Common
             {
                 return batch;
             }
+            finally
+            {
+                Interlocked.Add(ref _dataInBufferCount, -1 * batch.Count);
+            }
+        }
+        
+        public IEnumerable<T> Drain()
+        {
+            T data;
+            while (_bag.TryTake(out data))
+            {
+                yield return data;
+            }
+
+            TriggerDataAvailability();
         }
 
         public bool TryTake(out T data)
@@ -83,17 +100,6 @@ namespace KafkaNet.Common
             {
                 if (_bag.IsEmpty) TriggerDataAvailability();
             }
-        }
-
-        public IEnumerable<T> Drain()
-        {
-            T data;
-            while (_bag.TryTake(out data))
-            {
-                yield return data;
-            }
-
-            TriggerDataAvailability();
         }
 
         private void TriggerDataAvailability()

@@ -88,7 +88,6 @@
     <Compile Include="Unit\MetadataQueriesTests.cs" />
     <Compile Include="Unit\ConsumerTests.cs" />
     <Compile Include="Unit\DefaultPartitionSelectorTests.cs" />
-    <Compile Include="Unit\NagleBlockingCollectionTests.cs" />
     <Compile Include="Unit\ProducerTests.cs" />
     <Compile Include="Unit\ProtocolBaseRequestTests.cs" />
     <Compile Include="Unit\ProtocolMessageTests.cs" />
