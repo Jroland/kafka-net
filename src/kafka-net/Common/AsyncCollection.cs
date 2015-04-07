@@ -17,6 +17,13 @@ namespace KafkaNet.Common
             get { return _bag.Count; }
         }
 
+        public bool IsCompleted { get; private set; }
+
+        public void CompleteAdding()
+        {
+            IsCompleted = true;
+        }
+
         public Task OnDataAvailable(CancellationToken token)
         {
             return _dataAvailableEvent.WaitAsync().WithCancellation(token);
@@ -24,6 +31,11 @@ namespace KafkaNet.Common
 
         public void Add(T data)
         {
+            if (IsCompleted)
+            {
+                throw new ObjectDisposedException("AsyncCollection has been marked as complete.  No new documents can be added.");
+            }
+
             _bag.Add(data);
             TriggerDataAvailability();
         }
@@ -32,9 +44,8 @@ namespace KafkaNet.Common
         {
             foreach (var item in data)
             {
-                _bag.Add(item);
+                Add(item);
             }
-            TriggerDataAvailability();
         }
 
         public async Task<List<T>> TakeAsync(int count, TimeSpan timeout, CancellationToken token)

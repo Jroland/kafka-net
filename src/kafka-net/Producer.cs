@@ -23,15 +23,17 @@ namespace KafkaNet
 
         private readonly CancellationTokenSource _stopToken = new CancellationTokenSource();
         private readonly int _maximumAsyncRequests;
-        private readonly NagleBlockingCollection<TopicMessage> _nagleBlockingCollection;
+        private readonly int _maximumMessageBuffer;
+        private readonly AsyncCollection<TopicMessage> _asyncCollection;
         private readonly SemaphoreSlim _semaphoreMaximumAsync;
+        private readonly SemaphoreSlim _boundedCapacitySemaphore;
         private readonly IMetadataQueries _metadataQueries;
         private readonly Task _postTask;
 
         /// <summary>
         /// Get the number of messages sitting in the buffer waiting to be sent. 
         /// </summary>
-        public int BufferCount { get { return _nagleBlockingCollection.Count; } }
+        public int BufferCount { get { return _maximumMessageBuffer - _boundedCapacitySemaphore.CurrentCount; } }
 
         /// <summary>
         /// Get the number of active async threads sending messages.
@@ -47,6 +49,11 @@ namespace KafkaNet
         /// The time to wait for a batch size of <see cref="BatchSize"/> before sending messages to kafka.
         /// </summary>
         public TimeSpan BatchDelayTime { get; set; }
+
+        /// <summary>
+        /// The broker router this producer uses to route messages.
+        /// </summary>
+        public IBrokerRouter BrokerRouter { get; private set; }
 
         /// <summary>
         /// Construct a Producer class.
@@ -71,9 +78,11 @@ namespace KafkaNet
         {
             BrokerRouter = brokerRouter;
             _maximumAsyncRequests = maximumAsyncRequests;
+            _maximumMessageBuffer = maximumMessageBuffer;
             _metadataQueries = new MetadataQueries(BrokerRouter);
-            _nagleBlockingCollection = new NagleBlockingCollection<TopicMessage>(maximumMessageBuffer);
+            _asyncCollection = new AsyncCollection<TopicMessage>();
             _semaphoreMaximumAsync = new SemaphoreSlim(maximumAsyncRequests, maximumAsyncRequests);
+            _boundedCapacitySemaphore = new SemaphoreSlim(maximumMessageBuffer, maximumMessageBuffer);
 
             BatchSize = DefaultBatchSize;
             BatchDelayTime = TimeSpan.FromMilliseconds(DefaultBatchDelayMS);
@@ -110,7 +119,12 @@ namespace KafkaNet
                 Message = message
             }).ToList();
 
-            await _nagleBlockingCollection.AddRangeAsync(batch, _stopToken.Token).ConfigureAwait(false);
+            foreach (var item in batch)
+            {
+                item.Tcs.Task.ContinueWith(t => _boundedCapacitySemaphore.Release(), TaskContinuationOptions.ExecuteSynchronously);
+                _boundedCapacitySemaphore.Wait(_stopToken.Token);
+                _asyncCollection.Add(item);
+            }
 
             var results = new List<ProduceResponse>();
             foreach (var topicMessage in batch)
@@ -145,7 +159,7 @@ namespace KafkaNet
         public void Stop(bool waitForRequestsToComplete = true, TimeSpan? maxWait = null)
         {
             //block incoming data
-            _nagleBlockingCollection.CompleteAdding();
+            _asyncCollection.CompleteAdding();
 
             if (waitForRequestsToComplete)
             {
@@ -156,23 +170,10 @@ namespace KafkaNet
             _stopToken.Cancel();
         }
 
-        public void Dispose()
-        {
-            //Clients really should call Stop() first, but just in case they didn't...
-            this.Stop(false);
-
-            //dispose
-            using (_stopToken)
-            using (_nagleBlockingCollection)
-            using (_metadataQueries)
-            {
-            }
-        }
-
         private async Task BatchSendAsync()
         {
             var outstandingSendTasks = new System.Collections.Concurrent.ConcurrentDictionary<Task, Task>();
-            while (_nagleBlockingCollection.IsCompleted == false || _nagleBlockingCollection.Count > 0)
+            while (_asyncCollection.IsCompleted == false || _asyncCollection.Count > 0)
             {
                 List<TopicMessage> batch = null;
 
@@ -180,19 +181,19 @@ namespace KafkaNet
                 {
                     try
                     {
-                        batch = await _nagleBlockingCollection.TakeBatch(BatchSize, BatchDelayTime, _stopToken.Token).ConfigureAwait(false);
+                        batch = await _asyncCollection.TakeAsync(BatchSize, BatchDelayTime, _stopToken.Token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException ex)
                     {
                         //TODO log that the operation was canceled, this only happens during a dispose
                     }
 
-                    if (_nagleBlockingCollection.IsCompleted && _nagleBlockingCollection.Count > 0)
+                    if (_asyncCollection.IsCompleted && _asyncCollection.Count > 0)
                     {
-                        batch = batch ?? new List<TopicMessage>(_nagleBlockingCollection.Count);
+                        batch = batch ?? new List<TopicMessage>(_asyncCollection.Count);
 
                         //Drain any messages remaining in the queue and add them to the send batch
-                        batch.AddRange(_nagleBlockingCollection.Drain());
+                        batch.AddRange(_asyncCollection.Drain());
                     }
 
                     //we want to fire the batch without blocking and then move on to fire another one
@@ -299,7 +300,19 @@ namespace KafkaNet
             }
         }
 
-        public IBrokerRouter BrokerRouter { get; private set; }
+        #region Dispose...
+        public void Dispose()
+        {
+            //Clients really should call Stop() first, but just in case they didn't...
+            this.Stop(false);
+
+            //dispose
+            using (_stopToken)
+            using (_metadataQueries)
+            {
+            }
+        } 
+        #endregion
     }
 
     class TopicMessage
