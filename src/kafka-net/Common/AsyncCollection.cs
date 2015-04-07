@@ -25,13 +25,6 @@ namespace KafkaNet.Common
             IsCompleted = true;
         }
 
-        public bool IsCompleted { get; private set; }
-
-        public void CompleteAdding()
-        {
-            IsCompleted = true;
-        }
-
         public Task OnDataAvailable(CancellationToken token)
         {
             return _dataAvailableEvent.WaitAsync().WithCancellation(token);
