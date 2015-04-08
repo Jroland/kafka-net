@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -107,17 +107,17 @@ namespace KafkaNet
             {
                 var asyncRequest = new AsyncRequestItem(request.CorrelationId);
 
+
                 try
                 {
                     AddAsyncRequestItemToResponseQueue(asyncRequest);
-
                     await SendAsync(request.Encode()).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException ex)
                 {
                     TriggerMessageTimeout(asyncRequest);
                 }
-
+                
                 var response = await asyncRequest.ReceiveTask.Task.ConfigureAwait(false);
 
                 return request.Decode(response).ToList();
