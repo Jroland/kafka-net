@@ -31,15 +31,15 @@ namespace KafkaNet
         /// Convenience function to write full buffer data to the server.
         /// </summary>
         /// <param name="buffer">The buffer data to send.</param>
-        /// <returns>Returns Task handle to the write operation.</returns>
-        Task WriteAsync(byte[] buffer);
+        /// <returns>Returns Task handle to the write operation with size of written bytes.</returns>
+        Task<int> WriteAsync(byte[] buffer);
 
         /// <summary>
         /// Write the buffer data to the server.
         /// </summary>
         /// <param name="buffer">The buffer data to send.</param>
         /// <param name="cancellationToken">A cancellation token which will cancel the request.</param>
-        /// <returns>Returns Task handle to the write operation.</returns>
-        Task WriteAsync(byte[] buffer, CancellationToken cancellationToken);
+        /// <returns>Returns Task handle to the write operation ith size of written bytes..</returns>
+        Task<int> WriteAsync(byte[] buffer, CancellationToken cancellationToken);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -78,8 +79,8 @@ namespace KafkaNet
         /// Convenience function to write full buffer data to the server.
         /// </summary>
         /// <param name="buffer">The buffer data to send.</param>
-        /// <returns>Returns Task handle to the write operation.</returns>
-        public Task WriteAsync(byte[] buffer)
+        /// <returns>Returns Task handle to the write operation with size of written bytes..</returns>
+        public Task<int> WriteAsync(byte[] buffer)
         {
             return WriteAsync(buffer, _disposeToken.Token);
         }
@@ -90,14 +91,14 @@ namespace KafkaNet
         /// </summary>
         /// <param name="buffer">The buffer data to send.</param>
         /// <param name="cancellationToken">A cancellation token which will cancel the request.</param>
-        /// <returns>Returns Task handle to the write operation.</returns>
-        public Task WriteAsync(byte[] buffer, CancellationToken cancellationToken)
+        /// <returns>Returns Task handle to the write operation with size of written bytes..</returns>
+        public Task<int> WriteAsync(byte[] buffer, CancellationToken cancellationToken)
         {
             return EnsureWriteAsync(buffer, 0, buffer.Length, cancellationToken);
         }
         #endregion
 
-        private async Task EnsureWriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        private async Task<int> EnsureWriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
         {
             try
             {
@@ -107,6 +108,7 @@ namespace KafkaNet
                     //writing to network stream is not thread safe
                     //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
                     await netStream.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+                    return buffer.Length;
                 }
             }
             catch

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
@@ -42,6 +43,7 @@ namespace KafkaNet.Protocol
         #region Protocol...
         private byte[] EncodeProduceRequest(ProduceRequest request)
         {
+            int compressedAmount = 0;
             if (request.Payload == null) request.Payload = new List<Payload>();
 
             var groupedPayloads = (from p in request.Payload
@@ -71,18 +73,36 @@ namespace KafkaNet.Protocol
                             message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
                             break;
                         case MessageCodec.CodecGzip:
-                            message.Pack(Message.EncodeMessageSet(CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages))));
+                            var compressedMessage = CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages));
+                            Interlocked.Add(ref compressedAmount, compressedMessage.CompressedAmount);
+                            message.Pack(Message.EncodeMessageSet(new[] { compressedMessage.CompressedMessage }));
                             break;
                         default:
                             throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
                     }
                 }
 
-                return message.Payload();
+                var result = message.Payload();
+                Console.WriteLine("Message: {0}M Compressed: {1}M Ratio: {2}", ConvertToMegs(result.Length), ConvertToMegs(compressedAmount), CalculateRatio(result.Length, compressedAmount));
+                return result;
             }
         }
 
-        private IEnumerable<Message> CreateGzipCompressedMessage(IEnumerable<Message> messages)
+        private double ConvertToMegs(int bytes)
+        {
+            if (bytes == 0) return 0;
+            return Math.Round((double) bytes/1048576, 4);
+        }
+
+        private double CalculateRatio(int message, int compressed)
+        {
+            var total = message + compressed;
+            if (total == 0) return 0;
+
+            return Math.Round((double) compressed/total, 2);
+        }
+
+        private CompressedMessageResult CreateGzipCompressedMessage(IEnumerable<Message> messages)
         {
             var messageSet = Message.EncodeMessageSet(messages);
 
@@ -94,7 +114,11 @@ namespace KafkaNet.Protocol
                 Value = gZipBytes
             };
 
-            return new[] { compressedMessage };
+            return new CompressedMessageResult
+            {
+                CompressedAmount = messageSet.Length - compressedMessage.Value.Length,
+                CompressedMessage = compressedMessage
+            };
         }
 
         private IEnumerable<ProduceResponse> DecodeProduceResponse(byte[] data)
@@ -125,6 +149,12 @@ namespace KafkaNet.Protocol
             }
         }
         #endregion
+    }
+
+    class CompressedMessageResult
+    {
+        public int CompressedAmount { get; set; }
+        public Message CompressedMessage { get; set; }
     }
 
     public class ProduceResponse

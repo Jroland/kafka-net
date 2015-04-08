@@ -48,6 +48,7 @@
     <Compile Include="Common\AsyncManualResetEvent.cs" />
     <Compile Include="Common\AsyncCollection.cs" />
     <Compile Include="Common\KafkaMessagePacker.cs" />
+    <Compile Include="Statistics\StatisticsTracker.cs" />
     <Compile Include="Default\ConsoleLog.cs" />
     <Compile Include="Default\DefaultKafkaConnectionFactory.cs" />
     <Compile Include="Interfaces\IMetadataQueries.cs" />
