@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
@@ -15,6 +13,52 @@ namespace kafka_tests.Unit
     [Category("Unit")]
     public class AsyncLockTests
     {
+        [Test]
+        [ExpectedException(typeof(OperationCanceledException))]
+        public async void AsyncLockShouldCancelShouldThrowOperationCanceledException()
+        {
+            var count = 0;
+            var token = new CancellationTokenSource(TimeSpan.FromMilliseconds(10));
+            var alock = new AsyncLock();
+
+            for (int i = 0; i < 2; i++)
+            {
+                //the second call will timeout
+                using (await alock.LockAsync(token.Token))
+                {
+                    Interlocked.Increment(ref count);
+                    Thread.Sleep(20);
+                }
+            }
+            Assert.That(count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async void AsyncLockCancelShouldNotAllowInsideLock()
+        {
+            var count = 0;
+            var token = new CancellationTokenSource(TimeSpan.FromMilliseconds(10));
+            var alock = new AsyncLock();
+
+            try
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    //the second call will timeout
+                    using (await alock.LockAsync(token.Token))
+                    {
+                        Interlocked.Increment(ref count);
+                        Thread.Sleep(20);
+                    }
+                }
+            }
+            catch 
+            {
+            }
+
+            Assert.That(count, Is.EqualTo(1));
+        }
+
         [Test]
         public void AsyncLockShouldAllowMultipleStackedWaits()
         {

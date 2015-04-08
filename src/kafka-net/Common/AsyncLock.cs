@@ -29,11 +29,16 @@ namespace KafkaNet.Common
 		public Task<Releaser> LockAsync(CancellationToken canceller)
 		{
 			var wait = _semaphore.WaitAsync(canceller);
+            
+            if (wait.IsCanceled) throw new OperationCanceledException("Unable to aquire lock within timeout alloted.");
+
 			return wait.IsCompleted ?
 				_releaser :
-				wait.ContinueWith((_, state) => new Releaser((AsyncLock)state),
-					this, canceller,
-					TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+				wait.ContinueWith((t, state) =>
+				{
+                    if (t.IsCanceled) throw new OperationCanceledException("Unable to aquire lock within timeout alloted.");
+                    return new Releaser((AsyncLock) state);
+				},  this, canceller, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
 		}
 
 		public Task<Releaser> LockAsync()
