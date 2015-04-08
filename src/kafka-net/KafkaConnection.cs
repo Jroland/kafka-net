@@ -79,6 +79,17 @@ namespace KafkaNet
             return _client.WriteAsync(payload);
         }
 
+        /// <summary>
+        /// Send raw byte[] payload to the kafka server with a task indicating upload is complete.
+        /// </summary>
+        /// <param name="payload">kafka protocol formatted byte[] payload</param>
+        /// <param name="token">Cancellation token used to cancel the transfer.</param>
+        /// <returns>Task which signals the completion of the upload of data to the server.</returns>
+        public Task SendAsync(byte[] payload, CancellationToken token)
+        {
+            return _client.WriteAsync(payload, token);
+        }
+
 
         /// <summary>
         /// Send kafka payload to server and receive a task event when response is received.
@@ -99,8 +110,18 @@ namespace KafkaNet
                 if (_requestIndex.TryAdd(request.CorrelationId, asyncRequest) == false)
                     throw new ApplicationException("Failed to register request for async response.");
 
-                await SendAsync(request.Encode()).ConfigureAwait(false);
-
+                try
+                {
+                    using (var timeoutCancel = new CancellationTokenSource(_responseTimeoutMS))
+                    {
+                        await SendAsync(request.Encode(), timeoutCancel.Token).ConfigureAwait(false);
+                    }
+                }
+                catch (OperationCanceledException ex)
+                {
+                    TriggerMessageTimeout(asyncRequest);
+                }
+                
                 var response = await asyncRequest.ReceiveTask.Task.ConfigureAwait(false);
 
                 return request.Decode(response).ToList();
@@ -216,19 +237,7 @@ namespace KafkaNet
 
                 foreach (var timeout in timeouts)
                 {
-                    AsyncRequestItem request;
-                    if (_requestIndex.TryRemove(timeout.CorrelationId, out request))
-                    {
-                        if (_disposeToken.IsCancellationRequested)
-                        {
-                            request.ReceiveTask.TrySetException(new ObjectDisposedException("The object is being disposed and the connection is closing."));
-                        }
-                        else
-                        {
-                            request.ReceiveTask.TrySetException(new ResponseTimeoutException(
-                                string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.", _responseTimeoutMS)));
-                        }
-                    }
+                    TriggerMessageTimeout(timeout);
                 }
             }
             finally
@@ -236,6 +245,26 @@ namespace KafkaNet
                 _timeoutSemaphore.Release();
             }
         }
+
+        private void TriggerMessageTimeout(AsyncRequestItem asyncRequestItem)
+        {
+            AsyncRequestItem request;
+            if (_requestIndex.TryRemove(asyncRequestItem.CorrelationId, out request))
+            {
+                if (_disposeToken.IsCancellationRequested)
+                {
+                    request.ReceiveTask.TrySetException(
+                        new ObjectDisposedException("The object is being disposed and the connection is closing."));
+                }
+                else
+                {
+                    request.ReceiveTask.TrySetException(new ResponseTimeoutException(
+                        string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.",
+                            _responseTimeoutMS)));
+                }
+            }
+        }
+
 
         public void Dispose()
         {

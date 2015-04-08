@@ -137,6 +137,26 @@ namespace kafka_tests.Unit
         #endregion
 
         #region Send Tests...
+
+        [Test]
+        public void SendAsyncShouldTimeoutWhenSendAsyncTakesTooLong()
+        {
+            using (var server = new FakeTcpServer(8999))
+            using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
+            using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(1), log: _log))
+            {
+                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
+                Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
+
+                var taskResult = conn.SendAsync(new MetadataRequest());
+
+                taskResult.ContinueWith(t => taskResult = t).Wait(TimeSpan.FromMilliseconds(100));
+
+                Assert.That(taskResult.IsFaulted, Is.True, "Task should have reported an exception.");
+                Assert.That(taskResult.Exception.InnerException, Is.TypeOf<ResponseTimeoutException>());
+            }
+        }
+
         [Test]
         public void SendAsyncShouldTimeoutByThrowingResponseTimeoutException()
         {
