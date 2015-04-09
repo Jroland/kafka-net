@@ -99,7 +99,7 @@ namespace KafkaNet
                 if (_requestIndex.TryAdd(request.CorrelationId, asyncRequest) == false)
                     throw new ApplicationException("Failed to register request for async response.");
 
-                await SendAsync(request.Encode()).ConfigureAwait(false);
+                SendAsync(request.Encode());
 
                 var response = await asyncRequest.ReceiveTask.Task.ConfigureAwait(false);
 
