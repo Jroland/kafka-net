@@ -72,52 +72,53 @@ namespace SimpleKafka.Protocol
         /// </summary>
         /// <param name="messages">The collection of messages to encode together.</param>
         /// <returns>Encoded byte[] representing the collection of messages.</returns>
-        public static byte[] EncodeMessageSet(IEnumerable<Message> messages)
+        public static void EncodeMessageSet(ref BigEndianEncoder encoder, IEnumerable<Message> messages)
         {
-            using (var stream = new KafkaMessagePacker())
+            foreach (var message in messages)
             {
-                foreach (var message in messages)
-                {
-                    stream.Pack(InitialMessageOffset)
-                        .Pack(EncodeMessage(message));
-                }
-
-                return stream.PayloadNoLength();
+                encoder.Write(InitialMessageOffset);
+                var marker = encoder.PrepareForLength();
+                EncodeMessage(message, ref encoder);
+                encoder.WriteLength(marker);
             }
         }
 
         /// <summary>
         /// Decode a byte[] that represents a collection of messages.
         /// </summary>
-        /// <param name="messageSet">The byte[] encode as a message set from kafka.</param>
-        /// <returns>Enumerable representing stream of messages decoded from byte[]</returns>
-        public static IEnumerable<Message> DecodeMessageSet(byte[] messageSet)
+        /// <param name="decoder">The decoder positioned at the start of the buffer</param>
+        /// <returns>The messages</returns>
+        public static List<Message> DecodeMessageSet(int partitionId, ref BigEndianDecoder decoder, int messageSetSize)
         {
-            using (var stream = new BigEndianBinaryReader(messageSet))
+            var numberOfBytes = messageSetSize;
+
+            var messages = new List<Message>();
+            while (numberOfBytes > 0)
             {
-                while (stream.HasData)
+
+                if (numberOfBytes < MessageHeaderSize)
                 {
-                    //this checks that we have at least the minimum amount of data to retrieve a header
-                    if (stream.Available(MessageHeaderSize) == false)
-                        yield break;
-
-                    var offset = stream.ReadInt64();
-                    var messageSize = stream.ReadInt32();
-
-                    //if messagessize is greater than the total payload, our max buffer is insufficient.
-                    if ((stream.Length - MessageHeaderSize) < messageSize)
-                        throw new BufferUnderRunException(MessageHeaderSize, messageSize);
-
-                    //if the stream does not have enough left in the payload, we got only a partial message
-                    if (stream.Available(messageSize) == false)
-                        yield break;
-
-                    foreach (var message in DecodeMessage(offset, stream.RawRead(messageSize)))
-                    {
-                        yield return message;
-                    }
+                    break;
                 }
+                var offset = decoder.ReadInt64();
+                var messageSize = decoder.ReadInt32();
+                if (messageSetSize - MessageHeaderSize < messageSize)
+                {
+                    // This message is too big to fit in the buffer so we will never get it
+                    throw new BufferUnderRunException(numberOfBytes, messageSize);
+                }
+
+                numberOfBytes -= MessageHeaderSize;
+                if (numberOfBytes < messageSize)
+                {
+                    break;
+                }
+
+                var message = DecodeMessage(offset, partitionId, ref decoder, messageSize);
+                messages.Add(message);
+                numberOfBytes -= messageSize;
             }
+            return messages;
         }
 
         /// <summary>
@@ -129,16 +130,14 @@ namespace SimpleKafka.Protocol
         /// Format:
         /// Crc (Int32), MagicByte (Byte), Attribute (Byte), Key (Byte[]), Value (Byte[])
         /// </remarks>
-        public static byte[] EncodeMessage(Message message)
+        public static void EncodeMessage(Message message, ref BigEndianEncoder encoder)
         {
-            using(var stream = new KafkaMessagePacker())
-            {
-                return stream.Pack(message.MagicNumber)
-                    .Pack(message.Attribute)
-                    .Pack(message.Key)
-                    .Pack(message.Value)
-                    .CrcPayload();
-            }
+            var marker = encoder.PrepareForCrc();
+            encoder.Write(message.MagicNumber);
+            encoder.Write(message.Attribute);
+            encoder.Write(message.Key);
+            encoder.Write(message.Value);
+            encoder.CalculateCrc(marker);
         }
 
         /// <summary>
@@ -146,35 +145,36 @@ namespace SimpleKafka.Protocol
         /// </summary>
         /// <param name="offset">The offset represting the log entry from kafka of this message.</param>
         /// <param name="payload">The byte[] encode as a message from kafka.</param>
-        /// <returns>Enumerable representing stream of messages decoded from byte[].</returns>
+        /// <returns>The message</returns>
         /// <remarks>The return type is an Enumerable as the message could be a compressed message set.</remarks>
-        public static IEnumerable<Message> DecodeMessage(long offset, byte[] payload)
+        public static Message DecodeMessage(long offset, int partitionId, ref BigEndianDecoder decoder, int messageSize)
         {
-            var crc = payload.Take(4).ToArray();
-            using (var stream = new BigEndianBinaryReader(payload.Skip(4)))
+            var crc = decoder.ReadUInt32();
+            var calculatedCrc = Crc32Provider.Compute(decoder.Buffer, decoder.Offset, messageSize - 4);
+            if (calculatedCrc != crc)
             {
-                if (crc.SequenceEqual(stream.CrcHash()) == false)
-                    throw new FailCrcCheckException("Payload did not match CRC validation.");
-
-                var message = new Message
-                {
-                    Meta = new MessageMetadata { Offset = offset },
-                    MagicNumber = stream.ReadByte(),
-                    Attribute = stream.ReadByte(),
-                    Key = stream.ReadIntPrefixedBytes()
-                };
-
-                var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
-                switch (codec)
-                {
-                    case MessageCodec.CodecNone:
-                        message.Value = stream.ReadIntPrefixedBytes();
-                        yield return message;
-                        break;
-                    default:
-                        throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
-                }
+                throw new FailCrcCheckException("Payload did not match CRC validation.");
             }
+
+            var message = new Message
+            {
+                Meta = new MessageMetadata { Offset = offset, PartitionId = partitionId },
+                MagicNumber = decoder.ReadByte(),
+                Attribute = decoder.ReadByte(),
+                Key = decoder.ReadIntPrefixedBytes(),
+                
+            };
+            var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
+            switch (codec)
+            {
+                case MessageCodec.CodecNone:
+                    message.Value = decoder.ReadIntPrefixedBytes();
+                    break;
+
+                default:
+                    throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
+            }
+            return message;
         }
     }
 

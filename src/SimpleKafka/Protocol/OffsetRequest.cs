@@ -8,84 +8,82 @@ namespace SimpleKafka.Protocol
     /// <summary>
     /// A funky Protocol for requesting the starting offset of each segment for the requested partition 
     /// </summary>
-    public class OffsetRequest : BaseRequest, IKafkaRequest<OffsetResponse>
+    public class OffsetRequest : BaseRequest, IKafkaRequest<List<OffsetResponse>>
     {
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Offset; } }
         public List<Offset> Offsets { get; set; }
 
-        public byte[] Encode()
+        public void Encode(ref BigEndianEncoder encoder)
         {
-            return EncodeOffsetRequest(this);
+            EncodeOffsetRequest(this, ref encoder);
         }
 
-        public IEnumerable<OffsetResponse> Decode(byte[] payload)
+        public List<OffsetResponse> Decode(ref BigEndianDecoder decoder)
         {
-            return DecodeOffsetResponse(payload);
+            return DecodeOffsetResponse(ref decoder);
         }
 
-        private byte[] EncodeOffsetRequest(OffsetRequest request)
+        private static void EncodeOffsetRequest(OffsetRequest request, ref BigEndianEncoder encoder)
         {
             if (request.Offsets == null) request.Offsets = new List<Offset>();
-            using (var message = EncodeHeader(request))
+            EncodeHeader(request, ref encoder);
+            encoder.Write(ReplicaId);
+
+            var topicGroups = request.Offsets.GroupBy(x => x.Topic).ToList();
+            encoder.Write(topicGroups.Count);
+
+            foreach (var topicGroup in topicGroups)
             {
-                var topicGroups = request.Offsets.GroupBy(x => x.Topic).ToList();
-                message.Pack(ReplicaId)
-                       .Pack(topicGroups.Count);
+                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                encoder.Write(topicGroup.Key, StringPrefixEncoding.Int16);
+                encoder.Write(partitions.Count);
 
-                foreach (var topicGroup in topicGroups)
+                foreach (var partition in partitions)
                 {
-                    var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                    message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
-                        .Pack(partitions.Count);
-
-                    foreach (var partition in partitions)
+                    foreach (var offset in partition)
                     {
-                        foreach (var offset in partition)
-                        {
-                            message.Pack(partition.Key)
-                                .Pack(offset.Time)
-                                .Pack(offset.MaxOffsets);
-                        }
+                        encoder.Write(partition.Key);
+                        encoder.Write(offset.Time);
+                        encoder.Write(offset.MaxOffsets);
                     }
                 }
-
-                return message.Payload();
             }
+
         }
 
 
-        private IEnumerable<OffsetResponse> DecodeOffsetResponse(byte[] data)
+        private static List<OffsetResponse> DecodeOffsetResponse(ref BigEndianDecoder decoder)
         {
-            using (var stream = new BigEndianBinaryReader(data))
+            var correlationId = decoder.ReadInt32();
+
+            var responses = new List<OffsetResponse>();
+            var topicCount = decoder.ReadInt32();
+            for (int i = 0; i < topicCount; i++)
             {
-                var correlationId = stream.ReadInt32();
+                var topic = decoder.ReadInt16String();
 
-                var topicCount = stream.ReadInt32();
-                for (int i = 0; i < topicCount; i++)
+                var partitionCount = decoder.ReadInt32();
+                for (int j = 0; j < partitionCount; j++)
                 {
-                    var topic = stream.ReadInt16String();
-
-                    var partitionCount = stream.ReadInt32();
-                    for (int j = 0; j < partitionCount; j++)
+                    var response = new OffsetResponse()
                     {
-                        var response = new OffsetResponse()
-                        {
-                            Topic = topic,
-                            PartitionId = stream.ReadInt32(),
-                            Error = stream.ReadInt16(),
-                            Offsets = new List<long>()
-                        };
-                        var offsetCount = stream.ReadInt32();
-                        for (int k = 0; k < offsetCount; k++)
-                        {
-                            response.Offsets.Add(stream.ReadInt64());
-                        }
-
-                        yield return response;
+                        Topic = topic,
+                        PartitionId = decoder.ReadInt32(),
+                        Error = decoder.ReadInt16(),
+                        Offsets = new List<long>()
+                    };
+                    var offsetCount = decoder.ReadInt32();
+                    for (int k = 0; k < offsetCount; k++)
+                    {
+                        response.Offsets.Add(decoder.ReadInt64());
                     }
+
+                    responses.Add(response);
                 }
             }
+            return responses;
         }
+        
     }
 
     public class Offset

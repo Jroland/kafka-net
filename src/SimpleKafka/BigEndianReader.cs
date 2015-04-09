@@ -37,13 +37,7 @@ namespace SimpleKafka
         {
             var buffer = commonBuffer;
             await ReadFullyAsync(buffer, 0, 4, token).ConfigureAwait(false);
-            unchecked
-            {
-                return (buffer[0] << 24) |
-                    (buffer[1] << 16) |
-                    (buffer[2] << 8) |
-                    (buffer[3]);
-            }
+            return new BigEndianDecoder(buffer).ReadInt32();
         }
 
         public async Task<byte[]> ReadBytesAsync(int numberOfBytes, CancellationToken token)

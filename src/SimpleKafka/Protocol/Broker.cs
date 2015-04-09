@@ -10,14 +10,14 @@ namespace SimpleKafka.Protocol
         public int Port { get; set; }
         public Uri Address { get { return new Uri(string.Format("http://{0}:{1}", Host, Port));} }
 
-        public static Broker FromStream(BigEndianBinaryReader stream)
+        public static Broker Decode(ref BigEndianDecoder decoder)
         {
             return new Broker
-                {
-                    BrokerId = stream.ReadInt32(),
-                    Host = stream.ReadInt16String(),
-                    Port = stream.ReadInt32()
-                };
+            {
+                BrokerId = decoder.ReadInt32(),
+                Host = decoder.ReadInt16String(),
+                Port = decoder.ReadInt32()
+            };
         }
     }
 }

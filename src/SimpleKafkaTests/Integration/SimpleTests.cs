@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 namespace SimpleKafkaTests.Integration
 {
     [TestFixture]
-    [Category("Unit")]
+    [Category("Integration")]
     class SimpleTests
     {
         [SetUp]
@@ -211,8 +211,8 @@ namespace SimpleKafkaTests.Integration
                         };
 
                         var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Is.Not.Null);
-                        var first = response;
+                        Assert.That(response, Has.Count.EqualTo(1));
+                        var first = response.First();
 
                         Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
                         Assert.That(first.HighWaterMark, Is.EqualTo(4));
@@ -248,8 +248,8 @@ namespace SimpleKafkaTests.Integration
                         };
 
                         var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Is.Not.Null);
-                        var first = response;
+                        Assert.That(response, Has.Count.EqualTo(1));
+                        var first = response.First();
 
                         Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
                         Assert.That(first.Topic, Is.EqualTo(topic));
@@ -275,8 +275,8 @@ namespace SimpleKafkaTests.Integration
                         };
 
                         var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Is.Not.Null);
-                        var first = response;
+                        Assert.That(response, Has.Count.EqualTo(1));
+                        var first = response.First();
 
                         Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
                         Assert.That(first.Topic, Is.EqualTo(topic));
@@ -304,8 +304,9 @@ namespace SimpleKafkaTests.Integration
                                }
                         };
                         var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Is.Not.Null);
-                        var first = response;
+                        Assert.That(response, Has.Count.EqualTo(1));
+                        var first = response.First();
+
                         Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
                         Assert.That(first.Topic, Is.EqualTo(topic));
                         Assert.That(first.PartitionId, Is.EqualTo(0));
@@ -326,8 +327,8 @@ namespace SimpleKafkaTests.Integration
                         };
 
                         var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Is.Not.Null);
-                        var first = response;
+                        Assert.That(response, Has.Count.EqualTo(1));
+                        var first = response.First();
 
                         Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
                         Assert.That(first.Topic, Is.EqualTo(topic));
@@ -354,8 +355,8 @@ namespace SimpleKafkaTests.Integration
                         };
 
                         var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Is.Not.Null);
-                        var first = response;
+                        Assert.That(response, Has.Count.EqualTo(1));
+                        var first = response.First();
 
                         Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
                         Assert.That(first.HighWaterMark, Is.EqualTo(4));
@@ -406,8 +407,8 @@ namespace SimpleKafkaTests.Integration
                         };
 
                         var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Is.Not.Null);
-                        var first = response;
+                        Assert.That(response, Has.Count.EqualTo(1));
+                        var first = response.First();
 
                         Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
                         Assert.That(first.HighWaterMark, Is.EqualTo(4));

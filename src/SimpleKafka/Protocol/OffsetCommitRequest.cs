@@ -11,7 +11,7 @@ namespace SimpleKafka.Protocol
     /// arbitrary ConsumerGroup name provided by the call.
     /// This now supports version 0 and 1 of the protocol
     /// </summary>
-    public class OffsetCommitRequest : BaseRequest, IKafkaRequest<OffsetCommitResponse>
+    public class OffsetCommitRequest : BaseRequest, IKafkaRequest<List<OffsetCommitResponse>>
     {
         public OffsetCommitRequest(Int16 version = 1) : base(version)
         {
@@ -22,85 +22,77 @@ namespace SimpleKafka.Protocol
         public string ConsumerId { get; set; }
         public List<OffsetCommit> OffsetCommits { get; set; }
 
-        public byte[] Encode()
+        public void Encode(ref BigEndianEncoder encoder)
         {
-            return EncodeOffsetCommitRequest(this);
+            EncodeOffsetCommitRequest(this, ref encoder);
         }
 
-        public IEnumerable<OffsetCommitResponse> Decode(byte[] payload)
+        public List<OffsetCommitResponse> Decode(ref BigEndianDecoder decoder)
         {
-            return DecodeOffsetCommitResponse(payload);
+            return DecodeOffsetCommitResponse(ref decoder);
         }
 
-        private byte[] EncodeOffsetCommitRequest(OffsetCommitRequest request)
+        private static void EncodeOffsetCommitRequest(OffsetCommitRequest request, ref BigEndianEncoder encoder)
         {
             if (request.OffsetCommits == null) request.OffsetCommits = new List<OffsetCommit>();
-
-            using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
+            EncodeHeader(request, ref encoder);
+            encoder.Write(request.ConsumerGroup, StringPrefixEncoding.Int16);
+            if (request.ApiVersion == 1)
             {
-                if (ApiVersion == 1)
-                {
-                    message
-                        .Pack(ConsumerGroupGenerationId)
-                        .Pack(ConsumerId, StringPrefixEncoding.Int16);
-                }
-                var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
-                message.Pack(topicGroups.Count);
+                encoder.Write(request.ConsumerGroupGenerationId);
+                encoder.Write(request.ConsumerId, StringPrefixEncoding.Int16);
+            }
 
-                foreach (var topicGroup in topicGroups)
-                {
-                    var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                    message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
-                        .Pack(partitions.Count);
+            var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
+            encoder.Write(topicGroups.Count);
 
-                    foreach (var partition in partitions)
+            foreach (var topicGroup in topicGroups)
+            {
+                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                encoder.Write(topicGroup.Key, StringPrefixEncoding.Int16);
+                encoder.Write(partitions.Count);
+
+                foreach (var partition in partitions)
+                {
+                    foreach (var commit in partition)
                     {
-                        foreach (var commit in partition)
+                        encoder.Write(partition.Key);
+                        encoder.Write(commit.Offset);
+
+                        if (request.ApiVersion == 1)
                         {
-                            message
-                                .Pack(partition.Key)
-                                .Pack(commit.Offset);
-
-                            if (ApiVersion == 1)
-                            {
-                                message.Pack(commit.TimeStamp);
-                            }
-
-                            message
-                                .Pack(commit.Metadata, StringPrefixEncoding.Int16);
+                            encoder.Write(commit.TimeStamp);
                         }
+
+                        encoder.Write(commit.Metadata, StringPrefixEncoding.Int16);
                     }
                 }
-
-                return message.Payload();
             }
         }
 
-        private IEnumerable<OffsetCommitResponse> DecodeOffsetCommitResponse(byte[] data)
+        private static List<OffsetCommitResponse> DecodeOffsetCommitResponse(ref BigEndianDecoder decoder)
         {
-            using (var stream = new BigEndianBinaryReader(data))
+            var correlationId = decoder.ReadInt32();
+
+            var responses = new List<OffsetCommitResponse>();
+            var topicCount = decoder.ReadInt32();
+            for (int i = 0; i < topicCount; i++)
             {
-                var correlationId = stream.ReadInt32();
+                var topic = decoder.ReadInt16String();
 
-                var topicCount = stream.ReadInt32();
-                for (int i = 0; i < topicCount; i++)
+                var partitionCount = decoder.ReadInt32();
+                for (int j = 0; j < partitionCount; j++)
                 {
-                    var topic = stream.ReadInt16String();
-
-                    var partitionCount = stream.ReadInt32();
-                    for (int j = 0; j < partitionCount; j++)
+                    var response = new OffsetCommitResponse()
                     {
-                        var response = new OffsetCommitResponse()
-                        {
-                            Topic = topic,
-                            PartitionId = stream.ReadInt32(),
-                            Error = stream.ReadInt16()
-                        };
-
-                        yield return response;
-                    }
+                        Topic = topic,
+                        PartitionId = decoder.ReadInt32(),
+                        Error = decoder.ReadInt16()
+                    };
+                    responses.Add(response);
                 }
             }
+            return responses;
         }
     }
 

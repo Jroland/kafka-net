@@ -44,18 +44,12 @@ namespace SimpleKafka.Protocol
         /// </summary>
         public virtual bool ExpectResponse { get { return true; } }
 
-        /// <summary>
-        /// Encode the common head for kafka request.
-        /// </summary>
-        /// <returns>KafkaMessagePacker with header populated</returns>
-        /// <remarks>Format: (hhihs) </remarks>
-        public static KafkaMessagePacker EncodeHeader<T>(IKafkaRequest<T> request)
+        internal static void EncodeHeader<T>(IKafkaRequest<T> request, ref BigEndianEncoder encoder)
         {
-            return new KafkaMessagePacker()
-                 .Pack(((Int16)request.ApiKey))
-                 .Pack(request.ApiVersion)
-                 .Pack(request.CorrelationId)
-                 .Pack(request.ClientId, StringPrefixEncoding.Int16);
+            encoder.Write((Int16)request.ApiKey);
+            encoder.Write(request.ApiVersion);
+            encoder.Write(request.CorrelationId);
+            encoder.Write(request.ClientId, StringPrefixEncoding.Int16);
         }
     }
 }

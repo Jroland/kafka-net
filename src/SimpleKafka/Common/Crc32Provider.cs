@@ -33,16 +33,6 @@ namespace SimpleKafka.Common
             return ~CalculateHash(buffer, offset, length);
         }
 
-        public static byte[] ComputeHash(byte[] buffer)
-        {
-            return UInt32ToBigEndianBytes(Compute(buffer));
-        }
-
-        public static byte[] ComputeHash(byte[] buffer, int offset, int length)
-        {
-            return UInt32ToBigEndianBytes(Compute(buffer, offset, length));
-        }
-
         private static UInt32[] InitializeTable(UInt32 polynomial)
         {
             var createTable = new UInt32[256];
@@ -63,21 +53,12 @@ namespace SimpleKafka.Common
         private static UInt32 CalculateHash(byte[] buffer, int offset, int length)
         {
             var crc = DefaultSeed;
-            for (var i = offset; i < length; i++)
+            while (length-- > 0)
             {
-                crc = (crc >> 8) ^ PolynomialTable[buffer[i] ^ crc & 0xff];
+                crc = (crc >> 8) ^ PolynomialTable[buffer[offset++] ^ crc & 0xff];
             }
             return crc;
         }
 
-        private static byte[] UInt32ToBigEndianBytes(UInt32 uint32)
-        {
-            var result = BitConverter.GetBytes(uint32);
-
-            if (BitConverter.IsLittleEndian)
-                Array.Reverse(result);
-
-            return result;
-        }
     }
 }

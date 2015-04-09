@@ -1,6 +1,7 @@
 ﻿using System;
 using SimpleKafka.Common;
 using SimpleKafka.Protocol;
+using SimpleKafka;
 
 namespace SimpleKafkaTests.Helpers
 {
@@ -10,18 +11,22 @@ namespace SimpleKafkaTests.Helpers
         
         public static byte[] CreateMessage(long offset, byte[] key, byte[] payload, byte magicByte = 0, byte attributes = 0)
         {
-            var message = Message.EncodeMessage(new Message
-                {
-                    Attribute = attributes,
-                    MagicNumber = magicByte,
-                    Key = key,
-                    Value = payload
-                });
-            
-            return new KafkaMessagePacker()
-                .Pack(offset)
-                .Pack(message)
-                .PayloadNoLength();
+            var message = new Message
+            {
+                Attribute = attributes,
+                MagicNumber = magicByte,
+                Key = key,
+                Value = payload
+            };
+
+            var buffer = new byte[1024];
+            var encoder = new BigEndianEncoder(buffer);
+            Message.EncodeMessageSet(ref encoder, new[] { message });
+
+            var result = new byte[encoder.Offset];
+            Array.Copy(encoder.Buffer, result, encoder.Offset);
+
+            return result;
         }
     }
 }

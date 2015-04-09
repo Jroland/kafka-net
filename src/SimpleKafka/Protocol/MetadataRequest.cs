@@ -15,60 +15,51 @@ namespace SimpleKafka.Protocol
         /// </summary>
         public List<string> Topics { get; set; }
 
-        public byte[] Encode()
+        public void Encode(ref BigEndianEncoder encoder)
         {
-            return EncodeMetadataRequest(this);
+            EncodeMetadataRequest(this, ref encoder);
         }
 
-        public IEnumerable<MetadataResponse> Decode(byte[] payload)
+        public MetadataResponse Decode(ref BigEndianDecoder decoder)
         {
-            return new[] { DecodeMetadataResponse(payload) };
+            return DecodeMetadataResponse(ref decoder);
         }
 
-        /// <summary>
-        /// Encode a request for metadata about topic and broker information.
-        /// </summary>
-        /// <param name="request">The MetaDataRequest to encode.</param>
-        /// <returns>Encoded byte[] representing the request.</returns>
-        /// <remarks>Format: (MessageSize), Header, ix(hs)</remarks>
-        private byte[] EncodeMetadataRequest(MetadataRequest request)
+        private static void EncodeMetadataRequest(MetadataRequest request, ref BigEndianEncoder encoder)
         {
             if (request.Topics == null) request.Topics = new List<string>();
-
-            using (var message = EncodeHeader(request)
-                .Pack(request.Topics.Count)
-                .Pack(request.Topics, StringPrefixEncoding.Int16))
+            EncodeHeader(request, ref encoder);
+            encoder.Write(request.Topics.Count);
+            foreach (var topic in request.Topics)
             {
-                return message.Payload();
+                encoder.Write(topic, StringPrefixEncoding.Int16);
             }
         }
 
-        /// <summary>
-        /// Decode the metadata response from kafka server.
-        /// </summary>
-        /// <param name="data"></param>
-        /// <returns></returns>
-        private MetadataResponse DecodeMetadataResponse(byte[] data)
+        private static MetadataResponse DecodeMetadataResponse(ref BigEndianDecoder decoder)
         {
-            using (var stream = new BigEndianBinaryReader(data))
+            var response = new MetadataResponse
             {
-                var response = new MetadataResponse();
-                response.CorrelationId = stream.ReadInt32();
+                CorrelationId = decoder.ReadInt32(),
+            };
 
-                var brokerCount = stream.ReadInt32();
-                for (var i = 0; i < brokerCount; i++)
-                {
-                    response.Brokers.Add(Broker.FromStream(stream));
-                }
-
-                var topicCount = stream.ReadInt32();
-                for (var i = 0; i < topicCount; i++)
-                {
-                    response.Topics.Add(Topic.FromStream(stream));
-                }
-
-                return response;
+            var brokerCount = decoder.ReadInt32();
+            var brokers = new List<Broker>(brokerCount);
+            for (var i = 0; i < brokerCount; i++)
+            {
+                brokers.Add(Broker.Decode(ref decoder));
             }
+            response.Brokers = brokers;
+
+            var topicCount = decoder.ReadInt32();
+            var topics = new List<Topic>(topicCount);
+            for (var i = 0; i < topicCount; i++)
+            {
+                topics.Add(Topic.Decode(ref decoder));
+            }
+            response.Topics = topics;
+
+            return response;
         }
 
     }

@@ -33,13 +33,13 @@ namespace SimpleKafka
         /// <summary>
         /// Encode this request into the Kafka wire protocol.
         /// </summary>
-        /// <returns>Byte[] representing the binary wire protocol of this request.</returns>
-        byte[] Encode();
+        /// <param name="encoder">Encoder to use</param>
+        void Encode(ref BigEndianEncoder encoder);
         /// <summary>
-        /// Decode a response payload from Kafka into an enumerable of T responses. 
+        /// Decode a response payload from Kafka into T. 
         /// </summary>
-        /// <param name="payload">Payload data returned by Kafka servers.</param>
-        /// <returns></returns>
-        IEnumerable<T> Decode(byte[] payload);
+        /// <param name="decoder">Decoder to use</param>
+        /// <returns>Response</returns>
+        T Decode(ref BigEndianDecoder decoder);
     }
 }

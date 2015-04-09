@@ -10,20 +10,21 @@ namespace SimpleKafka.Protocol
         public string Name { get; set; }
         public List<Partition> Partitions { get; set; }
 
-        public static Topic FromStream(BigEndianBinaryReader stream)
+        internal static Topic Decode(ref BigEndianDecoder decoder)
         {
             var topic = new Topic
-                {
-                    ErrorCode = stream.ReadInt16(),
-                    Name = stream.ReadInt16String(),
-                    Partitions = new List<Partition>()
-                };
+            {
+                ErrorCode = decoder.ReadInt16(),
+                Name = decoder.ReadInt16String(),
+            };
 
-            var numPartitions = stream.ReadInt32();
+            var numPartitions = decoder.ReadInt32();
+            var partitions = new List<Partition>(numPartitions);
             for (int i = 0; i < numPartitions; i++)
             {
-                topic.Partitions.Add(Partition.FromStream(stream));
+                partitions.Add(Partition.Decode(ref decoder));
             }
+            topic.Partitions = partitions;
 
             return topic;
         }
@@ -52,27 +53,29 @@ namespace SimpleKafka.Protocol
         /// </summary>
         public List<int> Isrs { get; set; }
 
-        public static Partition FromStream(BigEndianBinaryReader stream)
+        public static Partition Decode(ref BigEndianDecoder decoder)
         {
             var partition = new Partition {
-                ErrorCode = stream.ReadInt16(),
-                PartitionId = stream.ReadInt32(),
-                LeaderId = stream.ReadInt32(),
-                Replicas = new List<int>(),
-                Isrs = new List<int>()
+                ErrorCode = decoder.ReadInt16(),
+                PartitionId = decoder.ReadInt32(),
+                LeaderId = decoder.ReadInt32(),
             };
 
-            var numReplicas = stream.ReadInt32();
+            var numReplicas = decoder.ReadInt32();
+            var replicas = new List<int>(numReplicas);
             for (int i = 0; i < numReplicas; i++)
             {
-                partition.Replicas.Add(stream.ReadInt32());
+                replicas.Add(decoder.ReadInt32());
             }
+            partition.Replicas = replicas;
 
-            var numIsr = stream.ReadInt32();
+            var numIsr = decoder.ReadInt32();
+            var isrs = new List<int>(numIsr);
             for (int i = 0; i < numIsr; i++)
             {
-                partition.Isrs.Add(stream.ReadInt32());
+                isrs.Add(decoder.ReadInt32());
             }
+            partition.Isrs = isrs;
 
             return partition;
         }

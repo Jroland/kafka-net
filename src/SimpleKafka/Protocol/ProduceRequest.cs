@@ -5,7 +5,7 @@ using SimpleKafka.Common;
 
 namespace SimpleKafka.Protocol
 {
-    public class ProduceRequest : BaseRequest, IKafkaRequest<IEnumerable<ProduceResponse>>
+    public class ProduceRequest : BaseRequest, IKafkaRequest<List<ProduceResponse>>
     {
         /// <summary>
         /// Provide a hint to the broker call not to expect a response for requests without Acks.
@@ -29,18 +29,18 @@ namespace SimpleKafka.Protocol
         public List<Payload> Payload = new List<Payload>();
 
 
-        public byte[] Encode()
+        public void Encode(ref BigEndianEncoder encoder)
         {
-            return EncodeProduceRequest(this);
+            EncodeProduceRequest(this, ref encoder);
         }
 
-        public IEnumerable<IEnumerable<ProduceResponse>> Decode(byte[] payload)
+        public List<ProduceResponse> Decode(ref BigEndianDecoder decoder)
         {
-            yield return DecodeProduceResponse(payload);
+            return DecodeProduceResponse(ref decoder);
         }
 
         #region Protocol...
-        private byte[] EncodeProduceRequest(ProduceRequest request)
+        private static void EncodeProduceRequest(ProduceRequest request, ref BigEndianEncoder encoder)
         {
             if (request.Payload == null) request.Payload = new List<Payload>();
 
@@ -53,57 +53,55 @@ namespace SimpleKafka.Protocol
                                    } into tpc
                                    select tpc).ToList();
 
-            using (var message = EncodeHeader(request)
-                .Pack(request.Acks)
-                .Pack(request.TimeoutMS)
-                .Pack(groupedPayloads.Count))
+            EncodeHeader(request, ref encoder);
+            encoder.Write(request.Acks);
+            encoder.Write(request.TimeoutMS);
+            encoder.Write(groupedPayloads.Count);
+            foreach (var groupedPayload in groupedPayloads)
             {
-                foreach (var groupedPayload in groupedPayloads)
+                var payloads = groupedPayload.ToList();
+                encoder.Write(groupedPayload.Key.Topic, StringPrefixEncoding.Int16);
+                encoder.Write(payloads.Count);
+                encoder.Write(groupedPayload.Key.Partition);
+
+                var marker = encoder.PrepareForLength();
+                switch (groupedPayload.Key.Codec)
                 {
-                    var payloads = groupedPayload.ToList();
-                    message.Pack(groupedPayload.Key.Topic, StringPrefixEncoding.Int16)
-                        .Pack(payloads.Count)
-                        .Pack(groupedPayload.Key.Partition);
-
-                    switch (groupedPayload.Key.Codec)
-                    {
-                        case MessageCodec.CodecNone:
-                            message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
-                            break;
-                        default:
-                            throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
-                    }
+                    case MessageCodec.CodecNone:
+                        Message.EncodeMessageSet(ref encoder, (payloads.SelectMany(x => x.Messages)));
+                        break;
+                    default:
+                        throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
                 }
-
-                return message.Payload();
+                encoder.WriteLength(marker);
             }
         }
-        private IEnumerable<ProduceResponse> DecodeProduceResponse(byte[] data)
+
+        private List<ProduceResponse> DecodeProduceResponse(ref BigEndianDecoder decoder)
         {
-            using (var stream = new BigEndianBinaryReader(data))
+            var correlationId = decoder.ReadInt32();
+
+            var responses = new List<ProduceResponse>();
+            var topicCount = decoder.ReadInt32();
+            for (int i = 0; i < topicCount; i++)
             {
-                var correlationId = stream.ReadInt32();
+                var topic = decoder.ReadInt16String();
 
-                var topicCount = stream.ReadInt32();
-                for (int i = 0; i < topicCount; i++)
+                var partitionCount = decoder.ReadInt32();
+                for (int j = 0; j < partitionCount; j++)
                 {
-                    var topic = stream.ReadInt16String();
-
-                    var partitionCount = stream.ReadInt32();
-                    for (int j = 0; j < partitionCount; j++)
+                    var response = new ProduceResponse()
                     {
-                        var response = new ProduceResponse()
-                        {
-                            Topic = topic,
-                            PartitionId = stream.ReadInt32(),
-                            Error = stream.ReadInt16(),
-                            Offset = stream.ReadInt64()
-                        };
+                        Topic = topic,
+                        PartitionId = decoder.ReadInt32(),
+                        Error = decoder.ReadInt16(),
+                        Offset = decoder.ReadInt64()
+                    };
 
-                        yield return response;
-                    }
+                    responses.Add(response);
                 }
             }
+            return responses;
         }
         #endregion
     }

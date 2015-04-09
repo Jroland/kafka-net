@@ -49,8 +49,8 @@
     <Compile Include="Helpers\MessageHelper.cs" />
     <Compile Include="Integration\SimpleTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Unit\BigEndianBinaryReaderTests.cs" />
-    <Compile Include="Unit\BigEndianBinaryWriterTests.cs" />
+    <Compile Include="Unit\BigEndianDecoderTests.cs" />
+    <Compile Include="Unit\BigEndianEncoderTests.cs" />
     <Compile Include="Unit\ProtocolBaseRequestTests.cs" />
     <Compile Include="Unit\ProtocolMessageTests.cs" />
   </ItemGroup>

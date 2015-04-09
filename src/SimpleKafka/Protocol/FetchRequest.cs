@@ -5,7 +5,7 @@ using SimpleKafka.Common;
 
 namespace SimpleKafka.Protocol
 {
-    public class FetchRequest : BaseRequest, IKafkaRequest<FetchResponse>
+    public class FetchRequest : BaseRequest, IKafkaRequest<List<FetchResponse>>
     {
         internal const int DefaultMinBlockingByteBufferSize = 4096;
         internal const int DefaultBufferSize = DefaultMinBlockingByteBufferSize * 8;
@@ -30,80 +30,79 @@ namespace SimpleKafka.Protocol
 
         public List<Fetch> Fetches { get; set; }
 
-        public byte[] Encode()
+        public void Encode(ref BigEndianEncoder encoder)
         {
-            return EncodeFetchRequest(this);
+            EncodeFetchRequest(this, ref encoder);
         }
 
-        public IEnumerable<FetchResponse> Decode(byte[] payload)
+        public List<FetchResponse> Decode(ref BigEndianDecoder decoder)
         {
-            return DecodeFetchResponse(payload);
+            return DecodeFetchResponses(ref decoder);
         }
 
-        private byte[] EncodeFetchRequest(FetchRequest request)
-        {          
+        private static void EncodeFetchRequest(FetchRequest request, ref BigEndianEncoder encoder)
+        {
             if (request.Fetches == null) request.Fetches = new List<Fetch>();
+            EncodeHeader(request, ref encoder);
 
-            using (var message = EncodeHeader(request))
+            var topicGroups = request.Fetches.GroupBy(x => x.Topic).ToList();
+            encoder.Write(ReplicaId);
+            encoder.Write(request.MaxWaitTime);
+            encoder.Write(request.MinBytes);
+            encoder.Write(topicGroups.Count);
+
+            foreach (var topicGroup in topicGroups)
             {
-                var topicGroups = request.Fetches.GroupBy(x => x.Topic).ToList();
-                message.Pack(ReplicaId)
-                    .Pack(request.MaxWaitTime)
-                    .Pack(request.MinBytes)
-                    .Pack(topicGroups.Count);
+                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
+                encoder.Write(topicGroup.Key, StringPrefixEncoding.Int16);
+                encoder.Write(partitions.Count);
 
-                foreach (var topicGroup in topicGroups)
+                foreach (var partition in partitions)
                 {
-                    var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                    message.Pack(topicGroup.Key, StringPrefixEncoding.Int16)
-                        .Pack(partitions.Count);
-
-                    foreach (var partition in partitions)
+                    foreach (var fetch in partition)
                     {
-                        foreach (var fetch in partition)
-                        {
-                            message.Pack(partition.Key)
-                                .Pack(fetch.Offset)
-                                .Pack(fetch.MaxBytes);
-                        }
+                        encoder.Write(partition.Key);
+                        encoder.Write(fetch.Offset);
+                        encoder.Write(fetch.MaxBytes);
                     }
                 }
-
-                return message.Payload();
             }
         }
 
-        private IEnumerable<FetchResponse> DecodeFetchResponse(byte[] data)
+        private List<FetchResponse> DecodeFetchResponses(ref BigEndianDecoder decoder)
         {
-            using (var stream = new BigEndianBinaryReader(data))
+            var correlationId = decoder.ReadInt32();
+
+            var result = new List<FetchResponse>();
+
+            var topicCount = decoder.ReadInt32();
+            for (int i = 0; i < topicCount; i++)
             {
-                var correlationId = stream.ReadInt32();
+                var topic = decoder.ReadInt16String();
 
-                var topicCount = stream.ReadInt32();
-                for (int i = 0; i < topicCount; i++)
+                var partitionCount = decoder.ReadInt32();
+                for (int j = 0; j < partitionCount; j++)
                 {
-                    var topic = stream.ReadInt16String();
-
-                    var partitionCount = stream.ReadInt32();
-                    for (int j = 0; j < partitionCount; j++)
+                    var partitionId = decoder.ReadInt32();
+                    var response = new FetchResponse
                     {
-                        var partitionId = stream.ReadInt32();
-                        var response = new FetchResponse
-                        {
-                            Topic = topic,
-                            PartitionId = partitionId,
-                            Error = stream.ReadInt16(),
-                            HighWaterMark = stream.ReadInt64()
-                        };
-                        //note: dont use initializer here as it breaks stream position.
-                        response.Messages = Message.DecodeMessageSet(stream.ReadIntPrefixedBytes())
-                            .Select(x => { x.Meta.PartitionId = partitionId; return x; })
-                            .ToList();
-                        yield return response;
-                    }
+                        Topic = topic,
+                        PartitionId = partitionId,
+                        Error = decoder.ReadInt16(),
+                        HighWaterMark = decoder.ReadInt64(),
+                    };
+                    var messageSetSize = decoder.ReadInt32();
+                    var current = decoder.Offset;
+                    response.Messages = Message.DecodeMessageSet(partitionId, ref decoder, messageSetSize);
+                    result.Add(response);
+
+                    // In case any truncated messages
+                    decoder.SetOffset(current + messageSetSize);
                 }
             }
+            return result;
         }
+
     }
 
     public class Fetch

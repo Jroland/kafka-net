@@ -21,63 +21,57 @@ namespace SimpleKafka
         private readonly IPEndPoint serverEndpoint;
         public IPEndPoint ServerEndpoint {  get { return serverEndpoint; } }
         private readonly TcpClient client;
-        private readonly BigEndianReader reader;
-        private readonly BigEndianWriter writer;
+        private readonly byte[] buffer;
+        private readonly NetworkStream stream;
+        private BigEndianDecoder decoder;
+        private BigEndianEncoder encoder;
 
-        private KafkaConnection(IPEndPoint serverEndpoint, TcpClient client)
+        private KafkaConnection(IPEndPoint serverEndpoint, TcpClient client, int bufferSize = 65536)
         {
             this.serverEndpoint = serverEndpoint;
             this.client = client;
-            var stream = client.GetStream();
-            this.reader = new BigEndianReader(stream);
-            this.writer = new BigEndianWriter(stream);
+            this.stream = client.GetStream();
+            this.buffer = new byte[bufferSize];
+            decoder = new BigEndianDecoder(buffer);
+            encoder = new BigEndianEncoder(buffer);
         }
 
 
-        private async Task<byte[]> ReceiveResponseAsync(CancellationToken token)
+        private async Task<int> ReceiveResponseAsync(CancellationToken token)
         {
-            var length = await reader.ReadInt32Async(token).ConfigureAwait(false);
-            var buffer = await reader.ReadBytesAsync(length, token).ConfigureAwait(false);
-            return buffer;
+            await stream.ReadFullyAsync(buffer, 0, 4, token).ConfigureAwait(false);
+            decoder.Reset(4);
+            var length = decoder.ReadInt32();
+            await stream.ReadFullyAsync(buffer, 0, length, token).ConfigureAwait(false);
+            decoder.Reset(length);
+            return length;
         }
 
-        private async Task<byte[]> CommunicateWithClientAsync(byte[] buffer, int offset, int length, bool expectResponse, CancellationToken token)
+        public async Task<T> SendRequestAsync<T>(IKafkaRequest<T> request, CancellationToken token)
         {
             await clientLock.WaitAsync(token).ConfigureAwait(false);
             try
             {
+                encoder.Reset();
+                var marker = encoder.PrepareForLength();
+                request.Encode(ref encoder);
+                encoder.WriteLength(marker);
 
-                await writer.WriteAsync(buffer, offset, length, token).ConfigureAwait(false);
-                if (expectResponse)
+                await stream.WriteAsync(buffer, 0, encoder.Offset, token).ConfigureAwait(false);
+                if (request.ExpectResponse)
                 {
-                    var resultBuffer = await ReceiveResponseAsync(token).ConfigureAwait(false);
-                    return resultBuffer;
+                    var length = await ReceiveResponseAsync(token).ConfigureAwait(false);
+                    var result = request.Decode(ref decoder);
+                    return result;
                 }
                 else
                 {
-                    return null;
+                    return default(T);
                 }
             }
             finally
             {
                 clientLock.Release();
-            }
-
-        }
-
-
-        public async Task<T> SendRequestAsync<T>(IKafkaRequest<T> request, CancellationToken token)
-        {
-            var encoded = request.Encode();
-            var resultBuffer = await CommunicateWithClientAsync(encoded, 0, encoded.Length, request.ExpectResponse, token).ConfigureAwait(false);
-            if (request.ExpectResponse)
-            {
-                var result = request.Decode(resultBuffer).Single();
-                return result;
-            }
-            else
-            {
-                return default(T);
             }
         }
 

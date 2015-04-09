@@ -14,41 +14,27 @@ namespace SimpleKafka.Protocol
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.ConsumerMetadataRequest; } }
         public string ConsumerGroup { get; set; }
 
-        public byte[] Encode()
+        public void Encode(ref BigEndianEncoder encoder)
         {
-            return EncodeConsumerMetadataRequest(this);
+            EncodeConsumerMetadataRequest(this, ref encoder);
         }
 
 
-        public IEnumerable<ConsumerMetadataResponse> Decode(byte[] payload)
+        public ConsumerMetadataResponse Decode(ref BigEndianDecoder decoder)
         {
-            return DecodeConsumerMetadataResponse(payload);
+            return DecodeConsumerMetadataResponse(ref decoder);
         }
 
-        private byte[] EncodeConsumerMetadataRequest(ConsumerMetadataRequest request)
+        private static void EncodeConsumerMetadataRequest(ConsumerMetadataRequest request, ref BigEndianEncoder encoder)
         {
-            using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
-            {
-                return message.Payload();
-            }
+            EncodeHeader(request, ref encoder);
+            encoder.Write(request.ConsumerGroup, StringPrefixEncoding.Int16);
         }
 
-        private IEnumerable<ConsumerMetadataResponse> DecodeConsumerMetadataResponse(byte[] data)
+        private static ConsumerMetadataResponse DecodeConsumerMetadataResponse(ref BigEndianDecoder decoder)
         {
-            using (var stream = new BigEndianBinaryReader(data))
-            {
-                var correlationId = stream.ReadInt32();
-
-                var response = new ConsumerMetadataResponse
-                    {
-                        Error = stream.ReadInt16(),
-                        CoordinatorId = stream.ReadInt32(),
-                        CoordinatorHost = stream.ReadInt16String(),
-                        CoordinatorPort = stream.ReadInt32()
-                    };
-
-                yield return response;
-            }
+            var correlationId = decoder.ReadInt32();
+            return new ConsumerMetadataResponse(ref decoder);
         }
     }
 
@@ -57,10 +43,18 @@ namespace SimpleKafka.Protocol
         /// <summary>
         /// Error code of exception that occured during the request.  Zero if no error.
         /// </summary>
-        public Int16 Error;
+        public readonly ErrorResponseCode Error;
 
-        public int CoordinatorId;
-        public string CoordinatorHost;
-        public int CoordinatorPort;
+        public readonly int CoordinatorId;
+        public readonly string CoordinatorHost;
+        public readonly int CoordinatorPort;
+
+        internal ConsumerMetadataResponse(ref BigEndianDecoder decoder)
+        {
+            Error = (ErrorResponseCode)decoder.ReadInt16();
+            CoordinatorId = decoder.ReadInt32();
+            CoordinatorHost = decoder.ReadInt16String();
+            CoordinatorPort = decoder.ReadInt32();
+        }
     }
 }

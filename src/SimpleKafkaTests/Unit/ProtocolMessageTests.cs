@@ -6,6 +6,7 @@ using NUnit.Framework;
 using SimpleKafka.Protocol;
 using SimpleKafkaTests.Helpers;
 using SimpleKafka.Common;
+using SimpleKafka;
 
 namespace SimpleKafkaTests.Unit
 {
@@ -19,11 +20,14 @@ namespace SimpleKafkaTests.Unit
             Assert.Throws(Is.TypeOf<FailCrcCheckException>(), () =>
             {
                 var testMessage = new Message(value: "kafka test message.", key: "test");
+                var buffer = new byte[1024];
+                var encoder = new BigEndianEncoder(buffer);
 
-                var encoded = Message.EncodeMessage(testMessage);
-                encoded[0] += 1;
+                Message.EncodeMessage(testMessage, ref encoder);
+                buffer[0] += 1;
 
-                var result = Message.DecodeMessage(0, encoded).First();
+                var decoder = new BigEndianDecoder(buffer, 0, encoder.Offset);
+                var result = Message.DecodeMessage(0, 0, ref decoder, encoder.Offset);
             });
         }
 
@@ -36,8 +40,12 @@ namespace SimpleKafkaTests.Unit
         {
             var testMessage = new Message(key: key, value: value);
 
-            var encoded = Message.EncodeMessage(testMessage);
-            var result = Message.DecodeMessage(0, encoded).First();
+            var buffer = new byte[1024];
+            var encoder = new BigEndianEncoder(buffer);
+            Message.EncodeMessage(testMessage, ref encoder);
+
+            var decoder = new BigEndianDecoder(buffer);
+            var result = Message.DecodeMessage(0, 0, ref decoder, encoder.Offset);
 
             Assert.That(testMessage.Key, Is.EqualTo(result.Key));
             Assert.That(testMessage.Value, Is.EqualTo(result.Value));
@@ -61,16 +69,19 @@ namespace SimpleKafkaTests.Unit
                     new Message("2", "1")
                 };
 
-            var result = Message.EncodeMessageSet(messages);
+            var buffer = new byte[expected.Length];
+            var encoder = new BigEndianEncoder(buffer);
+            Message.EncodeMessageSet(ref encoder, messages);
 
-            Assert.That(expected, Is.EqualTo(result));
+            Assert.That(buffer, Is.EqualTo(expected));
         }
 
         [Test]
         public void DecodeMessageSetShouldHandleResponseWithMaxBufferSizeHit()
         {
             //This message set has a truncated message bytes at the end of it
-            var result = Message.DecodeMessageSet(MessageHelper.FetchResponseMaxBytesOverflow).ToList();
+            var decoder = new BigEndianDecoder(MessageHelper.FetchResponseMaxBytesOverflow);
+            var result = Message.DecodeMessageSet(0, ref decoder, decoder.Length);
 
             var message = Encoding.UTF8.GetString(result.First().Value);
             
@@ -81,19 +92,22 @@ namespace SimpleKafkaTests.Unit
         [Test]
         public void WhenMessageIsTruncatedThenBufferUnderRunExceptionIsThrown()
         {
-            // arrange
-            var offset = (Int64)0;
-            var message = new Byte[] { };
-            var messageSize = message.Length + 1;
-            var memoryStream = new MemoryStream();
-            var binaryWriter = new BigEndianBinaryWriter(memoryStream);
-            binaryWriter.Write(offset);
-            binaryWriter.Write(messageSize);
-            binaryWriter.Write(message);
-            var payloadBytes = memoryStream.ToArray();
+            Assert.Throws<BufferUnderRunException>(() =>
+            {
+                // arrange
+                var offset = (Int64)0;
+                var message = new Byte[] { };
+                var messageSize = 5;
+                var payloadBytes = new byte[16];
+                var encoder = new BigEndianEncoder(payloadBytes);
+                encoder.Write(offset);
+                encoder.Write(messageSize);
+                encoder.Write(message);
 
-            // act/assert
-            Assert.Throws<BufferUnderRunException>(() => Message.DecodeMessageSet(payloadBytes).ToList());
+                var decoder = new BigEndianDecoder(payloadBytes);
+
+                Message.DecodeMessageSet(0, ref decoder, payloadBytes.Length);
+            });
         }
 
         [Test]
@@ -104,7 +118,8 @@ namespace SimpleKafkaTests.Unit
             var payload = MessageHelper.CreateMessage(0, new Byte[] { 0 }, expectedPayloadBytes);
 
             // act/assert
-            var messages = Message.DecodeMessageSet(payload).ToList();
+            var decoder = new BigEndianDecoder(payload, 0, payload.Length);
+            var messages = Message.DecodeMessageSet(0, ref decoder, payload.Length);
             var actualPayload = messages.First().Value;
 
             // assert
