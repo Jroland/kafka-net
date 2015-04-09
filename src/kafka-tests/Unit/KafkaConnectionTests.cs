@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Common;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
+using kafka_tests.Fakes;
 using Moq;
 using NUnit.Framework;
 using Ninject.MockingKernel.Moq;
@@ -137,6 +139,24 @@ namespace kafka_tests.Unit
         #endregion
 
         #region Send Tests...
+        [Test]
+        public void SendAsyncShouldTimeoutByThrowingResponseTimeoutExceptionWhenTcpConnectionIsNotAvailable()
+        {
+            using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
+            using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(100), log: _log))
+            {
+                var taskResult = conn.SendAsync(new MetadataRequest());
+
+                taskResult.ContinueWith(t => taskResult = t).Wait(TimeSpan.FromSeconds(1));
+
+                Assert.That(taskResult.IsFaulted, Is.True);
+                Assert.That(taskResult.Exception.InnerException, Is.TypeOf<ResponseTimeoutException>());
+            }
+        }
+
+
+
+
         [Test]
         public void SendAsyncShouldTimeoutByThrowingResponseTimeoutException()
         {
