@@ -60,7 +60,7 @@ namespace KafkaNet
         /// <returns>Returns a byte[] array with the size of readSize.</returns>
         public Task<byte[]> ReadAsync(int readSize)
         {
-            return EnsureReadAsync(readSize, _disposeToken.Token);
+            return EnsureReadAsync(readSize, CancellationToken.None);
         }
 
         /// <summary>
@@ -85,7 +85,7 @@ namespace KafkaNet
         /// <returns>Returns Task handle to the write operation.</returns>
         public Task WriteAsync(byte[] buffer)
         {
-            return WriteAsync(buffer, _disposeToken.Token);
+            return WriteAsync(buffer, CancellationToken.None);
         }
 
 
