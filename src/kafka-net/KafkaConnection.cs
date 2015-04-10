@@ -109,12 +109,9 @@ namespace KafkaNet
 
                 try
                 {
-                    var sendTask = SendAsync(request.Encode());
-                    //synchronously add the response message as soon as the send succeeds.  If the KafkaTcpSocket is trying establish a connection
-                    //the SendAsync call will block until its establish.  If we added response to queue before, it would timeout seperately from the send.
-                    sendTask.ContinueWith(t => AddAsyncRequestItemToResponseQueue(asyncRequest), TaskContinuationOptions.ExecuteSynchronously);
+                    AddAsyncRequestItemToResponseQueue(asyncRequest);
 
-                    await sendTask.ConfigureAwait(false);
+                    await SendAsync(request.Encode()).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException ex)
                 {
