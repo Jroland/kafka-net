@@ -107,21 +107,20 @@ namespace KafkaNet
             {
                 var asyncRequest = new AsyncRequestItem(request.CorrelationId);
 
-                if (_requestIndex.TryAdd(request.CorrelationId, asyncRequest) == false)
-                    throw new ApplicationException("Failed to register request for async response.");
-
                 try
                 {
-                    using (var timeoutCancel = new CancellationTokenSource(_responseTimeoutMS))
-                    {
-                        await SendAsync(request.Encode(), timeoutCancel.Token).ConfigureAwait(false);
-                    }
+                    var sendTask = SendAsync(request.Encode());
+                    //synchronously add the response message as soon as the send succeeds.  If the KafkaTcpSocket is trying establish a connection
+                    //the SendAsync call will block until its establish.  If we added response to queue before, it would timeout seperately from the send.
+                    sendTask.ContinueWith(t => AddAsyncRequestItemToResponseQueue(asyncRequest), TaskContinuationOptions.ExecuteSynchronously);
+
+                    await sendTask.ConfigureAwait(false);
                 }
                 catch (OperationCanceledException ex)
                 {
                     TriggerMessageTimeout(asyncRequest);
                 }
-                
+
                 var response = await asyncRequest.ReceiveTask.Task.ConfigureAwait(false);
 
                 return request.Decode(response).ToList();
@@ -246,25 +245,33 @@ namespace KafkaNet
             }
         }
 
-        private void TriggerMessageTimeout(AsyncRequestItem asyncRequestItem)
+        private void AddAsyncRequestItemToResponseQueue(AsyncRequestItem requestItem)
         {
-            AsyncRequestItem request;
-            if (_requestIndex.TryRemove(asyncRequestItem.CorrelationId, out request))
-            {
-                if (_disposeToken.IsCancellationRequested)
-                {
-                    request.ReceiveTask.TrySetException(
-                        new ObjectDisposedException("The object is being disposed and the connection is closing."));
-                }
-                else
-                {
-                    request.ReceiveTask.TrySetException(new ResponseTimeoutException(
-                        string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.",
-                            _responseTimeoutMS)));
-                }
-            }
+            if (requestItem == null) return;
+            requestItem.CreatedOnUtc = DateTime.UtcNow;
+            if (_requestIndex.TryAdd(requestItem.CorrelationId, requestItem) == false)
+                throw new ApplicationException("Failed to register request for async response.");
         }
 
+        private void TriggerMessageTimeout(AsyncRequestItem asyncRequestItem)
+        {
+            if (asyncRequestItem == null) return;
+
+            AsyncRequestItem request;
+            _requestIndex.TryRemove(asyncRequestItem.CorrelationId, out request); //just remove it from the index
+
+            if (_disposeToken.IsCancellationRequested)
+            {
+                asyncRequestItem.ReceiveTask.TrySetException(
+                    new ObjectDisposedException("The object is being disposed and the connection is closing."));
+            }
+            else
+            {
+                asyncRequestItem.ReceiveTask.TrySetException(new ResponseTimeoutException(
+                    string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.",
+                        _responseTimeoutMS)));
+            }
+        }
 
         public void Dispose()
         {

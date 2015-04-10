@@ -142,8 +142,7 @@ namespace KafkaNet
                     {
                         //reading from network stream is not thread safe
                         //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
-                        bytesReceived = await netStream.ReadAsync(buffer, 0, readSize, cancellationToken)
-                            .WithCancellation(cancellationToken).ConfigureAwait(false);
+                        bytesReceived = await netStream.ReadAsync(buffer, 0, readSize, cancellationToken).ConfigureAwait(false);
 
                         if (bytesReceived <= 0)
                         {
