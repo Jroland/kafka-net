@@ -8,6 +8,7 @@ using System.Threading;
 using KafkaNet.Common;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
+using KafkaNet.Statistics;
 
 namespace KafkaNet
 {
@@ -105,9 +106,12 @@ namespace KafkaNet
                 var netStream = await GetStreamAsync().ConfigureAwait(false);
                 using (await _writeLock.LockAsync(cancellationToken).ConfigureAwait(false))
                 {
+                    StatisticsTracker.IncrementActiveWrite();
                     //writing to network stream is not thread safe
                     //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
                     await netStream.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+                    StatisticsTracker.RecordNetworkWrite(_endpoint, buffer.Length);
+                    StatisticsTracker.DecrementActiveWrite();
                     return buffer.Length;
                 }
             }

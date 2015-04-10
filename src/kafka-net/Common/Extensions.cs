@@ -214,5 +214,13 @@ namespace KafkaNet.Common
             
             return new ApplicationException("Unknown exception occured.");
         }
+
+        /// <summary>
+        /// Rounds a datetime to the second, usefull for grouping by second.
+        /// </summary>
+        public static DateTime RoundToSeconds(this DateTime t)
+        {
+            return new DateTime(t.Year, t.Month, t.Day, t.Hour, t.Minute, t.Second);
+        }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using KafkaNet.Common;
+using KafkaNet.Statistics;
 
 namespace KafkaNet.Protocol
 {
@@ -43,7 +44,7 @@ namespace KafkaNet.Protocol
         #region Protocol...
         private byte[] EncodeProduceRequest(ProduceRequest request)
         {
-            int compressedAmount = 0;
+            int totalCompressedBytes = 0;
             if (request.Payload == null) request.Payload = new List<Payload>();
 
             var groupedPayloads = (from p in request.Payload
@@ -73,9 +74,9 @@ namespace KafkaNet.Protocol
                             message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
                             break;
                         case MessageCodec.CodecGzip:
-                            var compressedMessage = CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages));
-                            Interlocked.Add(ref compressedAmount, compressedMessage.CompressedAmount);
-                            message.Pack(Message.EncodeMessageSet(new[] { compressedMessage.CompressedMessage }));
+                            var compressedBytes = CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages));
+                            Interlocked.Add(ref totalCompressedBytes, compressedBytes.CompressedAmount);
+                            message.Pack(Message.EncodeMessageSet(new[] { compressedBytes.CompressedMessage }));
                             break;
                         default:
                             throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
@@ -83,23 +84,9 @@ namespace KafkaNet.Protocol
                 }
 
                 var result = message.Payload();
-                Console.WriteLine("Message: {0}M Compressed: {1}M Ratio: {2}", ConvertToMegs(result.Length), ConvertToMegs(compressedAmount), CalculateRatio(result.Length, compressedAmount));
+                StatisticsTracker.RecordProduceRequest(result.Length, totalCompressedBytes);
                 return result;
             }
-        }
-
-        private double ConvertToMegs(int bytes)
-        {
-            if (bytes == 0) return 0;
-            return Math.Round((double) bytes/1048576, 4);
-        }
-
-        private double CalculateRatio(int message, int compressed)
-        {
-            var total = message + compressed;
-            if (total == 0) return 0;
-
-            return Math.Round((double) compressed/total, 2);
         }
 
         private CompressedMessageResult CreateGzipCompressedMessage(IEnumerable<Message> messages)

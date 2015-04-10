@@ -32,7 +32,7 @@ namespace KafkaNet.Protocol
         /// </summary>
         /// <param name="request">The MetaDataRequest to encode.</param>
         /// <returns>Encoded byte[] representing the request.</returns>
-        /// <remarks>Format: (MessageSize), Header, ix(hs)</remarks>
+        /// <remarks>Format: (PayloadSize), Header, ix(hs)</remarks>
         private byte[] EncodeMetadataRequest(MetadataRequest request)
         {
             if (request.Topics == null) request.Topics = new List<string>();
