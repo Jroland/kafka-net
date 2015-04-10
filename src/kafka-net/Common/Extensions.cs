@@ -109,7 +109,9 @@ namespace KafkaNet.Common
         {
             var tcs = new TaskCompletionSource<bool>();
 
-            using (cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs))
+            var cancelRegistration = cancellationToken.Register(source => ((TaskCompletionSource<bool>) source).TrySetResult(true), tcs);
+            
+            using (cancelRegistration)
             {
                 if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
                 {
@@ -132,7 +134,9 @@ namespace KafkaNet.Common
         {
             var tcs = new TaskCompletionSource<bool>();
 
-            using (cancellationToken.Register(source => ((TaskCompletionSource<bool>) source).TrySetResult(true), tcs))
+            var cancelRegistration = cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs);
+
+            using (cancelRegistration)
             {
                 if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
                 {
