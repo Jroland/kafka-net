@@ -23,5 +23,20 @@ namespace kafka_tests.Helpers
                 .Pack(message)
                 .PayloadNoLength();
         }
+
+        public static byte[] CreateMetadataResponse(int correlationId, string topic)
+        {
+            return new KafkaMessagePacker()
+               .Pack(correlationId)
+               .Pack(2) //broker count
+               .Pack(1).Pack("http://localhost", StringPrefixEncoding.Int16).Pack(8990)
+               .Pack(2).Pack("http://localhost", StringPrefixEncoding.Int16).Pack(8991)
+               .Pack(1) //topic count
+               .Pack((Int16)ErrorResponseCode.NoError).Pack(topic, StringPrefixEncoding.Int16)
+               .Pack(2) //partition count
+               .Pack((Int16)ErrorResponseCode.NoError).Pack(0).Pack(0).Pack(0).Pack(0)
+               .Pack((Int16)ErrorResponseCode.NoError).Pack(1).Pack(1).Pack(0).Pack(0)
+               .Payload();
+        }
     }
 }
