@@ -5,17 +5,14 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Common;
 
-namespace kafka_tests.Helpers
+namespace kafka_tests.Fakes
 {
     public class FakeTcpServer : IDisposable
     {
-        public delegate void BytesReceivedDelegate(byte[] data);
-        public delegate void ClientEventDelegate();
-        public event BytesReceivedDelegate OnBytesReceived;
-        public event ClientEventDelegate OnClientConnected;
-        public event ClientEventDelegate OnClientDisconnected;
+        public event Action<byte[]> OnBytesReceived;
+        public event Action OnClientConnected;
+        public event Action OnClientDisconnected;
 
         private TcpClient _client;
         private readonly SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(0);

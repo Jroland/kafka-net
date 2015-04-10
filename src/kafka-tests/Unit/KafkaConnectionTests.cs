@@ -5,6 +5,7 @@ using KafkaNet;
 using KafkaNet.Common;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
+using kafka_tests.Fakes;
 using Moq;
 using NUnit.Framework;
 using Ninject.MockingKernel.Moq;
@@ -19,7 +20,7 @@ namespace kafka_tests.Unit
         private readonly DefaultTraceLog _log;
         private readonly KafkaEndpoint _kafkaEndpoint;
         private MoqMockingKernel _kernel;
-        
+
         public KafkaConnectionTests()
         {
             _log = new DefaultTraceLog();
@@ -99,8 +100,8 @@ namespace kafka_tests.Unit
                 TaskTest.WaitFor(() => server.DisconnectionEventCount > 0);
                 Assert.That(server.DisconnectionEventCount, Is.EqualTo(1));
 
-				//Wait a while for the client to notice the disconnect and log
-				Thread.Sleep(15);
+                //Wait a while for the client to notice the disconnect and log
+                Thread.Sleep(15);
 
                 //should log an exception and keep going
                 mockLog.Verify(x => x.ErrorFormat(It.IsAny<string>(), It.IsAny<Exception>()));
@@ -128,7 +129,7 @@ namespace kafka_tests.Unit
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
 
-				Thread.Sleep(10);
+                Thread.Sleep(10);
 
                 //should log a warning and keep going
                 mockLog.Verify(x => x.WarnFormat(It.IsAny<string>(), It.Is<int>(o => o == correlationId)));
@@ -137,45 +138,39 @@ namespace kafka_tests.Unit
         #endregion
 
         #region Send Tests...
-
         [Test]
-        public void SendAsyncShouldTimeoutWhenSendAsyncTakesTooLong()
+        public async void SendAsyncShouldNotAllowResponseToTimeoutWhileAwaitingKafkaToEstableConnection()
         {
-            using (var server = new FakeTcpServer(8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
-            using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(1), log: _log))
+            using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(1000000), log: _log))
             {
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
-                Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
-
-                var taskResult = conn.SendAsync(new MetadataRequest());
-
-                taskResult.ContinueWith(t => taskResult = t).Wait(TimeSpan.FromMilliseconds(100));
-
-                Assert.That(taskResult.IsFaulted, Is.True, "Task should have reported an exception.");
-                Assert.That(taskResult.Exception.InnerException, Is.TypeOf<ResponseTimeoutException>());
-            }
-        }
-
-        [Test]
-        public void SendAsyncShouldTimeoutByThrowingResponseTimeoutException()
-        {
-            using (var server = new FakeTcpServer(8999))
-            using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
-            using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(100), log: _log))
-            {
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
-                Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
-
+                Console.WriteLine("SendAsync blocked by reconnection attempts...");
                 var taskResult = conn.SendAsync(new MetadataRequest());
 
                 taskResult.ContinueWith(t => taskResult = t).Wait(TimeSpan.FromSeconds(1));
 
-                Assert.That(taskResult.IsFaulted, Is.True);
-                Assert.That(taskResult.Exception.InnerException, Is.TypeOf<ResponseTimeoutException>());
+                Console.WriteLine("Task result should be WaitingForActivation...");
+                Assert.That(taskResult.IsFaulted, Is.False);
+                Assert.That(taskResult.Status, Is.EqualTo(TaskStatus.WaitingForActivation));
+
+                Console.WriteLine("Starting server to establish connection...");
+                using (var server = new FakeTcpServer(8999))
+                {
+                    server.OnClientConnected += () => Console.WriteLine("Client connected...");
+                    server.OnBytesReceived += (b) =>
+                    {
+                        server.SendDataAsync(MessageHelper.CreateMetadataResponse(1, "Test"));
+                    };
+
+                    await taskResult;
+
+                    Assert.That(taskResult.IsFaulted, Is.False);
+                    Assert.That(taskResult.IsCanceled, Is.False);
+                    Assert.That(taskResult.Status, Is.EqualTo(TaskStatus.RanToCompletion));
+                }
             }
         }
-
+        
         [Test]
         public void SendAsyncShouldTimeoutMultipleMessagesAtATime()
         {

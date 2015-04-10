@@ -7,6 +7,7 @@ using KafkaNet;
 using KafkaNet.Common;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
+using kafka_tests.Fakes;
 using NUnit.Framework;
 using kafka_tests.Helpers;
 using System.Collections.Generic;
@@ -72,6 +73,35 @@ namespace kafka_tests.Unit
         #endregion
 
         #region Dispose Tests...
+        [Test]
+        public void DisposedMergedCancellationTokenShouldNotDisposeChildTokens()
+        {
+            var c1notdisposed = new CancellationTokenSource();
+            var c2notdisposed = new CancellationTokenSource();
+
+            var merge = CancellationTokenSource.CreateLinkedTokenSource(c1notdisposed.Token, c2notdisposed.Token);
+
+            using (merge)
+            {
+
+            }
+
+            Assert.That(c1notdisposed.Token.IsCancellationRequested, Is.False);
+            Assert.That(c2notdisposed.Token.IsCancellationRequested, Is.False);
+
+            Exception capturedDisposeException = null;
+            try
+            {
+                Assert.That(merge.Token.IsCancellationRequested, Is.False);
+            }
+            catch (ObjectDisposedException ex)
+            {
+                capturedDisposeException = ex;
+            }
+
+            Assert.That(capturedDisposeException, Is.Not.Null);
+        }
+
         [Test]
         public void KafkaTcpSocketShouldDisposeEvenWhilePollingToReconnect()
         {

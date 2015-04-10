@@ -24,7 +24,7 @@ namespace kafka_tests.Integration
         [Test]
         public void OffsetFetchRequestOfNonExistingGroupShouldReturnNoError()
         {
-            //From documentation: https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetFetchRequest
+            //From documentation: https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+ProtocolTests#AGuideToTheKafkaProtocol-OffsetFetchRequest
             //Note that if there is no offset associated with a topic-partition under that consumer group the broker does not set an error code 
             //(since it is not really an error), but returns empty metadata and sets the offset field to -1.
             const int partitionId = 0;
