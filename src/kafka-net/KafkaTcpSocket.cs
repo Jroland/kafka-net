@@ -106,11 +106,12 @@ namespace KafkaNet
                 var netStream = await GetStreamAsync().ConfigureAwait(false);
                 using (await _writeLock.LockAsync(cancellationToken).ConfigureAwait(false))
                 {
+                    var sw = Stopwatch.StartNew();
                     StatisticsTracker.IncrementActiveWrite();
                     //writing to network stream is not thread safe
                     //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
                     await netStream.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
-                    StatisticsTracker.RecordNetworkWrite(_endpoint, buffer.Length);
+                    StatisticsTracker.RecordNetworkWrite(_endpoint, buffer.Length, sw.ElapsedMilliseconds);
                     StatisticsTracker.DecrementActiveWrite();
                     return buffer.Length;
                 }

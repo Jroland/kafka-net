@@ -39,9 +39,9 @@ namespace KafkaNet.Statistics
             ProduceRequestStatistics.Add(new ProduceRequestStatistic(payloadBytes, compressedBytes));
         }
 
-        public static void RecordNetworkWrite(KafkaEndpoint endpoint, int payloadBytes)
+        public static void RecordNetworkWrite(KafkaEndpoint endpoint, int payloadBytes, long milliseconds)
         {
-            NetworkWriteStatistics.Add(new NetworkWriteStatistic(endpoint, payloadBytes));
+            NetworkWriteStatistics.Add(new NetworkWriteStatistic(endpoint, payloadBytes, milliseconds));
         }
 
         public static void IncrementActiveWrite()
@@ -80,7 +80,8 @@ namespace KafkaNet.Statistics
                     {
                         Endpoint = g.Key,
                         BytesPerSecond = (int)(g.Sum(x => x.PayloadBytes) / networkWriteSampleTimespan.TotalSeconds),
-                        SampleSize = NetworkWriteStatistics.Count
+                        SampleSize = NetworkWriteStatistics.Count,
+                        WriteDuration = TimeSpan.FromMilliseconds(g.Sum(x => x.WriteDuration.TotalMilliseconds) / NetworkWriteStatistics.Count)
                     }).ToList();
             }
             else
@@ -119,12 +120,14 @@ namespace KafkaNet.Statistics
         public DateTime CreatedOnUtc { get; private set; }
         public KafkaEndpoint Endpoint { get; private set; }
         public int PayloadBytes { get; private set; }
+        public TimeSpan WriteDuration { get; private set; }
 
-        public NetworkWriteStatistic(KafkaEndpoint endpoint, int payloadBytes)
+        public NetworkWriteStatistic(KafkaEndpoint endpoint, int payloadBytes, long milliseconds)
         {
             CreatedOnUtc = DateTime.UtcNow.RoundToSeconds();
             Endpoint = endpoint;
             PayloadBytes = payloadBytes;
+            WriteDuration = TimeSpan.FromMilliseconds(milliseconds);
         }
     }
 
@@ -133,6 +136,7 @@ namespace KafkaNet.Statistics
         public KafkaEndpoint Endpoint;
         public int SampleSize;
         public int BytesPerSecond;
+        public TimeSpan WriteDuration;
 
         public double MBytesPerSecond { get { return MathHelper.ConvertToMegabytes(BytesPerSecond); } }
     }
