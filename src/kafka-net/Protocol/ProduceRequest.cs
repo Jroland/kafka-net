@@ -10,7 +10,7 @@ namespace KafkaNet.Protocol
         /// <summary>
         /// Provide a hint to the broker call not to expect a response for requests without Acks.
         /// </summary>
-        public override bool ExpectResponse { get { return Acks > 0; } }
+        public override bool ExpectResponse { get { return Acks != 0; } }
         /// <summary>
         /// Indicates the type of kafka encoding this request is.
         /// </summary>
