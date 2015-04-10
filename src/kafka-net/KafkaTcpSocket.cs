@@ -60,7 +60,7 @@ namespace KafkaNet
         /// <returns>Returns a byte[] array with the size of readSize.</returns>
         public Task<byte[]> ReadAsync(int readSize)
         {
-            return EnsureReadAsync(readSize, CancellationToken.None);
+            return EnsureReadAsync(readSize, _disposeToken.Token);
         }
 
         /// <summary>
@@ -71,11 +71,7 @@ namespace KafkaNet
         /// <returns>Returns a byte[] array with the size of readSize.</returns>
         public Task<byte[]> ReadAsync(int readSize, CancellationToken cancellationToken)
         {
-            using (var mergedCancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,
-                    _disposeToken.Token))
-            {
-                return EnsureReadAsync(readSize, mergedCancel.Token);
-            }
+            return EnsureReadAsync(readSize, cancellationToken);
         }
 
         /// <summary>
@@ -85,7 +81,7 @@ namespace KafkaNet
         /// <returns>Returns Task handle to the write operation.</returns>
         public Task WriteAsync(byte[] buffer)
         {
-            return WriteAsync(buffer, CancellationToken.None);
+            return WriteAsync(buffer, _disposeToken.Token);
         }
 
 
@@ -97,11 +93,7 @@ namespace KafkaNet
         /// <returns>Returns Task handle to the write operation.</returns>
         public Task WriteAsync(byte[] buffer, CancellationToken cancellationToken)
         {
-            using (var mergedCancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, 
-                _disposeToken.Token))
-            {
-                return EnsureWriteAsync(buffer, 0, buffer.Length, mergedCancel.Token);
-            }
+            return EnsureWriteAsync(buffer, 0, buffer.Length, cancellationToken);
         }
         #endregion
 
@@ -142,7 +134,8 @@ namespace KafkaNet
                     {
                         //reading from network stream is not thread safe
                         //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
-                        bytesReceived = await netStream.ReadAsync(buffer, 0, readSize, cancellationToken).ConfigureAwait(false);
+                        bytesReceived = await netStream.ReadAsync(buffer, 0, readSize, cancellationToken)
+                            .WithCancellation(cancellationToken).ConfigureAwait(false);
 
                         if (bytesReceived <= 0)
                         {
