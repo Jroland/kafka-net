@@ -30,17 +30,17 @@ namespace SimpleKafka.Protocol
 
         public List<Fetch> Fetches { get; set; }
 
-        public void Encode(ref BigEndianEncoder encoder)
+        public void Encode(ref KafkaEncoder encoder)
         {
             EncodeFetchRequest(this, ref encoder);
         }
 
-        public List<FetchResponse> Decode(ref BigEndianDecoder decoder)
+        public List<FetchResponse> Decode(ref KafkaDecoder decoder)
         {
             return DecodeFetchResponses(ref decoder);
         }
 
-        private static void EncodeFetchRequest(FetchRequest request, ref BigEndianEncoder encoder)
+        private static void EncodeFetchRequest(FetchRequest request, ref KafkaEncoder encoder)
         {
             if (request.Fetches == null) request.Fetches = new List<Fetch>();
             EncodeHeader(request, ref encoder);
@@ -69,7 +69,7 @@ namespace SimpleKafka.Protocol
             }
         }
 
-        private List<FetchResponse> DecodeFetchResponses(ref BigEndianDecoder decoder)
+        private List<FetchResponse> DecodeFetchResponses(ref KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
 

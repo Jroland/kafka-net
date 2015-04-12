@@ -15,17 +15,17 @@ namespace SimpleKafka.Protocol
         /// </summary>
         public List<string> Topics { get; set; }
 
-        public void Encode(ref BigEndianEncoder encoder)
+        public void Encode(ref KafkaEncoder encoder)
         {
             EncodeMetadataRequest(this, ref encoder);
         }
 
-        public MetadataResponse Decode(ref BigEndianDecoder decoder)
+        public MetadataResponse Decode(ref KafkaDecoder decoder)
         {
             return DecodeMetadataResponse(ref decoder);
         }
 
-        private static void EncodeMetadataRequest(MetadataRequest request, ref BigEndianEncoder encoder)
+        private static void EncodeMetadataRequest(MetadataRequest request, ref KafkaEncoder encoder)
         {
             if (request.Topics == null) request.Topics = new List<string>();
             EncodeHeader(request, ref encoder);
@@ -36,7 +36,7 @@ namespace SimpleKafka.Protocol
             }
         }
 
-        private static MetadataResponse DecodeMetadataResponse(ref BigEndianDecoder decoder)
+        private static MetadataResponse DecodeMetadataResponse(ref KafkaDecoder decoder)
         {
             var response = new MetadataResponse
             {

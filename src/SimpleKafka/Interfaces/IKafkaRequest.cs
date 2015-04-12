@@ -34,12 +34,12 @@ namespace SimpleKafka
         /// Encode this request into the Kafka wire protocol.
         /// </summary>
         /// <param name="encoder">Encoder to use</param>
-        void Encode(ref BigEndianEncoder encoder);
+        void Encode(ref KafkaEncoder encoder);
         /// <summary>
         /// Decode a response payload from Kafka into T. 
         /// </summary>
         /// <param name="decoder">Decoder to use</param>
         /// <returns>Response</returns>
-        T Decode(ref BigEndianDecoder decoder);
+        T Decode(ref KafkaDecoder decoder);
     }
 }

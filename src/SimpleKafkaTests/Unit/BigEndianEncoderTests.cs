@@ -24,7 +24,7 @@ namespace SimpleKafkaTests.Unit
         public void Int64Tests(Int64 number, Byte[] expectedBytes)
         {
             var buffer = new byte[8];
-            var encoder = new BigEndianEncoder(buffer);
+            var encoder = new KafkaEncoder(buffer);
             encoder.Write(number);
             Assert.That(buffer, Is.EqualTo(expectedBytes));
         }
@@ -36,7 +36,7 @@ namespace SimpleKafkaTests.Unit
         public void UInt32Tests(UInt32 number, Byte[] expectedBytes)
         {
             var buffer = new byte[4];
-            var encoder = new BigEndianEncoder(buffer);
+            var encoder = new KafkaEncoder(buffer);
             encoder.Write(number);
             Assert.That(buffer, Is.EqualTo(expectedBytes));
         }
@@ -50,7 +50,7 @@ namespace SimpleKafkaTests.Unit
         public void Int32Tests(Int32 number, Byte[] expectedBytes)
         {
             var buffer = new byte[4];
-            var encoder = new BigEndianEncoder(buffer);
+            var encoder = new KafkaEncoder(buffer);
             encoder.Write(number);
             Assert.That(buffer, Is.EqualTo(expectedBytes));
         }
@@ -64,7 +64,7 @@ namespace SimpleKafkaTests.Unit
         public void Int16Tests(Int16 number, Byte[] expectedBytes)
         {
             var buffer = new byte[2];
-            var encoder = new BigEndianEncoder(buffer);
+            var encoder = new KafkaEncoder(buffer);
             encoder.Write(number);
             Assert.That(buffer, Is.EqualTo(expectedBytes));
         }
@@ -86,7 +86,7 @@ namespace SimpleKafkaTests.Unit
         public void StringTests(String value, Byte[] expectedBytes, StringPrefixEncoding encoding)
         {
             var buffer = new byte[expectedBytes.Length];
-            var encoder = new BigEndianEncoder(buffer);
+            var encoder = new KafkaEncoder(buffer);
             encoder.Write(value, encoding);
             Assert.That(encoder.Offset, Is.EqualTo(expectedBytes.Length));
             Assert.That(buffer, Is.EqualTo(expectedBytes));

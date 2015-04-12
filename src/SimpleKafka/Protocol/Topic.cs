@@ -10,7 +10,7 @@ namespace SimpleKafka.Protocol
         public string Name { get; set; }
         public List<Partition> Partitions { get; set; }
 
-        internal static Topic Decode(ref BigEndianDecoder decoder)
+        internal static Topic Decode(ref KafkaDecoder decoder)
         {
             var topic = new Topic
             {
@@ -53,7 +53,7 @@ namespace SimpleKafka.Protocol
         /// </summary>
         public List<int> Isrs { get; set; }
 
-        public static Partition Decode(ref BigEndianDecoder decoder)
+        public static Partition Decode(ref KafkaDecoder decoder)
         {
             var partition = new Partition {
                 ErrorCode = decoder.ReadInt16(),

@@ -13,17 +13,17 @@ namespace SimpleKafka.Protocol
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Offset; } }
         public List<Offset> Offsets { get; set; }
 
-        public void Encode(ref BigEndianEncoder encoder)
+        public void Encode(ref KafkaEncoder encoder)
         {
             EncodeOffsetRequest(this, ref encoder);
         }
 
-        public List<OffsetResponse> Decode(ref BigEndianDecoder decoder)
+        public List<OffsetResponse> Decode(ref KafkaDecoder decoder)
         {
             return DecodeOffsetResponse(ref decoder);
         }
 
-        private static void EncodeOffsetRequest(OffsetRequest request, ref BigEndianEncoder encoder)
+        private static void EncodeOffsetRequest(OffsetRequest request, ref KafkaEncoder encoder)
         {
             if (request.Offsets == null) request.Offsets = new List<Offset>();
             EncodeHeader(request, ref encoder);
@@ -52,7 +52,7 @@ namespace SimpleKafka.Protocol
         }
 
 
-        private static List<OffsetResponse> DecodeOffsetResponse(ref BigEndianDecoder decoder)
+        private static List<OffsetResponse> DecodeOffsetResponse(ref KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
 

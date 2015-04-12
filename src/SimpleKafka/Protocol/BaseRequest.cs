@@ -44,7 +44,7 @@ namespace SimpleKafka.Protocol
         /// </summary>
         public virtual bool ExpectResponse { get { return true; } }
 
-        internal static void EncodeHeader<T>(IKafkaRequest<T> request, ref BigEndianEncoder encoder)
+        internal static void EncodeHeader<T>(IKafkaRequest<T> request, ref KafkaEncoder encoder)
         {
             encoder.Write((Int16)request.ApiKey);
             encoder.Write(request.ApiVersion);

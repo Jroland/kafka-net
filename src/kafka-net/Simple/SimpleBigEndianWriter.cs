@@ -6,14 +6,14 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace SimpleKafka
+namespace KafkaNet.Simple
 {
-    public class BigEndianWriter
+    public class SimpleBigEndianWriter
     {
         private readonly Stream stream;
         private readonly byte[] commonBuffer = new byte[8];
 
-        public BigEndianWriter(Stream stream)
+        public SimpleBigEndianWriter(Stream stream)
         {
             this.stream = stream;
         }

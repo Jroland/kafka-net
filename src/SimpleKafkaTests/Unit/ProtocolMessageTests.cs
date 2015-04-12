@@ -21,12 +21,12 @@ namespace SimpleKafkaTests.Unit
             {
                 var testMessage = new Message(value: "kafka test message.", key: "test");
                 var buffer = new byte[1024];
-                var encoder = new BigEndianEncoder(buffer);
+                var encoder = new KafkaEncoder(buffer);
 
                 Message.EncodeMessage(testMessage, ref encoder);
                 buffer[0] += 1;
 
-                var decoder = new BigEndianDecoder(buffer, 0, encoder.Offset);
+                var decoder = new KafkaDecoder(buffer, 0, encoder.Offset);
                 var result = Message.DecodeMessage(0, 0, ref decoder, encoder.Offset);
             });
         }
@@ -41,10 +41,10 @@ namespace SimpleKafkaTests.Unit
             var testMessage = new Message(key: key, value: value);
 
             var buffer = new byte[1024];
-            var encoder = new BigEndianEncoder(buffer);
+            var encoder = new KafkaEncoder(buffer);
             Message.EncodeMessage(testMessage, ref encoder);
 
-            var decoder = new BigEndianDecoder(buffer);
+            var decoder = new KafkaDecoder(buffer);
             var result = Message.DecodeMessage(0, 0, ref decoder, encoder.Offset);
 
             Assert.That(testMessage.Key, Is.EqualTo(result.Key));
@@ -70,7 +70,7 @@ namespace SimpleKafkaTests.Unit
                 };
 
             var buffer = new byte[expected.Length];
-            var encoder = new BigEndianEncoder(buffer);
+            var encoder = new KafkaEncoder(buffer);
             Message.EncodeMessageSet(ref encoder, messages);
 
             Assert.That(buffer, Is.EqualTo(expected));
@@ -80,7 +80,7 @@ namespace SimpleKafkaTests.Unit
         public void DecodeMessageSetShouldHandleResponseWithMaxBufferSizeHit()
         {
             //This message set has a truncated message bytes at the end of it
-            var decoder = new BigEndianDecoder(MessageHelper.FetchResponseMaxBytesOverflow);
+            var decoder = new KafkaDecoder(MessageHelper.FetchResponseMaxBytesOverflow);
             var result = Message.DecodeMessageSet(0, ref decoder, decoder.Length);
 
             var message = Encoding.UTF8.GetString(result.First().Value);
@@ -99,12 +99,12 @@ namespace SimpleKafkaTests.Unit
                 var message = new Byte[] { };
                 var messageSize = 5;
                 var payloadBytes = new byte[16];
-                var encoder = new BigEndianEncoder(payloadBytes);
+                var encoder = new KafkaEncoder(payloadBytes);
                 encoder.Write(offset);
                 encoder.Write(messageSize);
                 encoder.Write(message);
 
-                var decoder = new BigEndianDecoder(payloadBytes);
+                var decoder = new KafkaDecoder(payloadBytes);
 
                 Message.DecodeMessageSet(0, ref decoder, payloadBytes.Length);
             });
@@ -118,7 +118,7 @@ namespace SimpleKafkaTests.Unit
             var payload = MessageHelper.CreateMessage(0, new Byte[] { 0 }, expectedPayloadBytes);
 
             // act/assert
-            var decoder = new BigEndianDecoder(payload, 0, payload.Length);
+            var decoder = new KafkaDecoder(payload, 0, payload.Length);
             var messages = Message.DecodeMessageSet(0, ref decoder, payload.Length);
             var actualPayload = messages.First().Value;
 

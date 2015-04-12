@@ -22,17 +22,17 @@ namespace SimpleKafka.Protocol
         public string ConsumerId { get; set; }
         public List<OffsetCommit> OffsetCommits { get; set; }
 
-        public void Encode(ref BigEndianEncoder encoder)
+        public void Encode(ref KafkaEncoder encoder)
         {
             EncodeOffsetCommitRequest(this, ref encoder);
         }
 
-        public List<OffsetCommitResponse> Decode(ref BigEndianDecoder decoder)
+        public List<OffsetCommitResponse> Decode(ref KafkaDecoder decoder)
         {
             return DecodeOffsetCommitResponse(ref decoder);
         }
 
-        private static void EncodeOffsetCommitRequest(OffsetCommitRequest request, ref BigEndianEncoder encoder)
+        private static void EncodeOffsetCommitRequest(OffsetCommitRequest request, ref KafkaEncoder encoder)
         {
             if (request.OffsetCommits == null) request.OffsetCommits = new List<OffsetCommit>();
             EncodeHeader(request, ref encoder);
@@ -70,7 +70,7 @@ namespace SimpleKafka.Protocol
             }
         }
 
-        private static List<OffsetCommitResponse> DecodeOffsetCommitResponse(ref BigEndianDecoder decoder)
+        private static List<OffsetCommitResponse> DecodeOffsetCommitResponse(ref KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
 

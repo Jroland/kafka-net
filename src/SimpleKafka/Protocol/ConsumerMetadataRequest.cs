@@ -14,24 +14,24 @@ namespace SimpleKafka.Protocol
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.ConsumerMetadataRequest; } }
         public string ConsumerGroup { get; set; }
 
-        public void Encode(ref BigEndianEncoder encoder)
+        public void Encode(ref KafkaEncoder encoder)
         {
             EncodeConsumerMetadataRequest(this, ref encoder);
         }
 
 
-        public ConsumerMetadataResponse Decode(ref BigEndianDecoder decoder)
+        public ConsumerMetadataResponse Decode(ref KafkaDecoder decoder)
         {
             return DecodeConsumerMetadataResponse(ref decoder);
         }
 
-        private static void EncodeConsumerMetadataRequest(ConsumerMetadataRequest request, ref BigEndianEncoder encoder)
+        private static void EncodeConsumerMetadataRequest(ConsumerMetadataRequest request, ref KafkaEncoder encoder)
         {
             EncodeHeader(request, ref encoder);
             encoder.Write(request.ConsumerGroup, StringPrefixEncoding.Int16);
         }
 
-        private static ConsumerMetadataResponse DecodeConsumerMetadataResponse(ref BigEndianDecoder decoder)
+        private static ConsumerMetadataResponse DecodeConsumerMetadataResponse(ref KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
             return new ConsumerMetadataResponse(ref decoder);
@@ -49,7 +49,7 @@ namespace SimpleKafka.Protocol
         public readonly string CoordinatorHost;
         public readonly int CoordinatorPort;
 
-        internal ConsumerMetadataResponse(ref BigEndianDecoder decoder)
+        internal ConsumerMetadataResponse(ref KafkaDecoder decoder)
         {
             Error = (ErrorResponseCode)decoder.ReadInt16();
             CoordinatorId = decoder.ReadInt32();

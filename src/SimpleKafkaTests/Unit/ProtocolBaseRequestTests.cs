@@ -15,7 +15,7 @@ namespace SimpleKafkaTests.Unit
         [Test]
         public void EnsureHeaderShouldPackCorrectByteLengths()
         {
-            var encoder = new BigEndianEncoder(new byte[14]);
+            var encoder = new KafkaEncoder(new byte[14]);
             var request = new FetchRequest { ClientId = "test", CorrelationId = 123456789 };
 
             BaseRequest.EncodeHeader(request, ref encoder);

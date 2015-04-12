@@ -23,8 +23,8 @@ namespace SimpleKafka
         private readonly TcpClient client;
         private readonly byte[] buffer;
         private readonly NetworkStream stream;
-        private BigEndianDecoder decoder;
-        private BigEndianEncoder encoder;
+        private KafkaDecoder decoder;
+        private KafkaEncoder encoder;
 
         private KafkaConnection(IPEndPoint serverEndpoint, TcpClient client, int bufferSize = 65536)
         {
@@ -32,8 +32,8 @@ namespace SimpleKafka
             this.client = client;
             this.stream = client.GetStream();
             this.buffer = new byte[bufferSize];
-            decoder = new BigEndianDecoder(buffer);
-            encoder = new BigEndianEncoder(buffer);
+            decoder = new KafkaDecoder(buffer);
+            encoder = new KafkaEncoder(buffer);
         }
 
 
@@ -84,7 +84,9 @@ namespace SimpleKafka
             {
                 if (disposing)
                 {
+                    stream.Dispose();
                     client.Close();
+                    clientLock.Dispose();
                 }
                 disposedValue = true;
             }

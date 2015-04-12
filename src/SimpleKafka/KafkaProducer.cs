@@ -51,7 +51,7 @@ namespace SimpleKafka
 
             while (topicMap.Count > 0)
             {
-                var brokerMap = await BuildBrokerMap(token, topicMap);
+                var brokerMap = await brokers.BuildBrokerMapAsync(token, topicMap).ConfigureAwait(false);
 
                 var completed = await SendMessagesToBrokersAsync(token, topicMap, brokerMap).ConfigureAwait(false);
                 if (!completed)
@@ -98,45 +98,6 @@ namespace SimpleKafka
             return brokerMap.Count > 0;
         }
 
-        private async Task<Dictionary<int, Dictionary<Tuple<string, int>, List<Message>>>> BuildBrokerMap(CancellationToken token, Dictionary<string, Dictionary<int, List<Message>>> topicMap)
-        {
-            var brokerMap = new Dictionary<int, Dictionary<Tuple<string, int>, List<Message>>>();
-            foreach (var topicKvp in topicMap)
-            {
-                var topic = topicKvp.Key;
-                var partitions = brokers.GetPartitionsForTopic(topic);
-                if (partitions == null)
-                {
-                    brokers.AddTopic(topic);
-                    var refreshed = await brokers.RefreshAsync(token).ConfigureAwait(false);
-                    if (!refreshed)
-                    {
-                        throw new KeyNotFoundException("Failed to refresh brokers");
-                    }
-                    partitions = brokers.GetPartitionsForTopic(topic);
-                    if (partitions == null)
-                    {
-                        throw new KeyNotFoundException("Failed to find topic: " + topic);
-                    }
-                }
-
-                foreach (var partitionKvp in topicKvp.Value)
-                {
-                    var partitionNumber = partitionKvp.Key;
-                    if (partitionNumber >= partitions.Length)
-                    {
-                        throw new IndexOutOfRangeException("Topic " + topic + ", partition " + partitionNumber + " is too big. Only have " + partitions.Length + " partitions");
-                    }
-
-                    var partition = partitions[partitionNumber];
-                    var brokerTopics = brokerMap.FindOrCreate(partition.LeaderId);
-                    var topicMessages = brokerTopics.FindOrCreate(Tuple.Create(topic, partitionNumber));
-                    topicMessages.AddRange(partitionKvp.Value);
-                }
-            }
-
-            return brokerMap;
-        }
 
         private async Task<IEnumerable<ProduceResponse>> ProduceMessagesToBroker(int brokerId, Dictionary<Tuple<string,int>,List<Message>> topicMessages, CancellationToken token)
         {

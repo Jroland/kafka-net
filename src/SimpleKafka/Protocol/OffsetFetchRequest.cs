@@ -22,12 +22,12 @@ namespace SimpleKafka.Protocol
         public string ConsumerGroup { get; set; }
         public List<OffsetFetch> Topics { get; set; }
 
-        public void Encode(ref BigEndianEncoder encoder)
+        public void Encode(ref KafkaEncoder encoder)
         {
             EncodeOffsetFetchRequest(this, ref encoder);
         }
 
-        private static void EncodeOffsetFetchRequest(OffsetFetchRequest request, ref BigEndianEncoder encoder)
+        private static void EncodeOffsetFetchRequest(OffsetFetchRequest request, ref KafkaEncoder encoder)
         {
             if (request.Topics == null) request.Topics = new List<OffsetFetch>();
             EncodeHeader(request, ref encoder);
@@ -54,13 +54,13 @@ namespace SimpleKafka.Protocol
 
         }
 
-        public List<OffsetFetchResponse> Decode(ref BigEndianDecoder decoder)
+        public List<OffsetFetchResponse> Decode(ref KafkaDecoder decoder)
         {
             return DecodeOffsetFetchResponse(ref decoder);
         }
 
 
-        private static List<OffsetFetchResponse> DecodeOffsetFetchResponse(ref BigEndianDecoder decoder)
+        private static List<OffsetFetchResponse> DecodeOffsetFetchResponse(ref KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
 

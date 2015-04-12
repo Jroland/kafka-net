@@ -23,7 +23,7 @@ namespace SimpleKafkaTests.Unit
         [TestCase(Int64.MaxValue, new Byte[] { 0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF })]
         public void Int64Tests(Int64 expectedValue, Byte[] givenBytes)
         {
-            var decoder = new BigEndianDecoder(givenBytes);
+            var decoder = new KafkaDecoder(givenBytes);
             var actualValue = decoder.ReadInt64();
             Assert.That(actualValue, Is.EqualTo(expectedValue));
         }
@@ -36,7 +36,7 @@ namespace SimpleKafkaTests.Unit
         [TestCase(Int32.MaxValue, new Byte[] { 0x7F, 0xFF, 0xFF, 0xFF })]
         public void Int32Tests(Int32 expectedValue, Byte[] givenBytes)
         {
-            var decoder = new BigEndianDecoder(givenBytes);
+            var decoder = new KafkaDecoder(givenBytes);
             var actualValue = decoder.ReadInt32();
             Assert.That(actualValue, Is.EqualTo(expectedValue));
         }
@@ -50,7 +50,7 @@ namespace SimpleKafkaTests.Unit
         [TestCase(Int16.MaxValue, new Byte[] { 0x7F, 0xFF })]
         public void Int16Tests(Int16 expectedValue, Byte[] givenBytes)
         {
-            var decoder = new BigEndianDecoder(givenBytes);
+            var decoder = new KafkaDecoder(givenBytes);
             var actualValue = decoder.ReadInt16();
             Assert.That(actualValue, Is.EqualTo(expectedValue));
         }
@@ -70,7 +70,7 @@ namespace SimpleKafkaTests.Unit
         [TestCase(null, new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF }, StringPrefixEncoding.Int32)]
         public void StringTests(String expectedValue, Byte[] givenBytes, StringPrefixEncoding encoding)
         {
-            var decoder = new BigEndianDecoder(givenBytes);
+            var decoder = new KafkaDecoder(givenBytes);
             string actualValue = null;
             switch (encoding)
             {

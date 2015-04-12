@@ -47,10 +47,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="BigEndianDecoder.cs" />
-    <Compile Include="BigEndianEncoder.cs" />
-    <Compile Include="BigEndianReader.cs" />
-    <Compile Include="BigEndianWriter.cs" />
+    <Compile Include="KafkaConsumer.cs" />
+    <Compile Include="KafkaDecoder.cs" />
+    <Compile Include="KafkaEncoder.cs" />
     <Compile Include="Common\Crc32Provider.cs" />
     <Compile Include="Common\Extensions.cs" />
     <Compile Include="Common\StringPrefixEncoding.cs" />
@@ -78,7 +77,9 @@
     <Compile Include="Protocol\ProduceRequest.cs" />
     <Compile Include="Protocol\Protocol.cs" />
     <Compile Include="Protocol\Topic.cs" />
+    <Compile Include="ReceivedKafkaMessage.cs" />
     <Compile Include="StringSerializer.cs" />
+    <Compile Include="TopicSelector.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

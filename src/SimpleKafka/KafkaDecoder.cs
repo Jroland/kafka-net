@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SimpleKafka
 {
-    public struct BigEndianDecoder
+    public struct KafkaDecoder
     {
         private int offset;
         public int Offset { get { return offset; } }
@@ -23,8 +23,8 @@ namespace SimpleKafka
         public byte[] Buffer { get { return buffer; } }
 
 
-        public BigEndianDecoder(byte[] buffer) : this(buffer, 0, buffer.Length) { }
-        public BigEndianDecoder(byte[] buffer, int offset, int length)
+        public KafkaDecoder(byte[] buffer) : this(buffer, 0, buffer.Length) { }
+        public KafkaDecoder(byte[] buffer, int offset, int length)
         {
             this.buffer = buffer;
             this.length = length;

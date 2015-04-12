@@ -29,18 +29,18 @@ namespace SimpleKafka.Protocol
         public List<Payload> Payload = new List<Payload>();
 
 
-        public void Encode(ref BigEndianEncoder encoder)
+        public void Encode(ref KafkaEncoder encoder)
         {
             EncodeProduceRequest(this, ref encoder);
         }
 
-        public List<ProduceResponse> Decode(ref BigEndianDecoder decoder)
+        public List<ProduceResponse> Decode(ref KafkaDecoder decoder)
         {
             return DecodeProduceResponse(ref decoder);
         }
 
         #region Protocol...
-        private static void EncodeProduceRequest(ProduceRequest request, ref BigEndianEncoder encoder)
+        private static void EncodeProduceRequest(ProduceRequest request, ref KafkaEncoder encoder)
         {
             if (request.Payload == null) request.Payload = new List<Payload>();
 
@@ -77,7 +77,7 @@ namespace SimpleKafka.Protocol
             }
         }
 
-        private List<ProduceResponse> DecodeProduceResponse(ref BigEndianDecoder decoder)
+        private List<ProduceResponse> DecodeProduceResponse(ref KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
 

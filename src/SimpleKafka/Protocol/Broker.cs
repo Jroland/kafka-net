@@ -10,7 +10,7 @@ namespace SimpleKafka.Protocol
         public int Port { get; set; }
         public Uri Address { get { return new Uri(string.Format("http://{0}:{1}", Host, Port));} }
 
-        public static Broker Decode(ref BigEndianDecoder decoder)
+        public static Broker Decode(ref KafkaDecoder decoder)
         {
             return new Broker
             {

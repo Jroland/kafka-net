@@ -37,43 +37,22 @@ namespace SimpleKafka
             }
         }
 
-        
-        public async Task<bool> RefreshAsync(CancellationToken token)
+
+        private bool IsLeaderElectionTakingPlaceForTopicAndPartition(string topic, int partition)
         {
-            while (await TryToRefreshAsync(token).ConfigureAwait(false))
+            var partitionsMap = topicToPartitions.TryGetValue(topic);
+            if (partitionsMap == null)
             {
-
-                if (!IsLeaderElectionTakingPlace)
-                {
-                    return true;
-                }
-                Log.Verbose("Leader election taking place");
-                await Task.Delay(backoffGenerator.Next(1000, 10000)).ConfigureAwait(false);
-            }
-            return false;
-
-        }
-
-        private bool IsLeaderElectionTakingPlace
-        {
-            get
-            {
-                foreach (var topicKvp in topicToPartitions)
-                {
-                    foreach (var partition in topicKvp.Value)
-                    {
-                        if (partition.LeaderId == -1)
-                        {
-                            return true;
-                        }
-                    }
-                }
-
                 return false;
             }
+            else
+            {
+                var partitionInfo = partitionsMap[partition];
+                return partitionInfo.LeaderId == -1;
+            }
         }
 
-        private async Task<bool> TryToRefreshAsync(CancellationToken token)
+        public async Task<bool> RefreshAsync(CancellationToken token)
         {
             if (brokers.Count == 0)
             {
@@ -124,6 +103,87 @@ namespace SimpleKafka
             }
         }
 
+        public async Task<Dictionary<int, Dictionary<Tuple<string, int>, T>>> BuildBrokerMapAsync<T>(CancellationToken token, Dictionary<string, Dictionary<int, T>> topicMap)
+        {
+            if (connections.Count == 0)
+            {
+                await RefreshAsync(token).ConfigureAwait(false);
+            }
+
+            var ready = false;
+            while (!ready)
+            {
+                ready = true;
+                foreach (var topicKvp in topicMap)
+                {
+                    var topic = topicKvp.Key;
+                    var partitions = GetPartitionsForTopic(topic);
+                    if (partitions == null)
+                    {
+                        AddTopic(topic);
+                        var refreshed = await RefreshAsync(token).ConfigureAwait(false);
+                        if (!refreshed)
+                        {
+                            throw new KeyNotFoundException("Failed to refresh brokers");
+                        }
+                        partitions = GetPartitionsForTopic(topic);
+                        if (partitions == null)
+                        {
+                            throw new KeyNotFoundException("Failed to find topic: " + topic);
+                        }
+                    }
+
+                    foreach (var partitionKvp in topicKvp.Value)
+                    {
+                        var partitionNumber = partitionKvp.Key;
+                        if (partitionNumber >= partitions.Length)
+                        {
+                            throw new IndexOutOfRangeException("Topic " + topic + ", partition " + partitionNumber + " is too big. Only have " + partitions.Length + " partitions");
+                        }
+
+                        var partition = partitions[partitionNumber];
+                        if (partition.LeaderId == -1)
+                        {
+                            Log.Information("Topic {topic}, partition {partition} has no leader, waiting", topic, partitionNumber);
+                            ready = false;
+                            break;
+                        }
+                    }
+                    if (!ready)
+                    {
+                        break;
+                    }
+                }
+
+                if (!ready)
+                {
+                    Log.Verbose("Waiting before trying again");
+                    await Task.Delay(backoffGenerator.Next(1000, 10000)).ConfigureAwait(false);
+                    var refreshed = await RefreshAsync(token).ConfigureAwait(false);
+                    if (!refreshed)
+                    {
+                        throw new KeyNotFoundException("Failed to refresh brokers");
+                    }
+                }
+            }
+
+            var brokerMap = new Dictionary<int, Dictionary<Tuple<string, int>, T>>();
+            foreach (var topicKvp in topicMap)
+            {
+                var topic = topicKvp.Key;
+                var partitions = GetPartitionsForTopic(topic);
+                foreach (var partitionKvp in topicKvp.Value)
+                {
+                    var partitionNumber = partitionKvp.Key;
+                    var partition = partitions[partitionNumber];
+                    var brokerTopics = brokerMap.FindOrCreate(partition.LeaderId);
+                    brokerTopics.Add(Tuple.Create(topic, partitionNumber), partitionKvp.Value);
+                }
+            }
+
+            return brokerMap;
+        }
+
         internal Partition[] GetPartitionsForTopic(string topic)
         {
             return topicToPartitions.TryGetValue(topic);
@@ -137,10 +197,9 @@ namespace SimpleKafka
                 var success = await TryToRefreshFromConnectionAsync(connection, token).ConfigureAwait(false);
                 if (success)
                 {
-                    return;
+                    break;
                 }
-                else
-                {
+                else { 
                     connection.Dispose();
                     connections.Remove(connectionKvp.Key);
                 }

@@ -20,10 +20,12 @@ namespace SimpleKafkaTests.Integration
         [SetUp]
         public void Setup()
         {
-
+            IntegrationHelpers.dockerHost = "tcp://server.home:2375";
+            IntegrationHelpers.zookeeperHost = "server.home";
+            IntegrationHelpers.dockerOptions = "";
         }
 
-        [Test]
+    [Test]
         public async Task TestProducingWorksOk()
         {
             using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(IntegrationConfig.IntegrationUri).ConfigureAwait(true))
@@ -132,40 +134,48 @@ namespace SimpleKafkaTests.Integration
         [Test]
         public async Task TestNewTopicProductionWorksOk()
         {
-            var topic = Guid.NewGuid().ToString();
-            RunKafkaTopicsCommand("--topic", topic, "--create", "--partitions", "1", "--replication-factor", "1");
-            try
+            using (var temporaryTopic = IntegrationHelpers.CreateTemporaryTopic())
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(IntegrationConfig.IntegrationUri).ConfigureAwait(true))
             {
-                using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(IntegrationConfig.IntegrationUri).ConfigureAwait(true))
+                var topic = temporaryTopic.Topic;
                 {
+                    var request = new MetadataRequest
                     {
-                        var request = new MetadataRequest
-                        {
-                            Topics = new List<string>
+                        Topics = new List<string>
                          {
                              topic
                          }
-                        };
-                        var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Is.Not.Null);
-                        var first = response;
-                        Assert.That(first.Topics, Has.Count.EqualTo(1));
-
-                        var firstTopic = first.Topics.First();
-                        Assert.That(firstTopic.ErrorCode, Is.EqualTo((short)ErrorResponseCode.NoError));
-                        Assert.That(firstTopic.Name, Is.EqualTo(topic));
-                        Assert.That(firstTopic.Partitions, Has.Count.EqualTo(1));
-
-                        var firstPartition = firstTopic.Partitions.First();
-                        Assert.That(firstPartition.PartitionId, Is.EqualTo(0));
-                    }
-
+                    };
+                    MetadataResponse response = null;
+                    while (response == null)
                     {
-                        var request = new ProduceRequest
+                        response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                        if (response.Topics[0].ErrorCode == (short)ErrorResponseCode.LeaderNotAvailable)
                         {
-                            Acks = 1,
-                            TimeoutMS = 10000,
-                            Payload = new List<Payload>
+                            response = null;
+                            await Task.Delay(1000);
+                        }
+
+                    }
+                    Assert.That(response, Is.Not.Null);
+                    var first = response;
+                    Assert.That(first.Topics, Has.Count.EqualTo(1));
+
+                    var firstTopic = first.Topics.First();
+                    Assert.That(firstTopic.ErrorCode, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(firstTopic.Name, Is.EqualTo(topic));
+                    Assert.That(firstTopic.Partitions, Has.Count.EqualTo(1));
+
+                    var firstPartition = firstTopic.Partitions.First();
+                    Assert.That(firstPartition.PartitionId, Is.EqualTo(0));
+                }
+
+                {
+                    var request = new ProduceRequest
+                    {
+                        Acks = 1,
+                        TimeoutMS = 10000,
+                        Payload = new List<Payload>
                              {
                                  new Payload
                                  {
@@ -181,24 +191,24 @@ namespace SimpleKafkaTests.Integration
                                       }
                                  }
                              }
-                        };
+                    };
 
-                        var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Is.Not.Null);
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    Assert.That(response, Is.Not.Null);
 
-                        var first = response.First();
-                        Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
-                        Assert.That(first.Topic, Is.EqualTo(topic));
-                        Assert.That(first.PartitionId, Is.EqualTo(0));
-                        Assert.That(first.Offset, Is.EqualTo(0));
-                    }
+                    var first = response.First();
+                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Topic, Is.EqualTo(topic));
+                    Assert.That(first.PartitionId, Is.EqualTo(0));
+                    Assert.That(first.Offset, Is.EqualTo(0));
+                }
 
+                {
+                    var request = new FetchRequest
                     {
-                        var request = new FetchRequest
-                        {
-                            MinBytes = 0,
-                            MaxWaitTime = 0,
-                            Fetches = new List<Fetch>
+                        MinBytes = 0,
+                        MaxWaitTime = 0,
+                        Fetches = new List<Fetch>
                              {
                                  new Fetch
                                  {
@@ -208,34 +218,34 @@ namespace SimpleKafkaTests.Integration
                                     Topic = topic,
                                  }
                             }
-                        };
+                    };
 
-                        var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Has.Count.EqualTo(1));
-                        var first = response.First();
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    Assert.That(response, Has.Count.EqualTo(1));
+                    var first = response.First();
 
-                        Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
-                        Assert.That(first.HighWaterMark, Is.EqualTo(4));
-                        Assert.That(first.PartitionId, Is.EqualTo(0));
-                        Assert.That(first.Topic, Is.EqualTo(topic));
-                        Assert.That(first.Messages, Has.Count.EqualTo(1));
+                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.HighWaterMark, Is.EqualTo(4));
+                    Assert.That(first.PartitionId, Is.EqualTo(0));
+                    Assert.That(first.Topic, Is.EqualTo(topic));
+                    Assert.That(first.Messages, Has.Count.EqualTo(1));
 
-                        var firstMessage = first.Messages.First();
-                        Assert.That(firstMessage.Meta.Offset, Is.EqualTo(0));
-                        Assert.That(firstMessage.Meta.PartitionId, Is.EqualTo(0));
-                        Assert.That(firstMessage.Attribute, Is.EqualTo(0));
-                        Assert.That(firstMessage.Key, Is.Null);
-                        Assert.That(firstMessage.MagicNumber, Is.EqualTo(0));
-                        Assert.That(firstMessage.Value, Is.Not.Null);
+                    var firstMessage = first.Messages.First();
+                    Assert.That(firstMessage.Meta.Offset, Is.EqualTo(0));
+                    Assert.That(firstMessage.Meta.PartitionId, Is.EqualTo(0));
+                    Assert.That(firstMessage.Attribute, Is.EqualTo(0));
+                    Assert.That(firstMessage.Key, Is.Null);
+                    Assert.That(firstMessage.MagicNumber, Is.EqualTo(0));
+                    Assert.That(firstMessage.Value, Is.Not.Null);
 
-                        var firstString = firstMessage.Value.ToUtf8String();
-                        Assert.That(firstString, Is.EqualTo("Message 1"));
-                    }
+                    var firstString = firstMessage.Value.ToUtf8String();
+                    Assert.That(firstString, Is.EqualTo("Message 1"));
+                }
 
+                {
+                    var request = new OffsetRequest
                     {
-                        var request = new OffsetRequest
-                        {
-                            Offsets = new List<Offset>
+                        Offsets = new List<Offset>
                              {
                                  new Offset
                                  {
@@ -245,26 +255,46 @@ namespace SimpleKafkaTests.Integration
                                       Topic = topic
                                  }
                              }
-                        };
+                    };
 
-                        var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Has.Count.EqualTo(1));
-                        var first = response.First();
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    Assert.That(response, Has.Count.EqualTo(1));
+                    var first = response.First();
 
-                        Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
-                        Assert.That(first.Topic, Is.EqualTo(topic));
-                        Assert.That(first.PartitionId, Is.EqualTo(0));
-                        Assert.That(first.Offsets, Has.Count.EqualTo(2));
+                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Topic, Is.EqualTo(topic));
+                    Assert.That(first.PartitionId, Is.EqualTo(0));
+                    Assert.That(first.Offsets, Has.Count.EqualTo(2));
 
-                        Assert.That(first.Offsets[0], Is.EqualTo(4));
-                        Assert.That(first.Offsets[1], Is.EqualTo(0));
-                    }
+                    Assert.That(first.Offsets[0], Is.EqualTo(4));
+                    Assert.That(first.Offsets[1], Is.EqualTo(0));
+                }
 
+                {
+                    var request = new ConsumerMetadataRequest
                     {
-                        var request = new OffsetFetchRequest
+                        ConsumerGroup = topic
+                    };
+                    ConsumerMetadataResponse response = null;
+                    while (response == null)
+                    {
+                        response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                        if (response.Error == ErrorResponseCode.ConsumerCoordinatorNotAvailableCode)
                         {
-                            ConsumerGroup = topic,
-                            Topics = new List<OffsetFetch>
+                            response = null;
+                            await Task.Delay(1000);
+                        }
+                    }
+                    Assert.That(response.Error, Is.EqualTo(ErrorResponseCode.NoError));
+                    Console.WriteLine("Id = {0}, Host = {1}, Port = {2}", response.CoordinatorId, response.CoordinatorHost, response.CoordinatorPort);
+
+                }
+
+                {
+                    var request = new OffsetFetchRequest
+                    {
+                        ConsumerGroup = topic,
+                        Topics = new List<OffsetFetch>
                               {
                                   new OffsetFetch
                                   {
@@ -272,26 +302,26 @@ namespace SimpleKafkaTests.Integration
                                        Topic = topic
                                   }
                               }
-                        };
+                    };
 
-                        var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Has.Count.EqualTo(1));
-                        var first = response.First();
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    Assert.That(response, Has.Count.EqualTo(1));
+                    var first = response.First();
 
-                        Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
-                        Assert.That(first.Topic, Is.EqualTo(topic));
-                        Assert.That(first.PartitionId, Is.EqualTo(0));
-                        Assert.That(first.MetaData, Is.Empty);
-                        Assert.That(first.Offset, Is.EqualTo(-1));
-                    }
+                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Topic, Is.EqualTo(topic));
+                    Assert.That(first.PartitionId, Is.EqualTo(0));
+                    Assert.That(first.MetaData, Is.Empty);
+                    Assert.That(first.Offset, Is.EqualTo(-1));
+                }
 
+                {
+                    var request = new OffsetCommitRequest
                     {
-                        var request = new OffsetCommitRequest
-                        {
-                            ConsumerGroup = topic,
-                            ConsumerGroupGenerationId = 1,
-                            ConsumerId = "0",
-                            OffsetCommits = new List<OffsetCommit>
+                        ConsumerGroup = topic,
+                        ConsumerGroupGenerationId = 1,
+                        ConsumerId = "0",
+                        OffsetCommits = new List<OffsetCommit>
                                {
                                    new OffsetCommit
                                    {
@@ -302,21 +332,21 @@ namespace SimpleKafkaTests.Integration
                                         Topic = topic,
                                    }
                                }
-                        };
-                        var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Has.Count.EqualTo(1));
-                        var first = response.First();
+                    };
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    Assert.That(response, Has.Count.EqualTo(1));
+                    var first = response.First();
 
-                        Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
-                        Assert.That(first.Topic, Is.EqualTo(topic));
-                        Assert.That(first.PartitionId, Is.EqualTo(0));
-                    }
+                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Topic, Is.EqualTo(topic));
+                    Assert.That(first.PartitionId, Is.EqualTo(0));
+                }
 
+                {
+                    var request = new OffsetFetchRequest
                     {
-                        var request = new OffsetFetchRequest
-                        {
-                            ConsumerGroup = topic,
-                            Topics = new List<OffsetFetch>
+                        ConsumerGroup = topic,
+                        Topics = new List<OffsetFetch>
                               {
                                   new OffsetFetch
                                   {
@@ -324,25 +354,25 @@ namespace SimpleKafkaTests.Integration
                                        Topic = topic
                                   }
                               }
-                        };
+                    };
 
-                        var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Has.Count.EqualTo(1));
-                        var first = response.First();
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    Assert.That(response, Has.Count.EqualTo(1));
+                    var first = response.First();
 
-                        Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
-                        Assert.That(first.Topic, Is.EqualTo(topic));
-                        Assert.That(first.PartitionId, Is.EqualTo(0));
-                        Assert.That(first.MetaData, Is.EqualTo("Metadata 1"));
-                        Assert.That(first.Offset, Is.EqualTo(0));
-                    }
+                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Topic, Is.EqualTo(topic));
+                    Assert.That(first.PartitionId, Is.EqualTo(0));
+                    Assert.That(first.MetaData, Is.EqualTo("Metadata 1"));
+                    Assert.That(first.Offset, Is.EqualTo(0));
+                }
 
+                {
+                    var request = new FetchRequest
                     {
-                        var request = new FetchRequest
-                        {
-                            MinBytes = 0,
-                            MaxWaitTime = 0,
-                            Fetches = new List<Fetch>
+                        MinBytes = 0,
+                        MaxWaitTime = 0,
+                        Fetches = new List<Fetch>
                              {
                                  new Fetch
                                  {
@@ -352,49 +382,49 @@ namespace SimpleKafkaTests.Integration
                                     Topic = topic,
                                  }
                             }
-                        };
+                    };
 
-                        var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Has.Count.EqualTo(1));
-                        var first = response.First();
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    Assert.That(response, Has.Count.EqualTo(1));
+                    var first = response.First();
 
-                        Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
-                        Assert.That(first.HighWaterMark, Is.EqualTo(4));
-                        Assert.That(first.PartitionId, Is.EqualTo(0));
-                        Assert.That(first.Topic, Is.EqualTo(topic));
-                        Assert.That(first.Messages, Has.Count.EqualTo(3));
+                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.HighWaterMark, Is.EqualTo(4));
+                    Assert.That(first.PartitionId, Is.EqualTo(0));
+                    Assert.That(first.Topic, Is.EqualTo(topic));
+                    Assert.That(first.Messages, Has.Count.EqualTo(3));
 
-                        var firstMessage = first.Messages.First();
-                        Assert.That(firstMessage.Meta.Offset, Is.EqualTo(1));
-                        Assert.That(firstMessage.Meta.PartitionId, Is.EqualTo(0));
-                        Assert.That(firstMessage.Attribute, Is.EqualTo(0));
-                        Assert.That(firstMessage.Key, Is.Null);
-                        Assert.That(firstMessage.MagicNumber, Is.EqualTo(0));
-                        Assert.That(firstMessage.Value, Is.Not.Null);
+                    var firstMessage = first.Messages.First();
+                    Assert.That(firstMessage.Meta.Offset, Is.EqualTo(1));
+                    Assert.That(firstMessage.Meta.PartitionId, Is.EqualTo(0));
+                    Assert.That(firstMessage.Attribute, Is.EqualTo(0));
+                    Assert.That(firstMessage.Key, Is.Null);
+                    Assert.That(firstMessage.MagicNumber, Is.EqualTo(0));
+                    Assert.That(firstMessage.Value, Is.Not.Null);
 
-                        var firstString = firstMessage.Value.ToUtf8String();
-                        Assert.That(firstString, Is.EqualTo("Message 2"));
+                    var firstString = firstMessage.Value.ToUtf8String();
+                    Assert.That(firstString, Is.EqualTo("Message 2"));
 
-                        var lastMessage = first.Messages.Last();
-                        Assert.That(lastMessage.Meta.Offset, Is.EqualTo(3));
-                        Assert.That(lastMessage.Meta.PartitionId, Is.EqualTo(0));
-                        Assert.That(lastMessage.Attribute, Is.EqualTo(0));
-                        Assert.That(lastMessage.Key, Is.Null);
-                        Assert.That(lastMessage.MagicNumber, Is.EqualTo(0));
-                        Assert.That(lastMessage.Value, Is.Not.Null);
+                    var lastMessage = first.Messages.Last();
+                    Assert.That(lastMessage.Meta.Offset, Is.EqualTo(3));
+                    Assert.That(lastMessage.Meta.PartitionId, Is.EqualTo(0));
+                    Assert.That(lastMessage.Attribute, Is.EqualTo(0));
+                    Assert.That(lastMessage.Key, Is.Null);
+                    Assert.That(lastMessage.MagicNumber, Is.EqualTo(0));
+                    Assert.That(lastMessage.Value, Is.Not.Null);
 
-                        var lastString = lastMessage.Value.ToUtf8String();
-                        Assert.That(lastString, Is.EqualTo("Message 4"));
+                    var lastString = lastMessage.Value.ToUtf8String();
+                    Assert.That(lastString, Is.EqualTo("Message 4"));
 
 
-                    }
+                }
 
+                {
+                    var request = new FetchRequest
                     {
-                        var request = new FetchRequest
-                        {
-                            MinBytes = 0,
-                            MaxWaitTime = 0,
-                            Fetches = new List<Fetch>
+                        MinBytes = 0,
+                        MaxWaitTime = 0,
+                        Fetches = new List<Fetch>
                              {
                                  new Fetch
                                  {
@@ -404,26 +434,20 @@ namespace SimpleKafkaTests.Integration
                                     Topic = topic,
                                  }
                             }
-                        };
+                    };
 
-                        var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        Assert.That(response, Has.Count.EqualTo(1));
-                        var first = response.First();
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    Assert.That(response, Has.Count.EqualTo(1));
+                    var first = response.First();
 
-                        Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
-                        Assert.That(first.HighWaterMark, Is.EqualTo(4));
-                        Assert.That(first.PartitionId, Is.EqualTo(0));
-                        Assert.That(first.Topic, Is.EqualTo(topic));
-                        Assert.That(first.Messages, Has.Count.EqualTo(0));
-                    }
-                    }
-                    Console.WriteLine("Test completed");
+                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.HighWaterMark, Is.EqualTo(4));
+                    Assert.That(first.PartitionId, Is.EqualTo(0));
+                    Assert.That(first.Topic, Is.EqualTo(topic));
+                    Assert.That(first.Messages, Has.Count.EqualTo(0));
+                }
             }
-            finally
-            {
-                RunKafkaTopicsCommand("--topic", topic, "--delete");
-            }
-
+            Console.WriteLine("Test completed");
         }
 
         [Test]
@@ -454,23 +478,5 @@ namespace SimpleKafkaTests.Integration
             }
         }
 
-        private static void RunKafkaTopicsCommand(params string[] args)
-        {
-            var cmd = "--host=tcp://server.home:2375 run --rm sceneskope/kafka:0.8.2.1 bin/kafka-topics.sh --zookeeper server.home ";
-            var arguments = cmd + String.Join(" ", args);
-
-            var info = new ProcessStartInfo
-            {
-                Arguments = arguments,
-                CreateNoWindow = true,
-                FileName = @"c:\users\nick\bin\docker.exe",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-            };
-            var process = Process.Start(info);
-            var stdout = process.StandardOutput.ReadToEnd();
-            process.WaitForExit();
-            Console.WriteLine(stdout);
-        }
     }
 }
