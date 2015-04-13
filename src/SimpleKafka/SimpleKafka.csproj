@@ -79,6 +79,7 @@
     <Compile Include="Protocol\Topic.cs" />
     <Compile Include="ReceivedKafkaMessage.cs" />
     <Compile Include="StringSerializer.cs" />
+    <Compile Include="TopicPartitionOffset.cs" />
     <Compile Include="TopicSelector.cs" />
   </ItemGroup>
   <ItemGroup>

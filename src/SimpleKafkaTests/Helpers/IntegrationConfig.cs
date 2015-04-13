@@ -13,10 +13,10 @@ namespace SimpleKafkaTests.Helpers
         public static string IntegrationTopic = "IntegrationTopic";
         public static string IntegrationConsumer = "IntegrationConsumer";
 //        public static Uri IntegrationUri = new Uri("http://server.home:9092");
-        public static Uri IntegrationUri = new Uri("http://server.home:39092");
+        public static Uri IntegrationUri = new Uri("http://server.home:39093");
         public static Uri[] IntegrationUriArray = new[]
         {
-            new Uri("http://server.home:39092"),
+            new Uri("http://server.home:39093"),
             //new Uri("http://server.home:39093"),
             //new Uri("http://server.home:39094"),
         };

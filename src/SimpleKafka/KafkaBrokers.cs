@@ -103,6 +103,32 @@ namespace SimpleKafka
             }
         }
 
+
+        private readonly Dictionary<string, int> offsetCoordinatorMap = new Dictionary<string, int>();
+        public async Task<Dictionary<string, int>> BuildOffsetCoordinatorMapAsync(CancellationToken token, params string[] consumerGroups)
+        {
+            if (connections.Count == 0)
+            {
+                await RefreshAsync(token).ConfigureAwait(false);
+            }
+
+            foreach (var consumerGroup in consumerGroups)
+            {
+                var currentCoordinator = offsetCoordinatorMap.GetOrCreate(consumerGroup, () => -1);
+                if (currentCoordinator == -1)
+                {
+                    var request = new ConsumerMetadataRequest { ConsumerGroup = consumerGroup };
+                    var response = await connections.Values.First().SendRequestAsync(request, token).ConfigureAwait(false);
+                    if (response.Error != ErrorResponseCode.NoError)
+                    {
+                        throw new InvalidOperationException("Failed to retrieve consumer offsets " + response.Error);
+                    }
+                    offsetCoordinatorMap[consumerGroup] = response.CoordinatorId;
+                }
+            }
+            return offsetCoordinatorMap;
+        }
+
         public async Task<Dictionary<int, Dictionary<Tuple<string, int>, T>>> BuildBrokerMapAsync<T>(CancellationToken token, Dictionary<string, Dictionary<int, T>> topicMap)
         {
             if (connections.Count == 0)

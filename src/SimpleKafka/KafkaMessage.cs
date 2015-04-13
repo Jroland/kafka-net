@@ -6,6 +6,14 @@ using System.Threading.Tasks;
 
 namespace SimpleKafka
 {
+    public static class KafkaMessage
+    {
+        public static KafkaMessage<TKey, TValue> Create<TKey, TValue>(string topic, TKey key, TValue value)
+        {
+            return new KafkaMessage<TKey, TValue>(topic, key, value);
+        }
+    }
+
     public class KafkaMessage<TKey,TValue>
     {
         private readonly string topic;
@@ -21,6 +29,7 @@ namespace SimpleKafka
             this.key = key;
             this.value = value;
         }
+
 
     }
 }

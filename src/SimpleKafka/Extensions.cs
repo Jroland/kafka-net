@@ -49,5 +49,20 @@ namespace SimpleKafka
                 return null;
             }
         }
+
+        public static TValue GetOrCreate<TKey, TValue>(this IDictionary<TKey, TValue> map, TKey key, Func<TValue> creator)
+        {
+            TValue result;
+            if (map.TryGetValue(key, out result))
+            {
+                return result;
+            }
+            else
+            {
+                result = creator();
+                map.Add(key, result);
+                return result;
+            }
+        }
     }
 }

@@ -8,9 +8,11 @@ namespace SimpleKafka
 {
     public enum OffsetSelectionStrategy
     {
-        Earliest,
-        Latest,
-        Specified
+        Earliest = -2,
+        Last = -3,
+        Next = -1,
+        Specified = 0,
+        NextUncommitted = -4,
     };
 
     public class TopicSelector
@@ -19,14 +21,14 @@ namespace SimpleKafka
         public int Partition { get; set; }
 
         public long Offset { get; set; }
-
+        
         public OffsetSelectionStrategy DefaultOffsetSelection { get; set; }
         public OffsetSelectionStrategy FailureOffsetSelection { get; set; }
 
         public TopicSelector()
         {
             DefaultOffsetSelection = OffsetSelectionStrategy.Specified;
-            FailureOffsetSelection = OffsetSelectionStrategy.Latest;
+            FailureOffsetSelection = OffsetSelectionStrategy.Next; 
         }
 
     }
