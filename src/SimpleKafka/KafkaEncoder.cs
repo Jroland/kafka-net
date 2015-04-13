@@ -7,14 +7,15 @@ using System.Threading.Tasks;
 
 namespace SimpleKafka
 {
-    public struct KafkaEncoder
+    internal class KafkaEncoder
     {
         private int offset;
         public int Offset {  get { return offset; } }
 
-        public void SetOffset(int offset)
+        public KafkaEncoder SetOffset(int offset)
         {
             this.offset = offset;
+            return this;
         }
 
         private readonly byte[] buffer;
@@ -26,12 +27,13 @@ namespace SimpleKafka
             this.buffer = buffer;
         }
 
-        public void Reset()
+        public KafkaEncoder Reset()
         {
             offset = 0;
+            return this;
         }
 
-        public void Write(long value)
+        public KafkaEncoder Write(long value)
         {
             unchecked
             {
@@ -44,8 +46,9 @@ namespace SimpleKafka
                 buffer[offset++] = (byte)((value >> 8));
                 buffer[offset++] = (byte)(value);
             }
+            return this;
         }
-        public void Write(int value)
+        public KafkaEncoder Write(int value)
         {
             unchecked
             {
@@ -54,9 +57,10 @@ namespace SimpleKafka
                 buffer[offset++] = (byte)((value >> 8));
                 buffer[offset++] = (byte)(value);
             }
+            return this;
         }
 
-        public void Write(uint value)
+        public KafkaEncoder Write(uint value)
         {
             unchecked
             {
@@ -65,106 +69,85 @@ namespace SimpleKafka
                 buffer[offset++] = (byte)((value >> 8));
                 buffer[offset++] = (byte)(value);
             }
+            return this;
         }
 
-        public void Write(short value)
+        public KafkaEncoder Write(short value)
         {
             unchecked
             {
                 buffer[offset++] = (byte)((value >> 8));
                 buffer[offset++] = (byte)(value);
             }
+            return this;
         }
 
-        public void Write(byte value)
+        public KafkaEncoder Write(byte value)
         {
             buffer[offset++] = value;
+            return this;
         }
 
-        public void Write(string data, StringPrefixEncoding encoding = StringPrefixEncoding.Int32)
+        public KafkaEncoder Write(string data)
         {
             if (data == null)
             {
-                switch (encoding)
-                {
-                    case StringPrefixEncoding.None: break;
-                    case StringPrefixEncoding.Int16: Write((short)-1); break;
-                    case StringPrefixEncoding.Int32: Write(-1); break;
-                    default: throw new InvalidOperationException("Unknown encoding: " + encoding);
-                }
-
-            } else
-            {
-                int adjust;
-                switch (encoding)
-                {
-                    case StringPrefixEncoding.None: adjust = 0; break;
-                    case StringPrefixEncoding.Int16: adjust = 2; break;
-                    case StringPrefixEncoding.Int32: adjust = 4; break;
-                    default: throw new InvalidOperationException("Unknown encoding: " + encoding);
-                }
-                var bytesWritten = Encoding.UTF8.GetBytes(data, 0, data.Length, buffer, offset + adjust);
-                switch (encoding)
-                {
-                    case StringPrefixEncoding.None: break;
-                    case StringPrefixEncoding.Int16: Write((short)bytesWritten); break;
-                    case StringPrefixEncoding.Int32: Write(bytesWritten); break;
-                }
-                offset += bytesWritten;
-            }
-        }
-
-        public void Write(byte[] data, StringPrefixEncoding encoding = StringPrefixEncoding.Int32)
-        {
-            if (data == null)
-            {
-                switch (encoding)
-                {
-                    case StringPrefixEncoding.Int16: Write((short)-1); break;
-                    default: Write(-1); break;
-                }
-
+                Write((short)-1);
             }
             else
             {
-                switch (encoding)
-                {
-                    case StringPrefixEncoding.Int16: Write((short)data.Length); break;
-                    default: Write(data.Length); break;
-                }
+                var bytesWritten = Encoding.UTF8.GetBytes(data, 0, data.Length, buffer, offset + 2);
+                Write((short)bytesWritten);
+                offset += bytesWritten;
+            }
+            return this;
+        }
+
+        public KafkaEncoder Write(byte[] data)
+        {
+            if (data == null)
+            {
+                    Write(-1);
+            }
+            else
+            {
+                Write(data.Length);
                 Array.Copy(data, 0, buffer, offset, data.Length);
                 offset += data.Length;
             }
+            return this;
         }
 
-        internal int PrepareForCrc()
+        public int PrepareForCrc()
         {
             offset += 4;
             return offset;
         }
 
-        internal void CalculateCrc(int crcMarker)
+        public KafkaEncoder CalculateCrc(int crcMarker)
         {
             var crc = Crc32Provider.Compute(buffer, crcMarker, offset - crcMarker);
             var current = offset;
             offset = crcMarker - 4;
             Write(crc);
             offset = current;
+            return this;
         }
 
-        internal int PrepareForLength()
+        public int PrepareForLength()
         {
             offset += 4;
             return offset;
         }
 
-        internal void WriteLength(int lengthMarker)
+        public KafkaEncoder WriteLength(int lengthMarker)
         {
             var current = offset;
             var length = offset - lengthMarker;
             offset = lengthMarker - 4;
             Write(length);
             offset = current;
+            return this;
         }
 
     }

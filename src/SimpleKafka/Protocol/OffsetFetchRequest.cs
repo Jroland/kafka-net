@@ -12,55 +12,77 @@ namespace SimpleKafka.Protocol
     /// under any abritrary name.
     /// This now supports version 1 of the protocol
     /// </summary>
-    public class OffsetFetchRequest : BaseRequest, IKafkaRequest<List<OffsetFetchResponse>>
+    public class OffsetFetchRequest : BaseRequest<List<OffsetFetchResponse>>, IKafkaRequest
     {
-        public OffsetFetchRequest(short version = 1) : base(version)
+        public OffsetFetchRequest(short version = 1) : base(ApiKeyRequestType.OffsetFetch, version)
         {
 
         }
-        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetFetch; } }
         public string ConsumerGroup { get; set; }
         public List<OffsetFetch> Topics { get; set; }
 
-        public void Encode(ref KafkaEncoder encoder)
+        internal override KafkaEncoder Encode(KafkaEncoder encoder)
         {
-            EncodeOffsetFetchRequest(this, ref encoder);
+            return EncodeOffsetFetchRequest(this, encoder);
         }
 
-        private static void EncodeOffsetFetchRequest(OffsetFetchRequest request, ref KafkaEncoder encoder)
+        private static KafkaEncoder EncodeOffsetFetchRequest(OffsetFetchRequest request, KafkaEncoder encoder)
         {
-            if (request.Topics == null) request.Topics = new List<OffsetFetch>();
-            EncodeHeader(request, ref encoder);
+            request
+                .EncodeHeader(encoder)
+                .Write(request.ConsumerGroup);
 
-            encoder.Write(request.ConsumerGroup, StringPrefixEncoding.Int16);
-
-            var topicGroups = request.Topics.GroupBy(x => x.Topic).ToList();
-            encoder.Write(topicGroups.Count);
-
-            foreach (var topicGroup in topicGroups)
+            if (request.Topics == null)
             {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                encoder.Write(topicGroup.Key, StringPrefixEncoding.Int16);
-                encoder.Write(partitions.Count);
-
-                foreach (var partition in partitions)
+                // nothing to fetch
+                encoder.Write(0);
+            }
+            else if (request.Topics.Count == 1)
+            {
+                // Short cut single instance request
+                var fetch = request.Topics[0];
+                encoder
+                    .Write(1)
+                    .Write(fetch.Topic)
+                    .Write(1)
+                    .Write(fetch.PartitionId);
+            }
+            else
+            {
+                // more complex
+                var topicGroups = new Dictionary<string, List<int>>();
+                foreach (var fetch in request.Topics)
                 {
-                    foreach (var offset in partition)
+                    var partitions = topicGroups.GetOrCreate(fetch.Topic, () => new List<int>(request.Topics.Count));
+                    partitions.Add(fetch.PartitionId);
+                }
+
+                encoder.Write(topicGroups.Count);
+                foreach (var kvp in topicGroups)
+                {
+                    var topic = kvp.Key;
+                    var partitions = kvp.Value;
+                    encoder
+                        .Write(topic)
+                        .Write(partitions.Count);
+                    foreach (var fetch in partitions)
                     {
-                        encoder.Write(offset.PartitionId);
+                        encoder.Write(fetch);
                     }
+
                 }
             }
 
+            return encoder;
         }
 
-        public List<OffsetFetchResponse> Decode(ref KafkaDecoder decoder)
+        internal override List<OffsetFetchResponse> Decode(KafkaDecoder decoder)
         {
-            return DecodeOffsetFetchResponse(ref decoder);
+            return DecodeOffsetFetchResponse(decoder);
         }
 
 
-        private static List<OffsetFetchResponse> DecodeOffsetFetchResponse(ref KafkaDecoder decoder)
+        private static List<OffsetFetchResponse> DecodeOffsetFetchResponse(KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
 
@@ -68,19 +90,12 @@ namespace SimpleKafka.Protocol
             var topicCount = decoder.ReadInt32();
             for (int i = 0; i < topicCount; i++)
             {
-                var topic = decoder.ReadInt16String();
+                var topic = decoder.ReadString();
 
                 var partitionCount = decoder.ReadInt32();
                 for (int j = 0; j < partitionCount; j++)
                 {
-                    var response = new OffsetFetchResponse()
-                    {
-                        Topic = topic,
-                        PartitionId = decoder.ReadInt32(),
-                        Offset = decoder.ReadInt64(),
-                        MetaData = decoder.ReadInt16String(),
-                        Error = decoder.ReadInt16()
-                    };
+                    var response = OffsetFetchResponse.Decode(decoder, topic);
                     responses.Add(response);
                 }
             }
@@ -106,23 +121,42 @@ namespace SimpleKafka.Protocol
         /// <summary>
         /// The name of the topic this response entry is for.
         /// </summary>
-        public string Topic;
+        public readonly string Topic;
         /// <summary>
         /// The id of the partition this response is for.
         /// </summary>
-        public Int32 PartitionId;
+        public readonly int PartitionId;
         /// <summary>
         /// The offset position saved to the server.
         /// </summary>
-        public Int64 Offset;
+        public readonly long Offset;
         /// <summary>
         /// Any arbitrary metadata stored during a CommitRequest.
         /// </summary>
-        public string MetaData;
+        public readonly string MetaData;
         /// <summary>
         /// Error code of exception that occured during the request.  Zero if no error.
         /// </summary>
-        public Int16 Error;
+        public readonly ErrorResponseCode Error;
+
+        private OffsetFetchResponse(string topic, int partitionId, long offset, string metaData, ErrorResponseCode error)
+        {
+            this.Topic = topic;
+            this.PartitionId = partitionId;
+            this.Offset = offset;
+            this.MetaData = metaData;
+            this.Error = error;
+        }
+
+        internal static OffsetFetchResponse Decode(KafkaDecoder decoder, string topic)
+        {
+            var partitionId = decoder.ReadInt32();
+            var offset = decoder.ReadInt64();
+            var metaData = decoder.ReadString();
+            var error = decoder.ReadErrorResponseCode();
+            var response = new OffsetFetchResponse(topic, partitionId, offset, metaData, error);
+            return response;
+        }
 
         public override string ToString()
         {

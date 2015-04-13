@@ -73,7 +73,7 @@ namespace SimpleKafka
                 var responses = await ProduceMessagesToBroker(brokerKvp.Key, brokerKvp.Value, token).ConfigureAwait(false);
                 foreach (var response in responses)
                 {
-                    switch ((ErrorResponseCode)response.Error)
+                    switch (response.Error)
                     {
                         case ErrorResponseCode.NoError:
                             var partitions = topicMap[response.Topic];
@@ -90,7 +90,7 @@ namespace SimpleKafka
                             break;
 
                         default:
-                            throw new InvalidOperationException("Unhandled error " + (ErrorResponseCode)response.Error + ", " + response.Topic + ":" + response.PartitionId);
+                            throw new InvalidOperationException("Unhandled error " + response.Error + ", " + response.Topic + ":" + response.PartitionId);
                     }
                 }
             }
@@ -127,9 +127,9 @@ namespace SimpleKafka
             var topicMap = new Dictionary<string, Dictionary<int, List<Message>>>();
             foreach (var message in messages)
             {
-                var partitionMap = topicMap.FindOrCreate(message.Topic);
+                var partitionMap = topicMap.GetOrCreate(message.Topic);
                 var partition = messagePartitioner.CalculatePartition(message);
-                var messageList = partitionMap.FindOrCreate(partition);
+                var messageList = partitionMap.GetOrCreate(partition);
                 var encodedMessage = new Message
                 {
                     Key = keySerializer.Serialize(message.Key),

@@ -13,7 +13,7 @@ namespace SimpleKafkaTests.Unit
     /// <remarks>Modified to work with nunit from xunit.</remarks>
     [TestFixture]
     [Category("Unit")]
-    public class BigEndianEncoderTests
+    public class KafkaEncoderTests
     {
         [Theory]
         [TestCase((Int64)0, new Byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 })]
@@ -31,7 +31,6 @@ namespace SimpleKafkaTests.Unit
         [Theory]
         [TestCase((UInt32)0, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((UInt32)1, new Byte[] { 0x00, 0x00, 0x00, 0x01 })]
-        [TestCase(UInt32.MinValue, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase(UInt32.MaxValue, new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF })]
         public void UInt32Tests(UInt32 number, Byte[] expectedBytes)
         {
@@ -71,23 +70,15 @@ namespace SimpleKafkaTests.Unit
 
 
         [Theory]
-        [TestCase("0000", new Byte[] { 0x00, 0x04, 0x30, 0x30, 0x30, 0x30 }, StringPrefixEncoding.Int16)]
-        [TestCase("0000", new Byte[] { 0x00, 0x00, 0x00, 0x04, 0x30, 0x30, 0x30, 0x30 }, StringPrefixEncoding.Int32)]
-        [TestCase("0000", new Byte[] { 0x30, 0x30, 0x30, 0x30 }, StringPrefixEncoding.None)]
-        [TestCase("€€€€", new Byte[] { 0x00, 0x0C, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.Int16)]
-        [TestCase("€€€€", new Byte[] { 0x00, 0x00, 0x00, 0x0C, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.Int32)]
-        [TestCase("€€€€", new Byte[] { 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.None)]
-        [TestCase("", new Byte[] { }, StringPrefixEncoding.None)]
-        [TestCase("", new Byte[] { 0x00, 0x00 }, StringPrefixEncoding.Int16)]
-        [TestCase("", new Byte[] { 0x00, 0x00, 0x00, 0x00 }, StringPrefixEncoding.Int32)]
-        [TestCase(null, new Byte[] { }, StringPrefixEncoding.None)]
-        [TestCase(null, new Byte[] { 0xFF, 0xFF }, StringPrefixEncoding.Int16)]
-        [TestCase(null, new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF }, StringPrefixEncoding.Int32)]
-        public void StringTests(String value, Byte[] expectedBytes, StringPrefixEncoding encoding)
+        [TestCase("0000", new Byte[] { 0x00, 0x04, 0x30, 0x30, 0x30, 0x30 })]
+        [TestCase("€€€€", new Byte[] { 0x00, 0x0C, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC })]
+        [TestCase("", new Byte[] { 0x00, 0x00 })]
+        [TestCase(null, new Byte[] { 0xFF, 0xFF })]
+        public void StringTests(String value, Byte[] expectedBytes)
         {
             var buffer = new byte[expectedBytes.Length];
             var encoder = new KafkaEncoder(buffer);
-            encoder.Write(value, encoding);
+            encoder.Write(value);
             Assert.That(encoder.Offset, Is.EqualTo(expectedBytes.Length));
             Assert.That(buffer, Is.EqualTo(expectedBytes));
         }

@@ -5,16 +5,12 @@ using SimpleKafka.Common;
 
 namespace SimpleKafka.Protocol
 {
-    public class ProduceRequest : BaseRequest, IKafkaRequest<List<ProduceResponse>>
+    public class ProduceRequest : BaseRequest<List<ProduceResponse>>, IKafkaRequest
     {
         /// <summary>
         /// Provide a hint to the broker call not to expect a response for requests without Acks.
         /// </summary>
         public override bool ExpectResponse { get { return Acks > 0; } }
-        /// <summary>
-        /// Indicates the type of kafka encoding this request is.
-        /// </summary>
-        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Produce; } }
         /// <summary>
         /// Time kafka will wait for requested ack level before returning.
         /// </summary>
@@ -28,56 +24,89 @@ namespace SimpleKafka.Protocol
         /// </summary>
         public List<Payload> Payload = new List<Payload>();
 
+        public ProduceRequest() : base(ApiKeyRequestType.Produce) { }
 
-        public void Encode(ref KafkaEncoder encoder)
+        internal override KafkaEncoder Encode(KafkaEncoder encoder)
         {
-            EncodeProduceRequest(this, ref encoder);
+            return EncodeProduceRequest(this, encoder);
         }
 
-        public List<ProduceResponse> Decode(ref KafkaDecoder decoder)
+        internal override List<ProduceResponse> Decode(KafkaDecoder decoder)
         {
-            return DecodeProduceResponse(ref decoder);
+            return DecodeProduceResponse(decoder);
         }
 
         #region Protocol...
-        private static void EncodeProduceRequest(ProduceRequest request, ref KafkaEncoder encoder)
+        private static KafkaEncoder EncodeProduceRequest(ProduceRequest request, KafkaEncoder encoder)
         {
-            if (request.Payload == null) request.Payload = new List<Payload>();
+            request.EncodeHeader(encoder)
+                .Write(request.Acks)
+                .Write(request.TimeoutMS);
 
-            var groupedPayloads = (from p in request.Payload
-                                   group p by new
-                                   {
-                                       p.Topic,
-                                       p.Partition,
-                                       p.Codec
-                                   } into tpc
-                                   select tpc).ToList();
-
-            EncodeHeader(request, ref encoder);
-            encoder.Write(request.Acks);
-            encoder.Write(request.TimeoutMS);
-            encoder.Write(groupedPayloads.Count);
-            foreach (var groupedPayload in groupedPayloads)
+            if (request.Payload == null)
             {
-                var payloads = groupedPayload.ToList();
-                encoder.Write(groupedPayload.Key.Topic, StringPrefixEncoding.Int16);
-                encoder.Write(payloads.Count);
-                encoder.Write(groupedPayload.Key.Partition);
-
-                var marker = encoder.PrepareForLength();
-                switch (groupedPayload.Key.Codec)
-                {
-                    case MessageCodec.CodecNone:
-                        Message.EncodeMessageSet(ref encoder, (payloads.SelectMany(x => x.Messages)));
-                        break;
-                    default:
-                        throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
-                }
-                encoder.WriteLength(marker);
+                encoder.Write(0);
             }
+            else if (request.Payload.Count == 1)
+            {
+                // Short cut single request
+                var payload = request.Payload[0];
+                encoder
+                    .Write(1)
+                    .Write(payload.Topic)
+                    .Write(1);
+
+                WritePayload(encoder, payload);
+            }
+            else
+            {
+                // More complex
+                var topicGroups = new Dictionary<string, List<Payload>>();
+                foreach (var payload in request.Payload)
+                {
+                    var payloads = topicGroups.GetOrCreate(payload.Topic, () => new List<Payload>(request.Payload.Count));
+                    payloads.Add(payload);
+                }
+
+                encoder.Write(topicGroups.Count);
+                foreach (var kvp in topicGroups)
+                {
+                    var topic = kvp.Key;
+                    var payloads = kvp.Value;
+
+                    encoder
+                        .Write(topic)
+                        .Write(payloads.Count);
+
+                    foreach (var payload in payloads)
+                    {
+                        WritePayload(encoder, payload);
+                    }
+                }
+            }
+            return encoder;
         }
 
-        private List<ProduceResponse> DecodeProduceResponse(ref KafkaDecoder decoder)
+        private static void WritePayload(KafkaEncoder encoder, Payload payload)
+        {
+            encoder
+                .Write(payload.Partition);
+
+            var marker = encoder.PrepareForLength();
+            switch (payload.Codec)
+            {
+                case MessageCodec.CodecNone:
+                    Message.EncodeMessageSet(encoder, payload.Messages);
+                    break;
+
+                default:
+                    throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", payload.Codec));
+
+            }
+            encoder.WriteLength(marker);
+        }
+
+        private List<ProduceResponse> DecodeProduceResponse(KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
 
@@ -85,19 +114,12 @@ namespace SimpleKafka.Protocol
             var topicCount = decoder.ReadInt32();
             for (int i = 0; i < topicCount; i++)
             {
-                var topic = decoder.ReadInt16String();
+                var topic = decoder.ReadString();
 
                 var partitionCount = decoder.ReadInt32();
                 for (int j = 0; j < partitionCount; j++)
                 {
-                    var response = new ProduceResponse()
-                    {
-                        Topic = topic,
-                        PartitionId = decoder.ReadInt32(),
-                        Error = decoder.ReadInt16(),
-                        Offset = decoder.ReadInt64()
-                    };
-
+                    var response = ProduceResponse.Decode(decoder, topic);
                     responses.Add(response);
                 }
             }
@@ -111,19 +133,37 @@ namespace SimpleKafka.Protocol
         /// <summary>
         /// The topic the offset came from.
         /// </summary>
-        public string Topic { get; set; }
+        public readonly string Topic;
         /// <summary>
         /// The partition the offset came from.
         /// </summary>
-        public int PartitionId { get; set; }
+        public readonly int PartitionId;
         /// <summary>
         /// Error response code.  0 is success.
         /// </summary>
-        public Int16 Error { get; set; }
+        public readonly ErrorResponseCode Error;
         /// <summary>
         /// The offset number to commit as completed.
         /// </summary>
-        public long Offset { get; set; }
+        public readonly long Offset;
+
+        private ProduceResponse(string topic, int partitionId, ErrorResponseCode error, long offset)
+        {
+            this.Topic = topic;
+            this.PartitionId = partitionId;
+            this.Error = error;
+            this.Offset = offset;
+        }
+
+        internal static ProduceResponse Decode(KafkaDecoder decoder, string topic)
+        {
+            var partitionId = decoder.ReadInt32();
+            var error = decoder.ReadErrorResponseCode();
+            var offset = decoder.ReadInt64();
+
+            var response = new ProduceResponse(topic, partitionId, error, offset);
+            return response;
+        }
 
         public override bool Equals(object obj)
         {

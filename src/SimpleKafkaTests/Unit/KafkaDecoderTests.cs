@@ -13,7 +13,7 @@ namespace SimpleKafkaTests.Unit
     /// <remarks>Modified to work with nunit from xunit.</remarks>
     [TestFixture]
     [Category("Unit")]
-    public class BigEndianDecoderTests
+    public class KafkaDecoderTests
     {
         [Theory]
         [TestCase((Int64)0, new Byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 })]
@@ -57,28 +57,14 @@ namespace SimpleKafkaTests.Unit
 
 
         [Theory]
-        [TestCase("0000", new Byte[] { 0x00, 0x04, 0x30, 0x30, 0x30, 0x30 }, StringPrefixEncoding.Int16)]
-        [TestCase("0000", new Byte[] { 0x00, 0x00, 0x00, 0x04, 0x30, 0x30, 0x30, 0x30 }, StringPrefixEncoding.Int32)]
-        [TestCase("0000", new Byte[] { 0x30, 0x30, 0x30, 0x30 }, StringPrefixEncoding.None)]
-        [TestCase("€€€€", new Byte[] { 0x00, 0x0C, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.Int16)]
-        [TestCase("€€€€", new Byte[] { 0x00, 0x00, 0x00, 0x0C, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.Int32)]
-        [TestCase("€€€€", new Byte[] { 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC }, StringPrefixEncoding.None)]
-        [TestCase("", new Byte[] { }, StringPrefixEncoding.None)]
-        [TestCase("", new Byte[] { 0x00, 0x00 }, StringPrefixEncoding.Int16)]
-        [TestCase("", new Byte[] { 0x00, 0x00, 0x00, 0x00 }, StringPrefixEncoding.Int32)]
-        [TestCase(null, new Byte[] { 0xFF, 0xFF }, StringPrefixEncoding.Int16)]
-        [TestCase(null, new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF }, StringPrefixEncoding.Int32)]
-        public void StringTests(String expectedValue, Byte[] givenBytes, StringPrefixEncoding encoding)
+        [TestCase("0000", new Byte[] { 0x00, 0x04, 0x30, 0x30, 0x30, 0x30 })]
+        [TestCase("€€€€", new Byte[] { 0x00, 0x0C, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC })]
+        [TestCase("", new Byte[] { 0x00, 0x00 })]
+        [TestCase(null, new Byte[] { 0xFF, 0xFF })]
+        public void StringTests(String expectedValue, Byte[] givenBytes)
         {
             var decoder = new KafkaDecoder(givenBytes);
-            string actualValue = null;
-            switch (encoding)
-            {
-                case StringPrefixEncoding.None: actualValue = decoder.ReadString(); break;
-                case StringPrefixEncoding.Int16: actualValue = decoder.ReadInt16String(); break;
-                case StringPrefixEncoding.Int32: actualValue = decoder.ReadInt32String(); break;
-                default: Assert.Fail("Unknown encoding", encoding); break;
-            }
+            var actualValue = decoder.ReadString();
             Assert.That(decoder.Offset, Is.EqualTo(givenBytes.Length));
             Assert.That(actualValue, Is.EqualTo(expectedValue));
         }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SimpleKafka.Protocol;
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -47,21 +48,21 @@ namespace SimpleKafka
             return length;
         }
 
-        public async Task<T> SendRequestAsync<T>(IKafkaRequest<T> request, CancellationToken token)
+        public async Task<T> SendRequestAsync<T>(BaseRequest<T> request, CancellationToken token)
         {
             await clientLock.WaitAsync(token).ConfigureAwait(false);
             try
             {
                 encoder.Reset();
                 var marker = encoder.PrepareForLength();
-                request.Encode(ref encoder);
-                encoder.WriteLength(marker);
+                request.Encode(encoder)
+                    .WriteLength(marker);
 
                 await stream.WriteAsync(buffer, 0, encoder.Offset, token).ConfigureAwait(false);
                 if (request.ExpectResponse)
                 {
                     var length = await ReceiveResponseAsync(token).ConfigureAwait(false);
-                    var result = request.Decode(ref decoder);
+                    var result = request.Decode(decoder);
                     return result;
                 }
                 else

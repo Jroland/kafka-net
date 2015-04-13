@@ -52,7 +52,6 @@
     <Compile Include="KafkaEncoder.cs" />
     <Compile Include="Common\Crc32Provider.cs" />
     <Compile Include="Common\Extensions.cs" />
-    <Compile Include="Common\StringPrefixEncoding.cs" />
     <Compile Include="Extensions.cs" />
     <Compile Include="IKafkaMessagePartitioner.cs" />
     <Compile Include="IKafkaSerializer.cs" />
@@ -74,6 +73,7 @@
     <Compile Include="Protocol\OffsetCommitRequest.cs" />
     <Compile Include="Protocol\OffsetFetchRequest.cs" />
     <Compile Include="Protocol\OffsetRequest.cs" />
+    <Compile Include="Protocol\Partition.cs" />
     <Compile Include="Protocol\ProduceRequest.cs" />
     <Compile Include="Protocol\Protocol.cs" />
     <Compile Include="Protocol\Topic.cs" />

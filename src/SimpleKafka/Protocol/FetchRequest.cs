@@ -5,7 +5,7 @@ using SimpleKafka.Common;
 
 namespace SimpleKafka.Protocol
 {
-    public class FetchRequest : BaseRequest, IKafkaRequest<List<FetchResponse>>
+    public class FetchRequest : BaseRequest<List<FetchResponse>>, IKafkaRequest
     {
         internal const int DefaultMinBlockingByteBufferSize = 4096;
         internal const int DefaultBufferSize = DefaultMinBlockingByteBufferSize * 8;
@@ -30,46 +30,76 @@ namespace SimpleKafka.Protocol
 
         public List<Fetch> Fetches { get; set; }
 
-        public void Encode(ref KafkaEncoder encoder)
+        public FetchRequest() : base(ApiKeyRequestType.Fetch) { }
+
+
+        internal override KafkaEncoder Encode(KafkaEncoder encoder)
         {
-            EncodeFetchRequest(this, ref encoder);
+            return EncodeFetchRequest(this, encoder);
         }
 
-        public List<FetchResponse> Decode(ref KafkaDecoder decoder)
+        internal override List<FetchResponse> Decode(KafkaDecoder decoder)
         {
-            return DecodeFetchResponses(ref decoder);
+            return DecodeFetchResponses(decoder);
         }
 
-        private static void EncodeFetchRequest(FetchRequest request, ref KafkaEncoder encoder)
+        private static KafkaEncoder EncodeFetchRequest(FetchRequest request, KafkaEncoder encoder)
         {
-            if (request.Fetches == null) request.Fetches = new List<Fetch>();
-            EncodeHeader(request, ref encoder);
+            request
+                .EncodeHeader(encoder)
+                .Write(ReplicaId)
+                .Write(request.MaxWaitTime)
+                .Write(request.MinBytes);
 
-            var topicGroups = request.Fetches.GroupBy(x => x.Topic).ToList();
-            encoder.Write(ReplicaId);
-            encoder.Write(request.MaxWaitTime);
-            encoder.Write(request.MinBytes);
-            encoder.Write(topicGroups.Count);
-
-            foreach (var topicGroup in topicGroups)
+            if (request.Fetches == null)
             {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                encoder.Write(topicGroup.Key, StringPrefixEncoding.Int16);
-                encoder.Write(partitions.Count);
+                // no topics
+                encoder.Write(0);
+            }
+            else if (request.Fetches.Count == 1)
+            {
+                // single topic/partition - quick mode
+                var fetch = request.Fetches[0];
+                encoder
+                    .Write(1)
+                    .Write(fetch.Topic)
+                    .Write(1);
 
-                foreach (var partition in partitions)
-                {
-                    foreach (var fetch in partition)
-                    {
-                        encoder.Write(partition.Key);
-                        encoder.Write(fetch.Offset);
-                        encoder.Write(fetch.MaxBytes);
+                EncodeFetch(encoder, fetch);
+            }
+            else
+            {
+                // Multiple topics/partitions - slower mode
+                var topicGroups = new Dictionary<string,List<Fetch>>();
+                foreach (var fetch in request.Fetches) {
+                    var fetchList = topicGroups.GetOrCreate(fetch.Topic, () => new List<Fetch>(request.Fetches.Count));
+                    fetchList.Add(fetch);
+                }
+
+                encoder.Write(topicGroups.Count);
+                foreach (var topicGroupKvp in topicGroups) {
+                    var topicGroup = topicGroupKvp.Key;
+                    var fetches = topicGroupKvp.Value;
+                    encoder
+                        .Write(topicGroup)
+                        .Write(fetches.Count);
+                    foreach (var fetch in fetches) {
+                        EncodeFetch(encoder, fetch);
                     }
                 }
             }
+            return encoder;
         }
 
-        private List<FetchResponse> DecodeFetchResponses(ref KafkaDecoder decoder)
+        private static void EncodeFetch(KafkaEncoder encoder, Fetch fetch)
+        {
+            encoder
+                .Write(fetch.PartitionId)
+                .Write(fetch.Offset)
+                .Write(fetch.MaxBytes);
+        }
+
+        private List<FetchResponse> DecodeFetchResponses(KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
 
@@ -78,26 +108,13 @@ namespace SimpleKafka.Protocol
             var topicCount = decoder.ReadInt32();
             for (int i = 0; i < topicCount; i++)
             {
-                var topic = decoder.ReadInt16String();
+                var topic = decoder.ReadString();
 
                 var partitionCount = decoder.ReadInt32();
                 for (int j = 0; j < partitionCount; j++)
                 {
-                    var partitionId = decoder.ReadInt32();
-                    var response = new FetchResponse
-                    {
-                        Topic = topic,
-                        PartitionId = partitionId,
-                        Error = decoder.ReadInt16(),
-                        HighWaterMark = decoder.ReadInt64(),
-                    };
-                    var messageSetSize = decoder.ReadInt32();
-                    var current = decoder.Offset;
-                    response.Messages = Message.DecodeMessageSet(partitionId, ref decoder, messageSetSize);
+                    var response = FetchResponse.Decode(decoder, topic);
                     result.Add(response);
-
-                    // In case any truncated messages
-                    decoder.SetOffset(current + messageSetSize);
                 }
             }
             return result;
@@ -132,28 +149,36 @@ namespace SimpleKafka.Protocol
 
     public class FetchResponse
     {
-        /// <summary>
-        /// The name of the topic this response entry is for.
-        /// </summary>
-        public string Topic { get; set; }
-        /// <summary>
-        /// The id of the partition this response is for.
-        /// </summary>
-        public int PartitionId { get; set; }
-        /// <summary>
-        /// Error code of exception that occured during the request.  Zero if no error.
-        /// </summary>
-        public Int16 Error { get; set; }
-        /// <summary>
-        /// The offset at the end of the log for this partition. This can be used by the client to determine how many messages behind the end of the log they are.
-        /// </summary>
-        public long HighWaterMark { get; set; }
+        public readonly string Topic;
+        public readonly int PartitionId;
+        public readonly ErrorResponseCode Error;
+        public readonly long HighWaterMark;
+        public readonly IList<Message> Messages;
 
-        public List<Message> Messages { get; set; }
-
-        public FetchResponse()
+        private FetchResponse(string topic, int partitionId, ErrorResponseCode error, long highWaterMark, IList<Message> messages)
         {
-            Messages = new List<Message>();
+            this.Topic = topic;
+            this.PartitionId = partitionId;
+            this.Error = error;
+            this.HighWaterMark = highWaterMark;
+            this.Messages = messages;
+        }
+
+        internal static FetchResponse Decode(KafkaDecoder decoder, string topic)
+        {
+            var partitionId = decoder.ReadInt32();
+            var error = decoder.ReadErrorResponseCode();
+            var highWaterMark = decoder.ReadInt64();
+
+            var messageSetSize = decoder.ReadInt32();
+            var current = decoder.Offset;
+            var messages = Message.DecodeMessageSet(partitionId, decoder, messageSetSize);
+            var response = new FetchResponse(topic, partitionId, error, highWaterMark, messages);
+            
+            // In case any truncated messages
+            decoder.SetOffset(current + messageSetSize);
+
+            return response;
         }
     }
 }

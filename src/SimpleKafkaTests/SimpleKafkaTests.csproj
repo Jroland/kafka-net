@@ -51,8 +51,8 @@
     <Compile Include="Integration\IntegrationHelpers.cs" />
     <Compile Include="Integration\SimpleTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Unit\BigEndianDecoderTests.cs" />
-    <Compile Include="Unit\BigEndianEncoderTests.cs" />
+    <Compile Include="Unit\KafkaDecoderTests.cs" />
+    <Compile Include="Unit\KafkaEncoderTests.cs" />
     <Compile Include="Unit\ProtocolBaseRequestTests.cs" />
     <Compile Include="Unit\ProtocolMessageTests.cs" />
   </ItemGroup>

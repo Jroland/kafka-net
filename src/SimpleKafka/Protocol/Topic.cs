@@ -6,97 +6,33 @@ namespace SimpleKafka.Protocol
 {
     public class Topic
     {
-        public Int16 ErrorCode { get; set; }
-        public string Name { get; set; }
-        public List<Partition> Partitions { get; set; }
+        public readonly ErrorResponseCode ErrorCode;
+        public readonly string Name;
+        public readonly Partition[] Partitions;
 
-        internal static Topic Decode(ref KafkaDecoder decoder)
+        private Topic(ErrorResponseCode errorCode, string name, Partition[] partitions)
         {
-            var topic = new Topic
-            {
-                ErrorCode = decoder.ReadInt16(),
-                Name = decoder.ReadInt16String(),
-            };
+            this.ErrorCode = errorCode;
+            this.Name = name;
+            this.Partitions = partitions;
+        }
+
+        internal static Topic Decode(KafkaDecoder decoder)
+        {
+            var errorCode = decoder.ReadErrorResponseCode();
+            var name = decoder.ReadString();
 
             var numPartitions = decoder.ReadInt32();
-            var partitions = new List<Partition>(numPartitions);
+            var partitions = new Partition[numPartitions];
             for (int i = 0; i < numPartitions; i++)
             {
-                partitions.Add(Partition.Decode(ref decoder));
+                partitions[i] = Partition.Decode(decoder);
             }
-            topic.Partitions = partitions;
+            var topic = new Topic(errorCode, name, partitions);
 
             return topic;
         }
     }
 
-    public class Partition
-    {
-        /// <summary>
-        /// Error code. 0 indicates no error occured.
-        /// </summary>
-        public Int16 ErrorCode { get; set; }
-        /// <summary>
-        /// The Id of the partition that this metadata describes.
-        /// </summary>
-        public int PartitionId { get; set; }
-        /// <summary>
-        /// The node id for the kafka broker currently acting as leader for this partition. If no leader exists because we are in the middle of a leader election this id will be -1.
-        /// </summary>
-        public int LeaderId { get; set; }
-        /// <summary>
-        /// The set of alive nodes that currently acts as slaves for the leader for this partition.
-        /// </summary>
-        public List<int> Replicas { get; set; }
-        /// <summary>
-        /// The set subset of the replicas that are "caught up" to the leader
-        /// </summary>
-        public List<int> Isrs { get; set; }
-
-        public static Partition Decode(ref KafkaDecoder decoder)
-        {
-            var partition = new Partition {
-                ErrorCode = decoder.ReadInt16(),
-                PartitionId = decoder.ReadInt32(),
-                LeaderId = decoder.ReadInt32(),
-            };
-
-            var numReplicas = decoder.ReadInt32();
-            var replicas = new List<int>(numReplicas);
-            for (int i = 0; i < numReplicas; i++)
-            {
-                replicas.Add(decoder.ReadInt32());
-            }
-            partition.Replicas = replicas;
-
-            var numIsr = decoder.ReadInt32();
-            var isrs = new List<int>(numIsr);
-            for (int i = 0; i < numIsr; i++)
-            {
-                isrs.Add(decoder.ReadInt32());
-            }
-            partition.Isrs = isrs;
-
-            return partition;
-        }
-
-        protected bool Equals(Partition other)
-        {
-            return PartitionId == other.PartitionId;
-        }
-
-        public override int GetHashCode()
-        {
-            return PartitionId;
-        }
-
-        public override bool Equals(object obj)
-        {
-            if (ReferenceEquals(null, obj)) return false;
-            if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != this.GetType()) return false;
-            return Equals((Partition) obj);
-        }
-    }
 
 }

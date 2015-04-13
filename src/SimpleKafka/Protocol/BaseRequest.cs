@@ -3,7 +3,7 @@ using SimpleKafka.Common;
 
 namespace SimpleKafka.Protocol
 {
-    public abstract class BaseRequest
+    public abstract class BaseRequest<T>
     {
         /// <summary>
         /// From Documentation: 
@@ -17,9 +17,11 @@ namespace SimpleKafka.Protocol
         private readonly short _apiVersion;
         private string _clientId = "Kafka-Net";
         private int _correlationId = 1;
+        private readonly ApiKeyRequestType apiKey;
 
-        protected BaseRequest(short apiVersion = 0)
+        protected BaseRequest(ApiKeyRequestType apiKey, short apiVersion = 0)
         {
+            this.apiKey = apiKey;
             _apiVersion = apiVersion;
         }
 
@@ -44,12 +46,26 @@ namespace SimpleKafka.Protocol
         /// </summary>
         public virtual bool ExpectResponse { get { return true; } }
 
-        internal static void EncodeHeader<T>(IKafkaRequest<T> request, ref KafkaEncoder encoder)
+        /// <summary>
+        /// Encode this request into the Kafka wire protocol.
+        /// </summary>
+        /// <param name="encoder">Encoder to use</param>
+        internal abstract KafkaEncoder Encode(KafkaEncoder encoder);
+
+        /// <summary>
+        /// Decode a response payload from Kafka into T. 
+        /// </summary>
+        /// <param name="decoder">Decoder to use</param>
+        /// <returns>Response</returns>
+        internal abstract T Decode(KafkaDecoder decoder);
+
+        internal KafkaEncoder EncodeHeader(KafkaEncoder encoder)
         {
-            encoder.Write((Int16)request.ApiKey);
-            encoder.Write(request.ApiVersion);
-            encoder.Write(request.CorrelationId);
-            encoder.Write(request.ClientId, StringPrefixEncoding.Int16);
+            return encoder
+                .Write((Int16)apiKey)
+                .Write(ApiVersion)
+                .Write(CorrelationId)
+                .Write(ClientId);
         }
     }
 }

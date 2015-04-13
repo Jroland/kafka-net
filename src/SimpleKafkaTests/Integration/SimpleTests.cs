@@ -99,7 +99,7 @@ namespace SimpleKafkaTests.Integration
                         Console.WriteLine("{0},{1}", topic.ErrorCode, topic.Name);
                         foreach (var partition in topic.Partitions)
                         {
-                            Console.WriteLine("{0},{1},{2},{3},{4}", partition.ErrorCode, partition.Isrs.Count, partition.LeaderId, partition.PartitionId, partition.Replicas.Count);
+                            Console.WriteLine("{0},{1},{2},{3},{4}", partition.ErrorCode, partition.Isrs.Length, partition.LeaderId, partition.PartitionId, partition.Replicas.Length);
                         }
                     }
                 }
@@ -150,7 +150,7 @@ namespace SimpleKafkaTests.Integration
                     while (response == null)
                     {
                         response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                        if (response.Topics[0].ErrorCode == (short)ErrorResponseCode.LeaderNotAvailable)
+                        if (response.Topics[0].ErrorCode == ErrorResponseCode.LeaderNotAvailable)
                         {
                             response = null;
                             await Task.Delay(1000);
@@ -159,12 +159,12 @@ namespace SimpleKafkaTests.Integration
                     }
                     Assert.That(response, Is.Not.Null);
                     var first = response;
-                    Assert.That(first.Topics, Has.Count.EqualTo(1));
+                    Assert.That(first.Topics, Has.Length.EqualTo(1));
 
                     var firstTopic = first.Topics.First();
-                    Assert.That(firstTopic.ErrorCode, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(firstTopic.ErrorCode, Is.EqualTo(ErrorResponseCode.NoError));
                     Assert.That(firstTopic.Name, Is.EqualTo(topic));
-                    Assert.That(firstTopic.Partitions, Has.Count.EqualTo(1));
+                    Assert.That(firstTopic.Partitions, Has.Length.EqualTo(1));
 
                     var firstPartition = firstTopic.Partitions.First();
                     Assert.That(firstPartition.PartitionId, Is.EqualTo(0));
@@ -197,7 +197,7 @@ namespace SimpleKafkaTests.Integration
                     Assert.That(response, Is.Not.Null);
 
                     var first = response.First();
-                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
                     Assert.That(first.Topic, Is.EqualTo(topic));
                     Assert.That(first.PartitionId, Is.EqualTo(0));
                     Assert.That(first.Offset, Is.EqualTo(0));
@@ -224,7 +224,7 @@ namespace SimpleKafkaTests.Integration
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
-                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
                     Assert.That(first.HighWaterMark, Is.EqualTo(4));
                     Assert.That(first.PartitionId, Is.EqualTo(0));
                     Assert.That(first.Topic, Is.EqualTo(topic));
@@ -261,10 +261,10 @@ namespace SimpleKafkaTests.Integration
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
-                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
                     Assert.That(first.Topic, Is.EqualTo(topic));
                     Assert.That(first.PartitionId, Is.EqualTo(0));
-                    Assert.That(first.Offsets, Has.Count.EqualTo(2));
+                    Assert.That(first.Offsets, Has.Length.EqualTo(2));
 
                     Assert.That(first.Offsets[0], Is.EqualTo(4));
                     Assert.That(first.Offsets[1], Is.EqualTo(0));
@@ -308,7 +308,7 @@ namespace SimpleKafkaTests.Integration
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
-                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
                     Assert.That(first.Topic, Is.EqualTo(topic));
                     Assert.That(first.PartitionId, Is.EqualTo(0));
                     Assert.That(first.MetaData, Is.Empty);
@@ -337,7 +337,7 @@ namespace SimpleKafkaTests.Integration
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
-                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
                     Assert.That(first.Topic, Is.EqualTo(topic));
                     Assert.That(first.PartitionId, Is.EqualTo(0));
                 }
@@ -360,7 +360,7 @@ namespace SimpleKafkaTests.Integration
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
-                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
                     Assert.That(first.Topic, Is.EqualTo(topic));
                     Assert.That(first.PartitionId, Is.EqualTo(0));
                     Assert.That(first.MetaData, Is.EqualTo("Metadata 1"));
@@ -388,7 +388,7 @@ namespace SimpleKafkaTests.Integration
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
-                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
                     Assert.That(first.HighWaterMark, Is.EqualTo(4));
                     Assert.That(first.PartitionId, Is.EqualTo(0));
                     Assert.That(first.Topic, Is.EqualTo(topic));
@@ -440,7 +440,7 @@ namespace SimpleKafkaTests.Integration
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
-                    Assert.That(first.Error, Is.EqualTo((short)ErrorResponseCode.NoError));
+                    Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
                     Assert.That(first.HighWaterMark, Is.EqualTo(4));
                     Assert.That(first.PartitionId, Is.EqualTo(0));
                     Assert.That(first.Topic, Is.EqualTo(topic));

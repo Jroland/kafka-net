@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SimpleKafka.Protocol;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace SimpleKafka
 {
-    public struct KafkaDecoder
+    internal class KafkaDecoder
     {
         private int offset;
         public int Offset { get { return offset; } }
@@ -89,28 +90,14 @@ namespace SimpleKafka
             }
         }
 
+        public ErrorResponseCode ReadErrorResponseCode()
+        {
+            return (ErrorResponseCode)ReadInt16();
+        }
+
         public string ReadString()
         {
-            var result = Encoding.UTF8.GetString(buffer);
-            offset += buffer.Length;
-            return result;
-        }
-
-        public string ReadInt16String()
-        {
             var length = ReadInt16();
-            if (length == -1)
-            {
-                return null;
-            }
-            var result = Encoding.UTF8.GetString(buffer, offset, length);
-            offset += length;
-            return result;
-        }
-
-        public string ReadInt32String()
-        {
-            var length = ReadInt32();
             if (length == -1)
             {
                 return null;
@@ -125,7 +112,7 @@ namespace SimpleKafka
             return buffer[offset++];
         }
 
-        internal byte[] ReadIntPrefixedBytes()
+        internal byte[] ReadBytes()
         {
             var length = ReadInt32();
             if (length == -1)

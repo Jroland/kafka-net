@@ -52,7 +52,7 @@ namespace SimpleKafka
             topicMap = new Dictionary<string, Dictionary<int, TopicTracker>>();
             foreach (var topic in topics)
             {
-                var partitionMap = topicMap.FindOrCreate(topic.Topic);
+                var partitionMap = topicMap.GetOrCreate(topic.Topic);
                 if (partitionMap.ContainsKey(topic.Partition))
                 {
                     throw new InvalidOperationException("Topic " + topic.Topic + ", partition " + topic.Partition + " duplicated");
@@ -84,9 +84,9 @@ namespace SimpleKafka
             var responses = await coordinator.SendRequestAsync(request, token).ConfigureAwait(false);
             foreach (var response in responses)
             {
-                if (response.Error != (short)ErrorResponseCode.NoError)
+                if (response.Error != ErrorResponseCode.NoError)
                 {
-                    throw new InvalidOperationException("Failed to commit: " + (ErrorResponseCode)response.Error);
+                    throw new InvalidOperationException("Failed to commit: " + response.Error);
                 }
             }
         }
@@ -113,7 +113,7 @@ namespace SimpleKafka
                 {
                     if (fetchResponse.Error != (int)ErrorResponseCode.NoError)
                     {
-                        Log.Error("Error in fetch response {error} for {topic}/{partition}", (ErrorResponseCode)fetchResponse.Error, fetchResponse.Topic, fetchResponse.PartitionId);
+                        Log.Error("Error in fetch response {error} for {topic}/{partition}", fetchResponse.Error, fetchResponse.Topic, fetchResponse.PartitionId);
                     } else
                     {
                         var tracker = topicMap[fetchResponse.Topic][fetchResponse.PartitionId];
@@ -215,9 +215,9 @@ namespace SimpleKafka
                     var responses = await brokers[brokerKvp.Key].SendRequestAsync(request, token).ConfigureAwait(false);
                     foreach (var response in responses)
                     {
-                        if (response.Error != (short)ErrorResponseCode.NoError)
+                        if (response.Error != ErrorResponseCode.NoError)
                         {
-                            throw new InvalidOperationException("Unknown error fetching offsets: " + (ErrorResponseCode)response.Error);
+                            throw new InvalidOperationException("Unknown error fetching offsets: " + response.Error);
                         }
                         var tracker = trackerMap[Tuple.Create(response.Topic, response.PartitionId)];
                         switch (tracker.nextOffset)
@@ -268,9 +268,9 @@ namespace SimpleKafka
                     var responses = await coordinator.SendRequestAsync(request, token).ConfigureAwait(false);
                     foreach (var response in responses)
                     {
-                        if (response.Error != (short)ErrorResponseCode.NoError)
+                        if (response.Error != ErrorResponseCode.NoError)
                         {
-                            throw new InvalidOperationException("Unknown error fetching offsets: " + (ErrorResponseCode)response.Error);
+                            throw new InvalidOperationException("Unknown error fetching offsets: " + response.Error);
                         }
                         var tracker = trackerMap[Tuple.Create(response.Topic, response.PartitionId)];
                         tracker.nextOffset = response.Offset + 1;

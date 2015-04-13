@@ -11,66 +11,98 @@ namespace SimpleKafka.Protocol
     /// arbitrary ConsumerGroup name provided by the call.
     /// This now supports version 0 and 1 of the protocol
     /// </summary>
-    public class OffsetCommitRequest : BaseRequest, IKafkaRequest<List<OffsetCommitResponse>>
+    public class OffsetCommitRequest : BaseRequest<List<OffsetCommitResponse>>, IKafkaRequest
     {
-        public OffsetCommitRequest(Int16 version = 1) : base(version)
+        public OffsetCommitRequest(Int16 version = 1)
+            : base(ApiKeyRequestType.OffsetCommit, version)
         {
         }
-        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetCommit; } }
         public string ConsumerGroup { get; set; }
         public int ConsumerGroupGenerationId { get; set; }
         public string ConsumerId { get; set; }
         public List<OffsetCommit> OffsetCommits { get; set; }
 
-        public void Encode(ref KafkaEncoder encoder)
+        internal override KafkaEncoder Encode(KafkaEncoder encoder)
         {
-            EncodeOffsetCommitRequest(this, ref encoder);
+            return EncodeOffsetCommitRequest(this, encoder);
         }
 
-        public List<OffsetCommitResponse> Decode(ref KafkaDecoder decoder)
+        internal override List<OffsetCommitResponse> Decode(KafkaDecoder decoder)
         {
-            return DecodeOffsetCommitResponse(ref decoder);
+            return DecodeOffsetCommitResponse(decoder);
         }
 
-        private static void EncodeOffsetCommitRequest(OffsetCommitRequest request, ref KafkaEncoder encoder)
+        private static KafkaEncoder EncodeOffsetCommitRequest(OffsetCommitRequest request, KafkaEncoder encoder)
         {
-            if (request.OffsetCommits == null) request.OffsetCommits = new List<OffsetCommit>();
-            EncodeHeader(request, ref encoder);
-            encoder.Write(request.ConsumerGroup, StringPrefixEncoding.Int16);
+            request
+                .EncodeHeader(encoder)
+                .Write(request.ConsumerGroup);
+
             if (request.ApiVersion == 1)
             {
-                encoder.Write(request.ConsumerGroupGenerationId);
-                encoder.Write(request.ConsumerId, StringPrefixEncoding.Int16);
+                encoder
+                    .Write(request.ConsumerGroupGenerationId)
+                    .Write(request.ConsumerId);
             }
 
-            var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
-            encoder.Write(topicGroups.Count);
-
-            foreach (var topicGroup in topicGroups)
+            if (request.OffsetCommits == null)
             {
-                var partitions = topicGroup.GroupBy(x => x.PartitionId).ToList();
-                encoder.Write(topicGroup.Key, StringPrefixEncoding.Int16);
-                encoder.Write(partitions.Count);
+                // Nothing to commit
+                encoder.Write(0);
+            }
+            else if (request.OffsetCommits.Count == 1)
+            {
+                var commit = request.OffsetCommits[0];
+                // Shortcut the single version
+                encoder
+                    .Write(1)
+                    .Write(commit.Topic)
+                    .Write(1);
 
-                foreach (var partition in partitions)
+                EncodeCommit(encoder, request.ApiVersion, commit);
+            }
+            else
+            {
+                // Complete complex request
+                var topicGroups = new Dictionary<string, List<OffsetCommit>>();
+                foreach (var commit in request.OffsetCommits)
                 {
-                    foreach (var commit in partition)
+                    var topicGroup = topicGroups.GetOrCreate(commit.Topic, () => new List<OffsetCommit>(request.OffsetCommits.Count));
+                    topicGroup.Add(commit);
+                }
+
+                encoder.Write(topicGroups.Count);
+                foreach (var topicGroupKvp in topicGroups)
+                {
+                    var topic = topicGroupKvp.Key;
+                    var commits = topicGroupKvp.Value;
+                    encoder
+                        .Write(topic)
+                        .Write(commits.Count);
+
+                    foreach (var commit in commits)
                     {
-                        encoder.Write(partition.Key);
-                        encoder.Write(commit.Offset);
-
-                        if (request.ApiVersion == 1)
-                        {
-                            encoder.Write(commit.TimeStamp);
-                        }
-
-                        encoder.Write(commit.Metadata, StringPrefixEncoding.Int16);
+                        EncodeCommit(encoder, request.ApiVersion, commit);
                     }
                 }
             }
+            return encoder;
         }
 
-        private static List<OffsetCommitResponse> DecodeOffsetCommitResponse(ref KafkaDecoder decoder)
+        private static void EncodeCommit(KafkaEncoder encoder, int apiVersion, OffsetCommit commit)
+        {
+            encoder
+                .Write(commit.PartitionId)
+                .Write(commit.Offset);
+
+            if (apiVersion == 1)
+            {
+                encoder.Write(commit.TimeStamp);
+            }
+            encoder.Write(commit.Metadata);
+        }
+
+        private static List<OffsetCommitResponse> DecodeOffsetCommitResponse(KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
 
@@ -78,17 +110,12 @@ namespace SimpleKafka.Protocol
             var topicCount = decoder.ReadInt32();
             for (int i = 0; i < topicCount; i++)
             {
-                var topic = decoder.ReadInt16String();
+                var topic = decoder.ReadString();
 
                 var partitionCount = decoder.ReadInt32();
                 for (int j = 0; j < partitionCount; j++)
                 {
-                    var response = new OffsetCommitResponse()
-                    {
-                        Topic = topic,
-                        PartitionId = decoder.ReadInt32(),
-                        Error = decoder.ReadInt16()
-                    };
+                    var response = OffsetCommitResponse.Decode(decoder, topic);
                     responses.Add(response);
                 }
             }
@@ -123,7 +150,7 @@ namespace SimpleKafka.Protocol
         {
             TimeStamp = -1;
         }
-    
+
     }
 
     public class OffsetCommitResponse
@@ -131,14 +158,29 @@ namespace SimpleKafka.Protocol
         /// <summary>
         /// The name of the topic this response entry is for.
         /// </summary>
-        public string Topic;
+        public readonly string Topic;
         /// <summary>
         /// The id of the partition this response is for.
         /// </summary>
-        public Int32 PartitionId;
+        public readonly int PartitionId;
         /// <summary>
         /// Error code of exception that occured during the request.  Zero if no error.
         /// </summary>
-        public Int16 Error;
+        public readonly ErrorResponseCode Error;
+
+        private OffsetCommitResponse(string topic, int partitionId, ErrorResponseCode error)
+        {
+            this.Topic = topic;
+            this.PartitionId = partitionId;
+            this.Error = error;
+        }
+
+        internal static OffsetCommitResponse Decode(KafkaDecoder decoder, string topic)
+        {
+            var partitionId = decoder.ReadInt32();
+            var error = decoder.ReadErrorResponseCode();
+            var response = new OffsetCommitResponse(topic, partitionId, error);
+            return response;
+        }
     }
 }

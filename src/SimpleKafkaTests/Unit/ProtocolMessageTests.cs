@@ -23,11 +23,11 @@ namespace SimpleKafkaTests.Unit
                 var buffer = new byte[1024];
                 var encoder = new KafkaEncoder(buffer);
 
-                Message.EncodeMessage(testMessage, ref encoder);
+                Message.EncodeMessage(testMessage, encoder);
                 buffer[0] += 1;
 
                 var decoder = new KafkaDecoder(buffer, 0, encoder.Offset);
-                var result = Message.DecodeMessage(0, 0, ref decoder, encoder.Offset);
+                var result = Message.DecodeMessage(0, 0, decoder, encoder.Offset);
             });
         }
 
@@ -42,10 +42,10 @@ namespace SimpleKafkaTests.Unit
 
             var buffer = new byte[1024];
             var encoder = new KafkaEncoder(buffer);
-            Message.EncodeMessage(testMessage, ref encoder);
+            Message.EncodeMessage(testMessage, encoder);
 
             var decoder = new KafkaDecoder(buffer);
-            var result = Message.DecodeMessage(0, 0, ref decoder, encoder.Offset);
+            var result = Message.DecodeMessage(0, 0, decoder, encoder.Offset);
 
             Assert.That(testMessage.Key, Is.EqualTo(result.Key));
             Assert.That(testMessage.Value, Is.EqualTo(result.Value));
@@ -71,7 +71,7 @@ namespace SimpleKafkaTests.Unit
 
             var buffer = new byte[expected.Length];
             var encoder = new KafkaEncoder(buffer);
-            Message.EncodeMessageSet(ref encoder, messages);
+            Message.EncodeMessageSet(encoder, messages);
 
             Assert.That(buffer, Is.EqualTo(expected));
         }
@@ -81,7 +81,7 @@ namespace SimpleKafkaTests.Unit
         {
             //This message set has a truncated message bytes at the end of it
             var decoder = new KafkaDecoder(MessageHelper.FetchResponseMaxBytesOverflow);
-            var result = Message.DecodeMessageSet(0, ref decoder, decoder.Length);
+            var result = Message.DecodeMessageSet(0, decoder, decoder.Length);
 
             var message = Encoding.UTF8.GetString(result.First().Value);
             
@@ -106,7 +106,7 @@ namespace SimpleKafkaTests.Unit
 
                 var decoder = new KafkaDecoder(payloadBytes);
 
-                Message.DecodeMessageSet(0, ref decoder, payloadBytes.Length);
+                Message.DecodeMessageSet(0, decoder, payloadBytes.Length);
             });
         }
 
@@ -119,7 +119,7 @@ namespace SimpleKafkaTests.Unit
 
             // act/assert
             var decoder = new KafkaDecoder(payload, 0, payload.Length);
-            var messages = Message.DecodeMessageSet(0, ref decoder, payload.Length);
+            var messages = Message.DecodeMessageSet(0, decoder, payload.Length);
             var actualPayload = messages.First().Value;
 
             // assert

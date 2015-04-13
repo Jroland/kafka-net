@@ -72,15 +72,16 @@ namespace SimpleKafka.Protocol
         /// </summary>
         /// <param name="messages">The collection of messages to encode together.</param>
         /// <returns>Encoded byte[] representing the collection of messages.</returns>
-        public static void EncodeMessageSet(ref KafkaEncoder encoder, IEnumerable<Message> messages)
+        internal static KafkaEncoder EncodeMessageSet(KafkaEncoder encoder, IEnumerable<Message> messages)
         {
             foreach (var message in messages)
             {
                 encoder.Write(InitialMessageOffset);
                 var marker = encoder.PrepareForLength();
-                EncodeMessage(message, ref encoder);
-                encoder.WriteLength(marker);
+                EncodeMessage(message, encoder)
+                    .WriteLength(marker);
             }
+            return encoder;
         }
 
         /// <summary>
@@ -88,7 +89,7 @@ namespace SimpleKafka.Protocol
         /// </summary>
         /// <param name="decoder">The decoder positioned at the start of the buffer</param>
         /// <returns>The messages</returns>
-        public static List<Message> DecodeMessageSet(int partitionId, ref KafkaDecoder decoder, int messageSetSize)
+        internal static List<Message> DecodeMessageSet(int partitionId, KafkaDecoder decoder, int messageSetSize)
         {
             var numberOfBytes = messageSetSize;
 
@@ -114,7 +115,7 @@ namespace SimpleKafka.Protocol
                     break;
                 }
 
-                var message = DecodeMessage(offset, partitionId, ref decoder, messageSize);
+                var message = DecodeMessage(offset, partitionId, decoder, messageSize);
                 messages.Add(message);
                 numberOfBytes -= messageSize;
             }
@@ -130,14 +131,17 @@ namespace SimpleKafka.Protocol
         /// Format:
         /// Crc (Int32), MagicByte (Byte), Attribute (Byte), Key (Byte[]), Value (Byte[])
         /// </remarks>
-        public static void EncodeMessage(Message message, ref KafkaEncoder encoder)
+        internal static KafkaEncoder EncodeMessage(Message message, KafkaEncoder encoder)
         {
             var marker = encoder.PrepareForCrc();
-            encoder.Write(message.MagicNumber);
-            encoder.Write(message.Attribute);
-            encoder.Write(message.Key);
-            encoder.Write(message.Value);
-            encoder.CalculateCrc(marker);
+            encoder
+                .Write(message.MagicNumber)
+                .Write(message.Attribute)
+                .Write(message.Key)
+                .Write(message.Value)
+                .CalculateCrc(marker);
+
+            return encoder;
         }
 
         /// <summary>
@@ -147,7 +151,7 @@ namespace SimpleKafka.Protocol
         /// <param name="payload">The byte[] encode as a message from kafka.</param>
         /// <returns>The message</returns>
         /// <remarks>The return type is an Enumerable as the message could be a compressed message set.</remarks>
-        public static Message DecodeMessage(long offset, int partitionId, ref KafkaDecoder decoder, int messageSize)
+        internal static Message DecodeMessage(long offset, int partitionId, KafkaDecoder decoder, int messageSize)
         {
             var crc = decoder.ReadUInt32();
             var calculatedCrc = Crc32Provider.Compute(decoder.Buffer, decoder.Offset, messageSize - 4);
@@ -158,17 +162,17 @@ namespace SimpleKafka.Protocol
 
             var message = new Message
             {
-                Meta = new MessageMetadata { Offset = offset, PartitionId = partitionId },
+                Meta = new MessageMetadata(offset, partitionId),
                 MagicNumber = decoder.ReadByte(),
                 Attribute = decoder.ReadByte(),
-                Key = decoder.ReadIntPrefixedBytes(),
+                Key = decoder.ReadBytes(),
                 
             };
             var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
             switch (codec)
             {
                 case MessageCodec.CodecNone:
-                    message.Value = decoder.ReadIntPrefixedBytes();
+                    message.Value = decoder.ReadBytes();
                     break;
 
                 default:
@@ -190,10 +194,16 @@ namespace SimpleKafka.Protocol
         /// <summary>
         /// The log offset of this message as stored by the Kafka server.
         /// </summary>
-        public long Offset { get; set; }
+        public readonly long Offset;
         /// <summary>
         /// The partition id this offset is from.
         /// </summary>
-        public int PartitionId { get; set; }
+        public readonly int PartitionId;
+
+        public MessageMetadata(long offset, int partitionId)
+        {
+            this.PartitionId = partitionId;
+            this.Offset = offset;
+        }
     }
 }

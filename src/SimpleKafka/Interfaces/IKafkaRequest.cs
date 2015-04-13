@@ -7,8 +7,7 @@ namespace SimpleKafka
     /// KafkaRequest represents a Kafka request messages as an object which can Encode itself into the appropriate 
     /// binary request and Decode any responses to that request.
     /// </summary>
-    /// <typeparam name="T">The type of the KafkaResponse expected back from the request.</typeparam>
-    public interface IKafkaRequest<out T>
+    public interface IKafkaRequest
     {
         /// <summary>
         /// Indicates this request should wait for a response from the broker
@@ -26,20 +25,5 @@ namespace SimpleKafka
         /// Id which will be echoed back by Kafka to correlate responses to this request.  Usually automatically assigned by driver.
         /// </summary>
         int CorrelationId { get; set; }
-        /// <summary>
-        /// Enum identifying the specific type of request message being represented.
-        /// </summary>
-        ApiKeyRequestType ApiKey { get; }
-        /// <summary>
-        /// Encode this request into the Kafka wire protocol.
-        /// </summary>
-        /// <param name="encoder">Encoder to use</param>
-        void Encode(ref KafkaEncoder encoder);
-        /// <summary>
-        /// Decode a response payload from Kafka into T. 
-        /// </summary>
-        /// <param name="decoder">Decoder to use</param>
-        /// <returns>Response</returns>
-        T Decode(ref KafkaDecoder decoder);
     }
 }

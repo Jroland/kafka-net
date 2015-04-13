@@ -21,7 +21,7 @@ namespace SimpleKafkaTests.Helpers
 
             var buffer = new byte[1024];
             var encoder = new KafkaEncoder(buffer);
-            Message.EncodeMessageSet(ref encoder, new[] { message });
+            Message.EncodeMessageSet(encoder, new[] { message });
 
             var result = new byte[encoder.Offset];
             Array.Copy(encoder.Buffer, result, encoder.Offset);

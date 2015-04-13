@@ -24,7 +24,7 @@ namespace SimpleKafka
             }
         }
 
-        public static TValue FindOrCreate<TKey,TValue>(this Dictionary<TKey,TValue> map, TKey key)
+        public static TValue GetOrCreate<TKey,TValue>(this IDictionary<TKey,TValue> map, TKey key)
             where TValue : new()
         {
             TValue result;
@@ -36,7 +36,7 @@ namespace SimpleKafka
             return result;
         }
 
-        public static TValue TryGetValue<TKey, TValue>(this Dictionary<TKey, TValue> map, TKey key)
+        public static TValue TryGetValue<TKey, TValue>(this IDictionary<TKey, TValue> map, TKey key)
         where TValue : class
         {
             TValue result;

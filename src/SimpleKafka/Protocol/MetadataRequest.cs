@@ -3,62 +3,49 @@ using SimpleKafka.Common;
 
 namespace SimpleKafka.Protocol
 {
-    public class MetadataRequest : BaseRequest, IKafkaRequest<MetadataResponse>
+    public class MetadataRequest : BaseRequest<MetadataResponse>, IKafkaRequest
     {
-        /// <summary>
-        /// Indicates the type of kafka encoding this request is
-        /// </summary>
-        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.MetaData; } }
-
         /// <summary>
         /// The list of topics to get metadata for.
         /// </summary>
         public List<string> Topics { get; set; }
 
-        public void Encode(ref KafkaEncoder encoder)
+        public MetadataRequest() : base(ApiKeyRequestType.MetaData) { }
+        internal override KafkaEncoder Encode(KafkaEncoder encoder)
         {
-            EncodeMetadataRequest(this, ref encoder);
+            return EncodeMetadataRequest(this, encoder);
         }
 
-        public MetadataResponse Decode(ref KafkaDecoder decoder)
+        internal override MetadataResponse Decode(KafkaDecoder decoder)
         {
-            return DecodeMetadataResponse(ref decoder);
+            return DecodeMetadataResponse(decoder);
         }
 
-        private static void EncodeMetadataRequest(MetadataRequest request, ref KafkaEncoder encoder)
+        private static KafkaEncoder EncodeMetadataRequest(MetadataRequest request, KafkaEncoder encoder)
         {
-            if (request.Topics == null) request.Topics = new List<string>();
-            EncodeHeader(request, ref encoder);
-            encoder.Write(request.Topics.Count);
-            foreach (var topic in request.Topics)
+            request
+                .EncodeHeader(encoder);
+
+            if (request.Topics == null)
             {
-                encoder.Write(topic, StringPrefixEncoding.Int16);
+                encoder.Write(0);
             }
+            else
+            {
+                encoder.Write(request.Topics.Count);
+                foreach (var topic in request.Topics)
+                {
+                    encoder.Write(topic);
+                }
+            }
+
+            return encoder;
         }
 
-        private static MetadataResponse DecodeMetadataResponse(ref KafkaDecoder decoder)
+        private static MetadataResponse DecodeMetadataResponse(KafkaDecoder decoder)
         {
-            var response = new MetadataResponse
-            {
-                CorrelationId = decoder.ReadInt32(),
-            };
-
-            var brokerCount = decoder.ReadInt32();
-            var brokers = new List<Broker>(brokerCount);
-            for (var i = 0; i < brokerCount; i++)
-            {
-                brokers.Add(Broker.Decode(ref decoder));
-            }
-            response.Brokers = brokers;
-
-            var topicCount = decoder.ReadInt32();
-            var topics = new List<Topic>(topicCount);
-            for (var i = 0; i < topicCount; i++)
-            {
-                topics.Add(Topic.Decode(ref decoder));
-            }
-            response.Topics = topics;
-
+            var correlationId = decoder.ReadInt32();
+            var response = MetadataResponse.Decode(decoder);
             return response;
         }
 
@@ -66,14 +53,34 @@ namespace SimpleKafka.Protocol
 
     public class MetadataResponse
     {
-        public int CorrelationId { get; set; }
-        public MetadataResponse()
+        public readonly Broker[] Brokers;
+        public readonly Topic[] Topics;
+        private MetadataResponse(Broker[] brokers, Topic[] topics)
         {
-            Brokers = new List<Broker>();
-            Topics = new List<Topic>();
+            this.Brokers = brokers;
+            this.Topics = topics;
         }
 
-        public List<Broker> Brokers { get; set; }
-        public List<Topic> Topics { get; set; }
+        internal static MetadataResponse Decode(KafkaDecoder decoder)
+        {
+            var brokerCount = decoder.ReadInt32();
+            var brokers = new Broker[brokerCount];
+            for (var i = 0; i < brokerCount; i++)
+            {
+                brokers[i] = Broker.Decode(decoder);
+            }
+
+            var topicCount = decoder.ReadInt32();
+            var topics = new Topic[topicCount];
+            for (var i = 0; i < topicCount; i++)
+            {
+                topics[i] = Topic.Decode(decoder);
+            }
+
+            var response = new MetadataResponse(brokers, topics);
+
+            return response;
+
+        }
     }
 }

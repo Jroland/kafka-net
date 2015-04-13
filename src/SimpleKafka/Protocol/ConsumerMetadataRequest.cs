@@ -9,32 +9,35 @@ namespace SimpleKafka.Protocol
     /// The offsets for a given consumer group is maintained by a specific broker called the offset coordinator. i.e., a consumer needs 
     /// to issue its offset commit and fetch requests to this specific broker. It can discover the current offset coordinator by issuing a consumer metadata request.
     /// </summary>
-    public class ConsumerMetadataRequest : BaseRequest, IKafkaRequest<ConsumerMetadataResponse>
+    public class ConsumerMetadataRequest : BaseRequest<ConsumerMetadataResponse>, IKafkaRequest
     {
-        public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.ConsumerMetadataRequest; } }
         public string ConsumerGroup { get; set; }
 
-        public void Encode(ref KafkaEncoder encoder)
+        public ConsumerMetadataRequest() : base(ApiKeyRequestType.ConsumerMetadataRequest) { }
+
+        internal override KafkaEncoder Encode(KafkaEncoder encoder)
         {
-            EncodeConsumerMetadataRequest(this, ref encoder);
+            return EncodeConsumerMetadataRequest(this, encoder);
         }
 
 
-        public ConsumerMetadataResponse Decode(ref KafkaDecoder decoder)
+        internal override ConsumerMetadataResponse Decode(KafkaDecoder decoder)
         {
-            return DecodeConsumerMetadataResponse(ref decoder);
+            return DecodeConsumerMetadataResponse(decoder);
         }
 
-        private static void EncodeConsumerMetadataRequest(ConsumerMetadataRequest request, ref KafkaEncoder encoder)
+        private static KafkaEncoder EncodeConsumerMetadataRequest(ConsumerMetadataRequest request, KafkaEncoder encoder)
         {
-            EncodeHeader(request, ref encoder);
-            encoder.Write(request.ConsumerGroup, StringPrefixEncoding.Int16);
+            return 
+                request
+                .EncodeHeader(encoder)
+                .Write(request.ConsumerGroup);
         }
 
-        private static ConsumerMetadataResponse DecodeConsumerMetadataResponse(ref KafkaDecoder decoder)
+        private static ConsumerMetadataResponse DecodeConsumerMetadataResponse(KafkaDecoder decoder)
         {
             var correlationId = decoder.ReadInt32();
-            return new ConsumerMetadataResponse(ref decoder);
+            return ConsumerMetadataResponse.Decode(decoder);
         }
     }
 
@@ -49,12 +52,22 @@ namespace SimpleKafka.Protocol
         public readonly string CoordinatorHost;
         public readonly int CoordinatorPort;
 
-        internal ConsumerMetadataResponse(ref KafkaDecoder decoder)
+        private ConsumerMetadataResponse(ErrorResponseCode error, int coordinatorId, string coordinatorHost, int coordinatorPort)
         {
-            Error = (ErrorResponseCode)decoder.ReadInt16();
-            CoordinatorId = decoder.ReadInt32();
-            CoordinatorHost = decoder.ReadInt16String();
-            CoordinatorPort = decoder.ReadInt32();
+            this.Error = error;
+            this.CoordinatorId = coordinatorId;
+            this.CoordinatorHost = coordinatorHost;
+            this.CoordinatorPort = coordinatorPort;
+        }
+
+        internal static ConsumerMetadataResponse Decode(KafkaDecoder decoder)
+        {
+            var error = decoder.ReadErrorResponseCode();
+            var coordinatorId = decoder.ReadInt32();
+            var coordinatorHost = decoder.ReadString();
+            var coordinatorPort = decoder.ReadInt32();
+
+            return new ConsumerMetadataResponse(error, coordinatorId, coordinatorHost, coordinatorPort);
         }
     }
 }

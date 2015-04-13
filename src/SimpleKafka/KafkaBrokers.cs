@@ -202,7 +202,7 @@ namespace SimpleKafka
                 {
                     var partitionNumber = partitionKvp.Key;
                     var partition = partitions[partitionNumber];
-                    var brokerTopics = brokerMap.FindOrCreate(partition.LeaderId);
+                    var brokerTopics = brokerMap.GetOrCreate(partition.LeaderId);
                     brokerTopics.Add(Tuple.Create(topic, partitionNumber), partitionKvp.Value);
                 }
             }
@@ -254,31 +254,31 @@ namespace SimpleKafka
         }
 
 
-        private void RefreshTopics(List<Topic> topics)
+        private void RefreshTopics(Topic[] topics)
         {
             var previousTopics = new HashSet<string>(topicToPartitions.Keys);
 
 
             foreach (var topic in topics)
             {
-                if (topic.ErrorCode != (short)ErrorResponseCode.NoError)
+                if (topic.ErrorCode != ErrorResponseCode.NoError)
                 {
-                    Log.Information("Topic {topic} has error {error}", topic.Name, (ErrorResponseCode)topic.ErrorCode);
+                    Log.Information("Topic {topic} has error {error}", topic.Name, topic.ErrorCode);
                 }
                 else
                 {
                     var currentPartitions = topicToPartitions.TryGetValue(topic.Name);
-                    if ((currentPartitions == null) || (currentPartitions.Length != topic.Partitions.Count))
+                    if ((currentPartitions == null) || (currentPartitions.Length != topic.Partitions.Length))
                     {
-                        currentPartitions = new Partition[topic.Partitions.Count];
+                        currentPartitions = new Partition[topic.Partitions.Length];
                         topicToPartitions[topic.Name] = currentPartitions;
                     }
 
                     foreach (var partition in topic.Partitions)
                     {
-                        if (partition.ErrorCode != (short)ErrorResponseCode.NoError)
+                        if (partition.ErrorCode != ErrorResponseCode.NoError)
                         {
-                            Log.Verbose("Topic {topic} partition {partition} has error {error}", topic.Name, partition.PartitionId, (ErrorResponseCode)partition.ErrorCode);
+                            Log.Verbose("Topic {topic} partition {partition} has error {error}", topic.Name, partition.PartitionId, partition.ErrorCode);
                         }
                         currentPartitions[partition.PartitionId] = partition;
                     }
@@ -293,7 +293,7 @@ namespace SimpleKafka
             }
         }
 
-        private async Task RefreshBrokersAsync(List<Broker> latestBrokers, CancellationToken token)
+        private async Task RefreshBrokersAsync(Broker[] latestBrokers, CancellationToken token)
         {
             var previousBrokers = new HashSet<Uri>(brokers);
             var previousConnections = connections.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
