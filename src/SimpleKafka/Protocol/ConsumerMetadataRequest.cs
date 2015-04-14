@@ -9,7 +9,7 @@ namespace SimpleKafka.Protocol
     /// The offsets for a given consumer group is maintained by a specific broker called the offset coordinator. i.e., a consumer needs 
     /// to issue its offset commit and fetch requests to this specific broker. It can discover the current offset coordinator by issuing a consumer metadata request.
     /// </summary>
-    public class ConsumerMetadataRequest : BaseRequest<ConsumerMetadataResponse>, IKafkaRequest
+    public class ConsumerMetadataRequest : BaseRequest<ConsumerMetadataResponse>
     {
         public string ConsumerGroup { get; set; }
 

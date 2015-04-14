@@ -8,7 +8,7 @@ namespace SimpleKafka.Protocol
     /// <summary>
     /// A funky Protocol for requesting the starting offset of each segment for the requested partition 
     /// </summary>
-    public class OffsetRequest : BaseRequest<List<OffsetResponse>>, IKafkaRequest
+    public class OffsetRequest : BaseRequest<List<OffsetResponse>>
     {
         public List<Offset> Offsets { get; set; }
 

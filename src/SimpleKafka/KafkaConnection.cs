@@ -27,7 +27,7 @@ namespace SimpleKafka
         private KafkaDecoder decoder;
         private KafkaEncoder encoder;
 
-        private KafkaConnection(IPEndPoint serverEndpoint, TcpClient client, int bufferSize = 65536)
+        private KafkaConnection(IPEndPoint serverEndpoint, TcpClient client, int bufferSize = 1048576)
         {
             this.serverEndpoint = serverEndpoint;
             this.client = client;

@@ -11,7 +11,7 @@ namespace SimpleKafka.Protocol
     /// arbitrary ConsumerGroup name provided by the call.
     /// This now supports version 0 and 1 of the protocol
     /// </summary>
-    public class OffsetCommitRequest : BaseRequest<List<OffsetCommitResponse>>, IKafkaRequest
+    public class OffsetCommitRequest : BaseRequest<List<OffsetCommitResponse>>
     {
         public OffsetCommitRequest(Int16 version = 1)
             : base(ApiKeyRequestType.OffsetCommit, version)

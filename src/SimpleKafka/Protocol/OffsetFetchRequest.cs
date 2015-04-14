@@ -12,7 +12,7 @@ namespace SimpleKafka.Protocol
     /// under any abritrary name.
     /// This now supports version 1 of the protocol
     /// </summary>
-    public class OffsetFetchRequest : BaseRequest<List<OffsetFetchResponse>>, IKafkaRequest
+    public class OffsetFetchRequest : BaseRequest<List<OffsetFetchResponse>>
     {
         public OffsetFetchRequest(short version = 1) : base(ApiKeyRequestType.OffsetFetch, version)
         {

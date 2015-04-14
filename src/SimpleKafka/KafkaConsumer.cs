@@ -9,6 +9,21 @@ using System.Threading.Tasks;
 
 namespace SimpleKafka
 {
+    public static class KafkaConsumer
+    {
+        public static KafkaConsumer<object,TValue> Create<TValue>(string consumerGroup, KafkaBrokers brokers, 
+            IKafkaSerializer<TValue> valueSerializer, params TopicSelector[] topics)
+        {
+            return new KafkaConsumer<object, TValue>(consumerGroup, brokers, new NullSerializer<object>(), valueSerializer, topics);
+        }
+        public static KafkaConsumer<TKey, TValue> Create<TKey,TValue>(string consumerGroup, KafkaBrokers brokers,
+            IKafkaSerializer<TKey> keySerializer,
+            IKafkaSerializer<TValue> valueSerializer, params TopicSelector[] topics)
+        {
+            return new KafkaConsumer<TKey, TValue>(consumerGroup, brokers, keySerializer, valueSerializer, topics);
+        }
+    }
+
     public class KafkaConsumer<TKey,TValue>
     {
         private class TopicTracker
@@ -41,6 +56,8 @@ namespace SimpleKafka
         private readonly int maxWaitTimeMs = 1000;
         private readonly int minBytes = 1024;
         private readonly int maxBytes = 65536;
+        private readonly string consumerId = "test";
+        private readonly int consumerGroupGenerationId = 0;
         private readonly string consumerGroup;
 
         public KafkaConsumer(string consumerGroup, KafkaBrokers brokers, IKafkaSerializer<TKey> keySerializer, IKafkaSerializer<TValue> valueSerializer, params TopicSelector[] topics)
@@ -76,8 +93,8 @@ namespace SimpleKafka
             var request = new OffsetCommitRequest
             {
                 ConsumerGroup = consumerGroup,
-                ConsumerGroupGenerationId = 0,
-                ConsumerId = "test",
+                ConsumerGroupGenerationId = consumerGroupGenerationId,
+                ConsumerId = consumerId,
                 OffsetCommits = offsetCommits
             };
 

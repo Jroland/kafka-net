@@ -3,7 +3,7 @@ using SimpleKafka.Common;
 
 namespace SimpleKafka.Protocol
 {
-    public class MetadataRequest : BaseRequest<MetadataResponse>, IKafkaRequest
+    public class MetadataRequest : BaseRequest<MetadataResponse>
     {
         /// <summary>
         /// The list of topics to get metadata for.

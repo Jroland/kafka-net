@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 namespace SimpleKafka
 {
-    public interface IKafkaMessagePartitioner<TKey,TValue>
+    public interface IKafkaMessagePartitioner<TPartitionKey>
     {
-        int CalculatePartition(KafkaMessage<TKey, TValue> message);
+        int CalculatePartition(TPartitionKey partitionKey, int numberOfPartitions);
     }
 }

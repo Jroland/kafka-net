@@ -5,7 +5,7 @@ using SimpleKafka.Common;
 
 namespace SimpleKafka.Protocol
 {
-    public class ProduceRequest : BaseRequest<List<ProduceResponse>>, IKafkaRequest
+    public class ProduceRequest : BaseRequest<List<ProduceResponse>>
     {
         /// <summary>
         /// Provide a hint to the broker call not to expect a response for requests without Acks.

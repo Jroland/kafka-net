@@ -464,15 +464,13 @@ namespace SimpleKafkaTests.Integration
         [Test]
         public async Task TestSimpleProducerWorksOk()
         {
-            var keySerializer = new NullSerializer<string>();
             var valueSerializer = new StringSerializer();
-            var messagePartitioner = new LoadBalancedPartitioner<string, string>(1);
 
             using (var brokers = new KafkaBrokers(IntegrationConfig.IntegrationUri))
             {
-                var producer = new KafkaProducer<string,string>(brokers, keySerializer, valueSerializer, messagePartitioner);
+                var producer = KafkaProducer.Create(brokers, valueSerializer);
 
-                await producer.SendAsync(new KafkaMessage<string, string>(IntegrationConfig.IntegrationTopic, null, "Message"), CancellationToken.None).ConfigureAwait(true);
+                await producer.SendAsync(KeyedMessage.Create(IntegrationConfig.IntegrationTopic, "Message"), CancellationToken.None).ConfigureAwait(true);
 
 
             }

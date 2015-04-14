@@ -18,7 +18,7 @@ namespace SimpleKafka.Protocol
         public string Topic { get; set; }
         public int Partition { get; set; }
         public MessageCodec Codec { get; set; }
-        public List<Message> Messages { get; set; }
+        public IList<Message> Messages { get; set; }
     }
 
     /// <summary>

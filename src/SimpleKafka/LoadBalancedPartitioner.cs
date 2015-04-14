@@ -6,18 +6,16 @@ using System.Threading.Tasks;
 
 namespace SimpleKafka
 {
-    public class LoadBalancedPartitioner<TKey, TValue> : IKafkaMessagePartitioner<TKey, TValue>
+    public class LoadBalancedPartitioner<TPartitionKey> : IKafkaMessagePartitioner<TPartitionKey>
     {
-        private readonly int numberOfPartitions;
-        public LoadBalancedPartitioner(int numberOfPartitions)
-        {
-            this.numberOfPartitions = numberOfPartitions;
-        }
-
         private int current;
 
-        public int CalculatePartition(KafkaMessage<TKey, TValue> message)
+        public int CalculatePartition(TPartitionKey partitionKey, int numberOfPartitions)
         {
+            if (current >= numberOfPartitions)
+            {
+                current = 0;
+            }
             var partition = current;
             current = (current + 1) % numberOfPartitions;
             return partition;

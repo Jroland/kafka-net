@@ -8,31 +8,58 @@ using System.Threading.Tasks;
 
 namespace SimpleKafka
 {
-    public class KafkaProducer<TKey,TValue>
-    {
-        private class MessageAndPartition
-        {
-            readonly KafkaMessage<TKey, TValue> message;
-            readonly int partition;
-
-            public MessageAndPartition(KafkaMessage<TKey,TValue> message, int partition)
-            {
-
-                this.message = message;
-                this.partition = partition;
-            }
+    public static class KafkaProducer {
+        public static KafkaProducer<object,object,TValue> Create<TValue>(
+            KafkaBrokers brokers, 
+            IKafkaSerializer<TValue> valueSerializer) {
+            return new KafkaProducer<object,object,TValue>(brokers, 
+                new NullSerializer<object>(), 
+                valueSerializer, 
+                new LoadBalancedPartitioner<object>());
         }
+
+        public static KafkaProducer<TKey,TKey,TValue> Create<TKey,TValue>(
+            KafkaBrokers brokers, 
+            IKafkaSerializer<TKey> keySerializer,
+            IKafkaSerializer<TValue> valueSerializer
+            ) {
+            return new KafkaProducer<TKey,TKey,TValue>(
+                brokers,
+                keySerializer,
+                valueSerializer,
+                new LoadBalancedPartitioner<TKey>());
+        }
+
+        public static KafkaProducer<TKey,TPartitionKey,TValue> Create<TKey,TPartitionKey,TValue>(
+            KafkaBrokers brokers,
+            IKafkaSerializer<TKey> keySerializer,
+            IKafkaSerializer<TValue> valueSerializer,
+            IKafkaMessagePartitioner<TPartitionKey> partitioner)
+        {
+            return new KafkaProducer<TKey,TPartitionKey,TValue>(
+                brokers,
+                keySerializer,
+                valueSerializer,
+                partitioner);
+        }
+    }
+
+    public class KafkaProducer<TKey, TPartitionKey, TValue>
+    {
+
 
         private readonly KafkaBrokers brokers;
         private readonly IKafkaSerializer<TKey> keySerializer;
         private readonly IKafkaSerializer<TValue> valueSerializer;
-        private readonly IKafkaMessagePartitioner<TKey, TValue> messagePartitioner;
+        private readonly IKafkaMessagePartitioner<TPartitionKey> messagePartitioner;
         private readonly int acks = 1;
         private readonly int timeoutMs = 10000;
         private readonly MessageCodec codec = MessageCodec.CodecNone;
 
-        public KafkaProducer(KafkaBrokers brokers, IKafkaSerializer<TKey> keySerializer, IKafkaSerializer<TValue> valueSerializer, 
-            IKafkaMessagePartitioner<TKey,TValue> messagePartitioner)
+        public KafkaProducer(KafkaBrokers brokers, 
+            IKafkaSerializer<TKey> keySerializer, 
+            IKafkaSerializer<TValue> valueSerializer,
+            IKafkaMessagePartitioner<TPartitionKey> messagePartitioner)
         {
             this.brokers = brokers;
             this.keySerializer = keySerializer;
@@ -40,104 +67,124 @@ namespace SimpleKafka
             this.messagePartitioner = messagePartitioner;
         }
 
-        public async Task SendAsync(KafkaMessage<TKey,TValue> message, CancellationToken token)
+        public async Task SendAsync(KeyedMessage<TKey, TPartitionKey, TValue> message, CancellationToken token)
         {
-            await SendAsync(new KafkaMessage<TKey, TValue>[] { message }, token);
+            await SendAsync(new[] { message}, token).ConfigureAwait(false);
         }
 
-        public async Task SendAsync(IEnumerable<KafkaMessage<TKey,TValue>> messages, CancellationToken token)
+        public async Task SendAsync(IEnumerable<KeyedMessage<TKey, TPartitionKey, TValue>> messages, CancellationToken token)
         {
             var topicMap = BuildTopicMap(messages);
-
-            while (topicMap.Count > 0)
+            while (topicMap != null)
             {
-                var brokerMap = await brokers.BuildBrokerMapAsync(token, topicMap).ConfigureAwait(false);
+                var partitionsMap = await brokers.GetValidPartitionsForTopicsAsync(topicMap.Keys, token).ConfigureAwait(false);
+                var brokerMap = BuildBrokerMap(topicMap, partitionsMap);
+                var results = await SendMessagesAsync(brokerMap, token).ConfigureAwait(false);
 
-                var completed = await SendMessagesToBrokersAsync(token, topicMap, brokerMap).ConfigureAwait(false);
-                if (!completed)
+                topicMap = ProcessResults(topicMap, brokerMap, results);
+                if (topicMap != null)
                 {
-                    var refreshed = await brokers.RefreshAsync(token).ConfigureAwait(false);
-                    if (!refreshed)
-                    {
-                        throw new InvalidOperationException("Failed to refresh");
-                    }
+                    await brokers.BackoffAndRefresh(token).ConfigureAwait(false);
                 }
-
             }
         }
 
-        private async Task<bool> SendMessagesToBrokersAsync(CancellationToken token, Dictionary<string, Dictionary<int, List<Message>>> topicMap, Dictionary<int, Dictionary<Tuple<string, int>, List<Message>>> brokerMap)
+        private Dictionary<int, Dictionary<Tuple<string, int>, List<KeyedMessage<object, TPartitionKey, Message>>>> BuildBrokerMap(Dictionary<string, List<KeyedMessage<object, TPartitionKey, Message>>> topicMap, Dictionary<string, Partition[]> partitionsMap)
         {
+            var brokerMap = new Dictionary<int, Dictionary<Tuple<string, int>, List<KeyedMessage<object, TPartitionKey, Message>>>>();
+            foreach (var messageSet in topicMap.Values)
+            {
+                foreach (var message in messageSet)
+                {
+                    var partitions = partitionsMap[message.Topic];
+                    var partitionId = messagePartitioner.CalculatePartition(message.PartitionKey, partitions.Length);
+                    var partition = partitions[partitionId];
+
+                    brokerMap.GetOrCreate(partition.LeaderId)
+                        .GetOrCreate(Tuple.Create(message.Topic, partitionId))
+                        .Add(message);
+                }
+            }
+
+            return brokerMap;
+        }
+
+        private async Task<Dictionary<int, List<ProduceResponse>>> SendMessagesAsync(Dictionary<int, Dictionary<Tuple<string, int>, List<KeyedMessage<object, TPartitionKey, Message>>>> brokerMap, CancellationToken token)
+        {
+            var tasks = new List<Task>(brokerMap.Count);
+            var results = new Dictionary<int, List<ProduceResponse>>();
             foreach (var brokerKvp in brokerMap)
             {
-                var responses = await ProduceMessagesToBroker(brokerKvp.Key, brokerKvp.Value, token).ConfigureAwait(false);
-                foreach (var response in responses)
+                var request = new ProduceRequest
                 {
-                    switch (response.Error)
+                    Acks = (short)acks,
+                    TimeoutMS = timeoutMs,
+                    Payload = brokerKvp.Value.Select(kvp => new Payload
                     {
-                        case ErrorResponseCode.NoError:
-                            var partitions = topicMap[response.Topic];
-                            partitions.Remove(response.PartitionId);
-                            if (partitions.Count == 0)
-                            {
-                                topicMap.Remove(response.Topic);
-                            }
-                            break;
+                        Codec = codec,
+                        Messages = kvp.Value.Select(m => m.Value).ToList(),
+                        Partition = kvp.Key.Item2,
+                        Topic = kvp.Key.Item1
+                    }).ToList()
+                };
+                var brokerId = brokerKvp.Key;
+                tasks.Add(
+                    brokers[brokerId]
+                        .SendRequestAsync(request, token)
+                        .ContinueWith(task => results.Add(brokerId, task.Result), token)
+                    );
+            }
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+            return results;
+        }
 
+        private static Dictionary<string, List<KeyedMessage<object, TPartitionKey, Message>>> ProcessResults(Dictionary<string, List<KeyedMessage<object, TPartitionKey, Message>>> topicMap, Dictionary<int, Dictionary<Tuple<string, int>, List<KeyedMessage<object, TPartitionKey, Message>>>> brokerMap, Dictionary<int, List<ProduceResponse>> results)
+        {
+            Dictionary<string, List<KeyedMessage<object, TPartitionKey, Message>>> remainingTopicMap = null;
 
-                        case ErrorResponseCode.LeaderNotAvailable:
-                        case ErrorResponseCode.NotLeaderForPartition:
-                            break;
+            foreach (var kvp in results)
+            {
+                var brokerId = kvp.Key;
+                var brokerMessages = brokerMap[brokerId];
 
-                        default:
-                            throw new InvalidOperationException("Unhandled error " + response.Error + ", " + response.Topic + ":" + response.PartitionId);
+                foreach (var response in kvp.Value)
+                {
+                    if (response.Error == ErrorResponseCode.NoError)
+                    {
+                        // nothing to do - success!!
+                    }
+                    else
+                    {
+                        if (remainingTopicMap == null)
+                        {
+                            remainingTopicMap = new Dictionary<string, List<KeyedMessage<object, TPartitionKey, Message>>>();
+                        }
+                        remainingTopicMap
+                            .GetOrCreate(response.Topic)
+                            .AddRange(brokerMessages[Tuple.Create(response.Topic, response.PartitionId)]);
                     }
                 }
             }
 
-            return brokerMap.Count > 0;
+            topicMap = remainingTopicMap;
+            return topicMap;
         }
 
-
-        private async Task<IEnumerable<ProduceResponse>> ProduceMessagesToBroker(int brokerId, Dictionary<Tuple<string,int>,List<Message>> topicMessages, CancellationToken token)
+        private Dictionary<string, List<KeyedMessage<object,TPartitionKey,Message>>> BuildTopicMap(IEnumerable<KeyedMessage<TKey,TPartitionKey,TValue>> messages)
         {
-            var payload = new List<Payload>(topicMessages.Count);
-            foreach (var kvp in topicMessages)
-            {
-                payload.Add(new Payload
-                {
-                    Topic = kvp.Key.Item1,
-                    Partition = kvp.Key.Item2,
-                    Codec = codec,
-                    Messages = kvp.Value
-                });
-            }
-            var request = new ProduceRequest
-            {
-                Acks = (short)acks,
-                TimeoutMS = timeoutMs,
-                Payload = payload,
-            };
-            var response = await brokers[brokerId].SendRequestAsync(request, token).ConfigureAwait(false);
-            return response;
-        }
+            var result = new Dictionary<string, List<KeyedMessage<object, TPartitionKey, Message>>>();
 
-        private Dictionary<string, Dictionary<int, List<Message>>> BuildTopicMap(IEnumerable<KafkaMessage<TKey, TValue>> messages)
-        {
-            var topicMap = new Dictionary<string, Dictionary<int, List<Message>>>();
             foreach (var message in messages)
             {
-                var partitionMap = topicMap.GetOrCreate(message.Topic);
-                var partition = messagePartitioner.CalculatePartition(message);
-                var messageList = partitionMap.GetOrCreate(partition);
-                var encodedMessage = new Message
+                var encoded = new Message
                 {
                     Key = keySerializer.Serialize(message.Key),
-                    Value = valueSerializer.Serialize(message.Value),
+                    Value = valueSerializer.Serialize(message.Value)
                 };
-                messageList.Add(encodedMessage);
+                var prepared = KeyedMessage.Create(message.Topic, (object)null, message.PartitionKey, encoded);
+                result.GetOrCreate(message.Topic).Add(prepared);
             }
-            return topicMap;
+            return result;
         }
     }
 }

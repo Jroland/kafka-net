@@ -24,18 +24,19 @@ namespace SimpleKafkaTests.Integration
         [Test]
         public async Task TestSimpleConsumerWorksOk()
         {
-            var keySerializer = new NullSerializer<string>();
+            var keySerializer = new NullSerializer<object>();
             var valueSerializer = new StringSerializer();
-            var messagePartitioner = new LoadBalancedPartitioner<string, string>(1);
+            var messagePartitioner = new LoadBalancedPartitioner<object>();
 
             using (var temporaryTopic = IntegrationHelpers.CreateTemporaryTopic())
             using (var brokers = new KafkaBrokers(IntegrationConfig.IntegrationUriArray))
             {
                 var topic = temporaryTopic.Topic;
-                var producer = new KafkaProducer<string, string>(brokers, keySerializer, valueSerializer, messagePartitioner);
-                var consumer = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer, new TopicSelector { Partition = 0, Topic = topic });
+                var producer = KafkaProducer.Create(brokers, keySerializer, valueSerializer, messagePartitioner);
+                var consumer = KafkaConsumer.Create(defaultConsumerGroup, brokers, keySerializer, valueSerializer, 
+                    new TopicSelector { Partition = 0, Topic = topic });
 
-                await producer.SendAsync(new KafkaMessage<string, string>(topic, null, "Message"), CancellationToken.None).ConfigureAwait(true);
+                await producer.SendAsync(KeyedMessage.Create(topic, "Message"), CancellationToken.None).ConfigureAwait(true);
 
                 var responses = await consumer.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
                 Assert.That(responses, Is.Not.Null);
@@ -53,26 +54,24 @@ namespace SimpleKafkaTests.Integration
         [Test]
         public async Task TestProducing3MessagesAllowsTheConsumerToChooseTheCorrectMessage()
         {
-            var keySerializer = new NullSerializer<string>();
             var valueSerializer = new StringSerializer();
-            var messagePartitioner = new LoadBalancedPartitioner<string, string>(1);
 
             using (var temporaryTopic = IntegrationHelpers.CreateTemporaryTopic())
             using (var brokers = new KafkaBrokers(IntegrationConfig.IntegrationUriArray))
             {
                 var topic = temporaryTopic.Topic;
                 {
-                    var producer = new KafkaProducer<string, string>(brokers, keySerializer, valueSerializer, messagePartitioner);
+                    var producer = KafkaProducer.Create(brokers, valueSerializer);
 
                     await producer.SendAsync(new[] {
-                        KafkaMessage.Create(topic, (string)null, "1"),
-                        KafkaMessage.Create(topic, (string)null, "2"),
-                        KafkaMessage.Create(topic, (string)null, "3"),
+                        KeyedMessage.Create(topic, "1"),
+                        KeyedMessage.Create(topic, "2"),
+                        KeyedMessage.Create(topic, "3"),
                         }, CancellationToken.None).ConfigureAwait(true);
                 }
 
                 {
-                    var earliest = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer, 
+                    var earliest = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer, 
                         new TopicSelector { Partition = 0, Topic = topic, DefaultOffsetSelection = OffsetSelectionStrategy.Earliest });
 
                     var responses = await earliest.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
@@ -88,7 +87,7 @@ namespace SimpleKafkaTests.Integration
                 }
 
                 {
-                    var latest = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer,
+                    var latest = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer, 
                         new TopicSelector { Partition = 0, Topic = topic, DefaultOffsetSelection = OffsetSelectionStrategy.Last });
 
                     var responses = await latest.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
@@ -104,7 +103,7 @@ namespace SimpleKafkaTests.Integration
                 }
 
                 {
-                    var latest = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer,
+                    var latest = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer,
                         new TopicSelector { Partition = 0, Topic = topic, DefaultOffsetSelection = OffsetSelectionStrategy.Next });
 
                     var responses = await latest.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
@@ -114,7 +113,7 @@ namespace SimpleKafkaTests.Integration
                 }
 
                 {
-                    var specified = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer,
+                    var specified = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer,
                         new TopicSelector { Partition = 0, Topic = topic, DefaultOffsetSelection = OffsetSelectionStrategy.Specified, Offset = 1 });
 
                     var responses = await specified.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
@@ -136,26 +135,24 @@ namespace SimpleKafkaTests.Integration
         [Test]
         public async Task TestProducing3MessagesAllowsTheConsumerToCommitAndRestart()
         {
-            var keySerializer = new NullSerializer<string>();
             var valueSerializer = new StringSerializer();
-            var messagePartitioner = new LoadBalancedPartitioner<string, string>(1);
 
             using (var temporaryTopic = IntegrationHelpers.CreateTemporaryTopic())
             using (var brokers = new KafkaBrokers(IntegrationConfig.IntegrationUriArray))
             {
                 var topic = temporaryTopic.Topic;
                 {
-                    var producer = new KafkaProducer<string, string>(brokers, keySerializer, valueSerializer, messagePartitioner);
+                    var producer = KafkaProducer.Create(brokers, valueSerializer);
 
                     await producer.SendAsync(new[] {
-                        KafkaMessage.Create(topic, (string)null, "1"),
-                        KafkaMessage.Create(topic, (string)null, "2"),
-                        KafkaMessage.Create(topic, (string)null, "3"),
+                        KeyedMessage.Create(topic, "1"),
+                        KeyedMessage.Create(topic, "2"),
+                        KeyedMessage.Create(topic, "3"),
                         }, CancellationToken.None).ConfigureAwait(true);
                 }
 
                 {
-                    var noPreviousCommits = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer,
+                    var noPreviousCommits = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer,
                         new TopicSelector { Partition = 0, Topic = topic, 
                             DefaultOffsetSelection = OffsetSelectionStrategy.NextUncommitted, 
                             FailureOffsetSelection = OffsetSelectionStrategy.Earliest });
@@ -177,7 +174,7 @@ namespace SimpleKafkaTests.Integration
                 }
 
                 {
-                    var previousCommit = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer,
+                    var previousCommit = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer,
                         new TopicSelector
                         {
                             Partition = 0,
@@ -200,7 +197,7 @@ namespace SimpleKafkaTests.Integration
                 }
 
                 {
-                    var previousCommitAgain = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer,
+                    var previousCommitAgain = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer,
                         new TopicSelector
                         {
                             Partition = 0,
@@ -226,7 +223,7 @@ namespace SimpleKafkaTests.Integration
                 }
 
                 {
-                    var secondCommit = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer,
+                    var secondCommit = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer,
                         new TopicSelector
                         {
                             Partition = 0,
@@ -252,7 +249,7 @@ namespace SimpleKafkaTests.Integration
                 }
 
                 {
-                    var thirdCommit = new KafkaConsumer<string, string>(defaultConsumerGroup, brokers, keySerializer, valueSerializer,
+                    var thirdCommit = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer,
                         new TopicSelector
                         {
                             Partition = 0,

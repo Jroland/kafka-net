@@ -5,7 +5,7 @@ using SimpleKafka.Common;
 
 namespace SimpleKafka.Protocol
 {
-    public class FetchRequest : BaseRequest<List<FetchResponse>>, IKafkaRequest
+    public class FetchRequest : BaseRequest<List<FetchResponse>>
     {
         internal const int DefaultMinBlockingByteBufferSize = 4096;
         internal const int DefaultBufferSize = DefaultMinBlockingByteBufferSize * 8;
