@@ -49,6 +49,7 @@
     <Compile Include="Helpers\MessageHelper.cs" />
     <Compile Include="Integration\ConsumerTests.cs" />
     <Compile Include="Integration\IntegrationHelpers.cs" />
+    <Compile Include="Integration\MultiplePartitionTests.cs" />
     <Compile Include="Integration\SimpleTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Unit\KafkaDecoderTests.cs" />
