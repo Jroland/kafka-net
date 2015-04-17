@@ -63,7 +63,7 @@ namespace kafka_tests.Unit
             var count = 0;
             using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _badServerUrl))
             {
-                test.WriteAsync(1.ToBytes()); //will force a connection
+                test.WriteAsync(1.ToBytes().ToPayload()); //will force a connection
                 test.OnReconnectionAttempt += x => Interlocked.Increment(ref count);
                 TaskTest.WaitFor(() => count > 1, 10000);
                 Assert.That(count, Is.GreaterThan(1));
@@ -140,7 +140,7 @@ namespace kafka_tests.Unit
         {
             var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
-            var taskResult = test.WriteAsync(4.ToBytes());
+            var taskResult = test.WriteAsync(4.ToBytes().ToPayload());
 
             using (test) { } //allow the sockets to set
 
@@ -399,7 +399,7 @@ namespace kafka_tests.Unit
                 var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
                 server.OnBytesReceived += data => result = data.ToInt32();
 
-                test.WriteAsync(testData.ToBytes()).Wait(TimeSpan.FromSeconds(1));
+                test.WriteAsync(testData.ToBytes().ToPayload()).Wait(TimeSpan.FromSeconds(1));
                 TaskTest.WaitFor(() => result > 0);
                 Assert.That(result, Is.EqualTo(testData));
             }
@@ -416,7 +416,7 @@ namespace kafka_tests.Unit
                 var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
                 server.OnBytesReceived += results.AddRange;
 
-                Task.WaitAll(test.WriteAsync(testData.ToBytes()), test.WriteAsync(testData.ToBytes()));
+                Task.WaitAll(test.WriteAsync(testData.ToBytes().ToPayload()), test.WriteAsync(testData.ToBytes().ToPayload()));
                 TaskTest.WaitFor(() => results.Count >= 8);
                 Assert.That(results.Count, Is.EqualTo(8));
             }
@@ -438,7 +438,7 @@ namespace kafka_tests.Unit
                 var tasks = Enumerable.Range(1, 10)
                     .SelectMany(i => new[]
                     {
-                        test.WriteAsync(i.ToBytes()),
+                        test.WriteAsync(i.ToBytes().ToPayload()),
                         test.ReadAsync(4).ContinueWith(t => read.Add(t.Result.ToInt32())),
                         server.SendDataAsync(i.ToBytes())
                     }).ToArray();
@@ -463,7 +463,7 @@ namespace kafka_tests.Unit
                 var tasks = Enumerable.Range(1, 10000)
                     .SelectMany(i => new[]
                     {
-                        test.WriteAsync(i.ToBytes()),
+                        test.WriteAsync(i.ToBytes().ToPayload()),
                     }).ToArray();
 
                 Task.WaitAll(tasks);

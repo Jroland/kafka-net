@@ -15,7 +15,7 @@ namespace KafkaNet.Protocol
         public string ConsumerGroup { get; set; }
         public List<OffsetCommit> OffsetCommits { get; set; }
 
-        public byte[] Encode()
+        public KafkaDataPayload Encode()
         {
             return EncodeOffsetCommitRequest(this);
         }
@@ -25,7 +25,7 @@ namespace KafkaNet.Protocol
             return DecodeOffsetCommitResponse(payload);
         }
 
-        private byte[] EncodeOffsetCommitRequest(OffsetCommitRequest request)
+        private KafkaDataPayload EncodeOffsetCommitRequest(OffsetCommitRequest request)
         {
             if (request.OffsetCommits == null) request.OffsetCommits = new List<OffsetCommit>();
 
@@ -52,7 +52,12 @@ namespace KafkaNet.Protocol
                     }
                 }
 
-                return message.Payload();
+                return new KafkaDataPayload
+                {
+                    Buffer = message.Payload(),
+                    CorrelationId = request.CorrelationId,
+                    ApiKey = ApiKey
+                };
             }
         }
 

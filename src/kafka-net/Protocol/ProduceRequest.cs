@@ -31,7 +31,7 @@ namespace KafkaNet.Protocol
         public List<Payload> Payload = new List<Payload>();
 
 
-        public byte[] Encode()
+        public KafkaDataPayload Encode()
         {
             return EncodeProduceRequest(this);
         }
@@ -42,7 +42,7 @@ namespace KafkaNet.Protocol
         }
 
         #region Protocol...
-        private byte[] EncodeProduceRequest(ProduceRequest request)
+        private KafkaDataPayload EncodeProduceRequest(ProduceRequest request)
         {
             int totalCompressedBytes = 0;
             if (request.Payload == null) request.Payload = new List<Payload>();
@@ -70,6 +70,7 @@ namespace KafkaNet.Protocol
 
                     switch (groupedPayload.Key.Codec)
                     {
+
                         case MessageCodec.CodecNone:
                             message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
                             break;
@@ -83,8 +84,13 @@ namespace KafkaNet.Protocol
                     }
                 }
 
-                var result = message.Payload();
-                StatisticsTracker.RecordProduceRequest(result.Length, totalCompressedBytes);
+                var result = new KafkaDataPayload
+                {
+                    Buffer = message.Payload(),
+                    CorrelationId = request.CorrelationId,
+                    MessageCount = request.Payload.Sum(x => x.Messages.Count)
+                };
+                StatisticsTracker.RecordProduceRequest(result.MessageCount, result.Buffer.Length, totalCompressedBytes);
                 return result;
             }
         }

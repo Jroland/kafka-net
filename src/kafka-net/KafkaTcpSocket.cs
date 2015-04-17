@@ -79,46 +79,52 @@ namespace KafkaNet
         /// <summary>
         /// Convenience function to write full buffer data to the server.
         /// </summary>
-        /// <param name="buffer">The buffer data to send.</param>
+        /// <param name="payload">The buffer data to send.</param>
         /// <returns>Returns Task handle to the write operation with size of written bytes..</returns>
-        public Task<int> WriteAsync(byte[] buffer)
+        public Task<int> WriteAsync(KafkaDataPayload payload)
         {
-            return WriteAsync(buffer, _disposeToken.Token);
+            return WriteAsync(payload, _disposeToken.Token);
         }
 
 
         /// <summary>
         /// Write the buffer data to the server.
         /// </summary>
-        /// <param name="buffer">The buffer data to send.</param>
+        /// <param name="payload">The buffer data to send.</param>
         /// <param name="cancellationToken">A cancellation token which will cancel the request.</param>
         /// <returns>Returns Task handle to the write operation with size of written bytes..</returns>
-        public Task<int> WriteAsync(byte[] buffer, CancellationToken cancellationToken)
+        public Task<int> WriteAsync(KafkaDataPayload payload, CancellationToken cancellationToken)
         {
-            return EnsureWriteAsync(buffer, 0, buffer.Length, cancellationToken);
+            return EnsureWriteAsync(payload, cancellationToken);
         }
         #endregion
 
-        private async Task<int> EnsureWriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        private async Task<int> EnsureWriteAsync(KafkaDataPayload payload, CancellationToken cancellationToken)
         {
+            StatisticsTracker.QueueNetworkWrite(_endpoint, payload);
+            var sw = Stopwatch.StartNew();
             try
             {
                 var netStream = await GetStreamAsync().ConfigureAwait(false);
                 using (await _writeLock.LockAsync(cancellationToken).ConfigureAwait(false))
                 {
-                    var sw = Stopwatch.StartNew();
+                    sw.Restart();
                     StatisticsTracker.IncrementActiveWrite();
+                    
                     //writing to network stream is not thread safe
                     //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
-                    await netStream.WriteAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
-                    StatisticsTracker.RecordNetworkWrite(_endpoint, buffer.Length, sw.ElapsedMilliseconds);
+                    await netStream.WriteAsync(payload.Buffer, 0, payload.Buffer.Length, cancellationToken).ConfigureAwait(false);
+                    
                     StatisticsTracker.DecrementActiveWrite();
-                    return buffer.Length;
+                    StatisticsTracker.CompleteNetworkWrite(payload, sw.ElapsedMilliseconds, false);
+                    return payload.Buffer.Length;
                 }
             }
             catch
             {
                 if (_disposeToken.IsCancellationRequested) throw new ObjectDisposedException("Object is disposing.");
+                StatisticsTracker.DecrementActiveWrite();
+                StatisticsTracker.CompleteNetworkWrite(payload, sw.ElapsedMilliseconds, true);
                 throw;
             }
         }
@@ -241,5 +247,17 @@ namespace KafkaNet
                 }
             }
         }
+    }
+
+    public class KafkaDataPayload
+    {
+        public int CorrelationId { get; set; }
+        public ApiKeyRequestType ApiKey { get; set; }
+        public int MessageCount { get; set; }
+        public bool TrackPayload
+        {
+            get { return MessageCount > 0; }
+        }
+        public byte[] Buffer { get; set; }
     }
 }

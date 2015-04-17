@@ -22,7 +22,7 @@ namespace KafkaNet
         /// </summary>
         /// <param name="payload">The raw data to send to the connected endpoint.</param>
         /// <returns>Task representing the future success or failure of query.</returns>
-        Task SendAsync(byte[] payload);
+        Task SendAsync(KafkaDataPayload payload);
 
         /// <summary>
         /// Send a specific IKafkaRequest to the connected endpoint.

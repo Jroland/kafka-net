@@ -17,7 +17,7 @@ namespace KafkaNet.Protocol
         /// </summary>
         public List<string> Topics { get; set; }
 
-        public byte[] Encode()
+        public KafkaDataPayload Encode()
         {
             return EncodeMetadataRequest(this);
         }
@@ -33,7 +33,7 @@ namespace KafkaNet.Protocol
         /// <param name="request">The MetaDataRequest to encode.</param>
         /// <returns>Encoded byte[] representing the request.</returns>
         /// <remarks>Format: (PayloadSize), Header, ix(hs)</remarks>
-        private byte[] EncodeMetadataRequest(MetadataRequest request)
+        private KafkaDataPayload EncodeMetadataRequest(MetadataRequest request)
         {
             if (request.Topics == null) request.Topics = new List<string>();
 
@@ -41,7 +41,12 @@ namespace KafkaNet.Protocol
                 .Pack(request.Topics.Count)
                 .Pack(request.Topics, StringPrefixEncoding.Int16))
             {
-                return message.Payload();
+                return new KafkaDataPayload
+                {
+                    Buffer = message.Payload(),
+                    CorrelationId = request.CorrelationId,
+                    ApiKey = ApiKey
+                };
             }
         }
 

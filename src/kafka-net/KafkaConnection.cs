@@ -74,7 +74,7 @@ namespace KafkaNet
         /// </summary>
         /// <param name="payload">kafka protocol formatted byte[] payload</param>
         /// <returns>Task which signals the completion of the upload of data to the server.</returns>
-        public Task SendAsync(byte[] payload)
+        public Task SendAsync(KafkaDataPayload payload)
         {
             return _client.WriteAsync(payload);
         }
@@ -85,7 +85,7 @@ namespace KafkaNet
         /// <param name="payload">kafka protocol formatted byte[] payload</param>
         /// <param name="token">Cancellation token used to cancel the transfer.</param>
         /// <returns>Task which signals the completion of the upload of data to the server.</returns>
-        public Task SendAsync(byte[] payload, CancellationToken token)
+        public Task SendAsync(KafkaDataPayload payload, CancellationToken token)
         {
             return _client.WriteAsync(payload, token);
         }
@@ -111,7 +111,7 @@ namespace KafkaNet
                 try
                 {
                     AddAsyncRequestItemToResponseQueue(asyncRequest);
-                    await SendAsync(request.Encode()).ConfigureAwait(false);
+                    await _client.WriteAsync(request.Encode()).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException ex)
                 {
@@ -125,7 +125,7 @@ namespace KafkaNet
 
 
             //no response needed, just send
-            await SendAsync(request.Encode()).ConfigureAwait(false);
+            await _client.WriteAsync(request.Encode()).ConfigureAwait(false);
             //TODO should this return a response of success for request?
             return new List<T>();
         }

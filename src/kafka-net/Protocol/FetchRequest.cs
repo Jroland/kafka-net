@@ -30,7 +30,7 @@ namespace KafkaNet.Protocol
 
         public List<Fetch> Fetches { get; set; }
 
-        public byte[] Encode()
+        public KafkaDataPayload Encode()
         {
             return EncodeFetchRequest(this);
         }
@@ -40,7 +40,7 @@ namespace KafkaNet.Protocol
             return DecodeFetchResponse(payload);
         }
 
-        private byte[] EncodeFetchRequest(FetchRequest request)
+        private KafkaDataPayload EncodeFetchRequest(FetchRequest request)
         {          
             if (request.Fetches == null) request.Fetches = new List<Fetch>();
 
@@ -69,7 +69,12 @@ namespace KafkaNet.Protocol
                     }
                 }
 
-                return message.Payload();
+                return new KafkaDataPayload
+                {
+                    Buffer = message.Payload(),
+                    CorrelationId = request.CorrelationId,
+                    ApiKey = ApiKey
+                };
             }
         }
 

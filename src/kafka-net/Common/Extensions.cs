@@ -47,6 +47,11 @@ namespace KafkaNet.Common
             return Encoding.UTF8.GetString(value);
         }
 
+        public static KafkaDataPayload ToPayload(this byte[] data)
+        {
+            return new KafkaDataPayload {Buffer = data};
+        }
+
         public static byte[] ToBytes(this string value)
         {
             if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
@@ -213,14 +218,6 @@ namespace KafkaNet.Common
                 return task.Exception.Flatten();
             
             return new ApplicationException("Unknown exception occured.");
-        }
-
-        /// <summary>
-        /// Rounds a datetime to the second, usefull for grouping by second.
-        /// </summary>
-        public static DateTime RoundToSeconds(this DateTime t)
-        {
-            return new DateTime(t.Year, t.Month, t.Day, t.Hour, t.Minute, t.Second);
         }
     }
 }

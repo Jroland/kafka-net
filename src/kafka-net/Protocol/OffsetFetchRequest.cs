@@ -17,12 +17,12 @@ namespace KafkaNet.Protocol
         public string ConsumerGroup { get; set; }
         public List<OffsetFetch> Topics { get; set; }
 
-        public byte[] Encode()
+        public KafkaDataPayload Encode()
         {
             return EncodeOffsetFetchRequest(this);
         }
 
-        protected byte[] EncodeOffsetFetchRequest(OffsetFetchRequest request)
+        protected KafkaDataPayload EncodeOffsetFetchRequest(OffsetFetchRequest request)
         {
             if (request.Topics == null) request.Topics = new List<OffsetFetch>();
 
@@ -48,7 +48,12 @@ namespace KafkaNet.Protocol
                     }
                 }
 
-                return message.Payload();
+                return new KafkaDataPayload
+                {
+                    Buffer = message.Payload(),
+                    CorrelationId = request.CorrelationId,
+                    ApiKey = ApiKey
+                };
             }
         }
 
