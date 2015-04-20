@@ -1,9 +1,9 @@
 using System;
-using KafkaNet.Common;
+using SimpleKafka.Common;
 
-namespace KafkaNet.Protocol
+namespace SimpleKafka.Protocol
 {
-    public abstract class BaseRequest
+    public abstract class BaseRequest<T>
     {
         /// <summary>
         /// From Documentation: 
@@ -17,9 +17,11 @@ namespace KafkaNet.Protocol
         private readonly short _apiVersion;
         private string _clientId = "Kafka-Net";
         private int _correlationId = 1;
+        private readonly ApiKeyRequestType apiKey;
 
-        protected BaseRequest(short apiVersion = 0)
+        protected BaseRequest(ApiKeyRequestType apiKey, short apiVersion = 0)
         {
+            this.apiKey = apiKey;
             _apiVersion = apiVersion;
         }
 
@@ -45,17 +47,25 @@ namespace KafkaNet.Protocol
         public virtual bool ExpectResponse { get { return true; } }
 
         /// <summary>
-        /// Encode the common head for kafka request.
+        /// Encode this request into the Kafka wire protocol.
         /// </summary>
-        /// <returns>KafkaMessagePacker with header populated</returns>
-        /// <remarks>Format: (hhihs) </remarks>
-        public static KafkaMessagePacker EncodeHeader<T>(IKafkaRequest<T> request)
+        /// <param name="encoder">Encoder to use</param>
+        internal abstract KafkaEncoder Encode(KafkaEncoder encoder);
+
+        /// <summary>
+        /// Decode a response payload from Kafka into T. 
+        /// </summary>
+        /// <param name="decoder">Decoder to use</param>
+        /// <returns>Response</returns>
+        internal abstract T Decode(KafkaDecoder decoder);
+
+        internal KafkaEncoder EncodeHeader(KafkaEncoder encoder)
         {
-            return new KafkaMessagePacker()
-                 .Pack(((Int16)request.ApiKey))
-                 .Pack(request.ApiVersion)
-                 .Pack(request.CorrelationId)
-                 .Pack(request.ClientId, StringPrefixEncoding.Int16);
+            return encoder
+                .Write((Int16)apiKey)
+                .Write(ApiVersion)
+                .Write(CorrelationId)
+                .Write(ClientId);
         }
     }
 }

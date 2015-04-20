@@ -19,10 +19,15 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{F4C67622-F19D-4D3D-9C60-C2A9E717A197}"
 	ProjectSection(SolutionItems) = preProject
 		..\.gitignore = ..\.gitignore
+		coverage.bat = coverage.bat
 		..\LICENSE = ..\LICENSE
 		..\README.md = ..\README.md
 		..\RELEASE_NOTES.md = ..\RELEASE_NOTES.md
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleKafkaTests", "SimpleKafkaTests\SimpleKafkaTests.csproj", "{9B7B9E32-45E6-40C0-B6FA-9F0A99681B16}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleKafka", "SimpleKafka\SimpleKafka.csproj", "{DB719BEC-843A-4A5E-A151-EC47FEC2EE48}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,15 +38,20 @@ Global
 		{1343EB68-55CB-4452-8386-24A9989DE1C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1343EB68-55CB-4452-8386-24A9989DE1C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1343EB68-55CB-4452-8386-24A9989DE1C0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1343EB68-55CB-4452-8386-24A9989DE1C0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D80AE407-BB81-4C11-BFDC-5DD463F8B1BF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{D80AE407-BB81-4C11-BFDC-5DD463F8B1BF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D80AE407-BB81-4C11-BFDC-5DD463F8B1BF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D80AE407-BB81-4C11-BFDC-5DD463F8B1BF}.Release|Any CPU.Build.0 = Release|Any CPU
 		{53E0B3CE-6C41-4C8A-8B66-9BD03667B1E0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{53E0B3CE-6C41-4C8A-8B66-9BD03667B1E0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{53E0B3CE-6C41-4C8A-8B66-9BD03667B1E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{53E0B3CE-6C41-4C8A-8B66-9BD03667B1E0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9B7B9E32-45E6-40C0-B6FA-9F0A99681B16}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9B7B9E32-45E6-40C0-B6FA-9F0A99681B16}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9B7B9E32-45E6-40C0-B6FA-9F0A99681B16}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9B7B9E32-45E6-40C0-B6FA-9F0A99681B16}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DB719BEC-843A-4A5E-A151-EC47FEC2EE48}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DB719BEC-843A-4A5E-A151-EC47FEC2EE48}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DB719BEC-843A-4A5E-A151-EC47FEC2EE48}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DB719BEC-843A-4A5E-A151-EC47FEC2EE48}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
