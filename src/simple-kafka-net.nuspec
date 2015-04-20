@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>simple-kafka-net</id>
+    <version>$version$</version>
+    <authors>Nick Randell</authors>
+    <owners>Nick Randell</owners>
+    <licenseUrl>https://github.com/nrandell/simple-kafka-net/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/nrandell/simple-kafka-net</projectUrl>
+    <iconUrl>http://kafka.apache.org/images/kafka_logo.png</iconUrl>
+    <title>simple-kafka-net</title>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Provides high and low level classes for communicating with an Apache Kafka cluster. Based off jroland/kafka-net but simplified and providing more control for clients</description>
+    <summary>Native C# client for Apache Kafka.</summary>
+    <copyright>Copyright Nick Randell 2015</copyright>
+    <tags>C# Apache Kafka</tags>
+    <releaseNotes>https://github.com/nrandell/simple-kafka-net/blob/master/RELEASE_NOTES.md</releaseNotes>
+  </metadata>
+  <files>
+    <file src="SimpleKafka\bin\$configuration$\SimpleKafka.dll" target="lib\net45" />
+  </files>
+</package>
