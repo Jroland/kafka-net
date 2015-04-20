@@ -16,10 +16,19 @@ namespace SimpleKafkaTests.Integration
     {
         private readonly string defaultConsumerGroup = "unit-tests";
 
-        [SetUp]
-        public void Setup()
+        private KafkaTestCluster testCluster;
+
+        [OneTimeSetUp]
+        public void BuildTestCluster()
         {
-            IntegrationHelpers.zookeeperHost = "server.home:32181";
+            testCluster = new KafkaTestCluster("server.home", 1);
+        }
+
+        [OneTimeTearDown]
+        public void DestroyTestCluster()
+        {
+            testCluster.Dispose();
+            testCluster = null;
         }
 
         [Test]
@@ -29,10 +38,10 @@ namespace SimpleKafkaTests.Integration
             var valueSerializer = new StringSerializer();
             var messagePartitioner = new Int32Partitioner();
 
-            using (var temporaryTopic = IntegrationHelpers.CreateTemporaryTopic(partitions:2))
-            using (var brokers = new KafkaBrokers(IntegrationConfig.IntegrationUriArray))
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic(partitions:2))
+            using (var brokers = new KafkaBrokers(testCluster.CreateBrokerUris()))
             {
-                var topic = temporaryTopic.Topic;
+                var topic = temporaryTopic.Name;
                 var producer = KafkaProducer.Create(brokers, keySerializer, valueSerializer, messagePartitioner);
                 var consumers = new[] {
                     KafkaConsumer.Create(defaultConsumerGroup, brokers, keySerializer, valueSerializer,
@@ -76,10 +85,10 @@ namespace SimpleKafkaTests.Integration
             var valueSerializer = new StringSerializer();
             var messagePartitioner = new Int32Partitioner();
 
-            using (var temporaryTopic = IntegrationHelpers.CreateTemporaryTopic(partitions: numberOfPartitions))
-            using (var brokers = new KafkaBrokers(IntegrationConfig.IntegrationUriArray))
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic(partitions: 2))
+            using (var brokers = new KafkaBrokers(testCluster.CreateBrokerUris()))
             {
-                var topic = temporaryTopic.Topic;
+                var topic = temporaryTopic.Name;
                 {
                     var producer = KafkaProducer.Create(brokers, keySerializer, valueSerializer, messagePartitioner);
                     var messages =

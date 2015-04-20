@@ -1,4 +1,5 @@
-﻿using SimpleKafka.Protocol;
+﻿using Serilog;
+using SimpleKafka.Protocol;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -74,17 +75,44 @@ namespace SimpleKafka
 
         public async Task SendAsync(IEnumerable<KeyedMessage<TKey, TPartitionKey, TValue>> messages, CancellationToken token)
         {
+            var backoffs = new BackoffHandler();
             var topicMap = BuildTopicMap(messages);
             while (topicMap != null)
             {
-                var partitionsMap = await brokers.GetValidPartitionsForTopicsAsync(topicMap.Keys, token).ConfigureAwait(false);
-                var brokerMap = BuildBrokerMap(topicMap, partitionsMap);
-                var results = await SendMessagesAsync(brokerMap, token).ConfigureAwait(false);
+                Exception caughtException = null;
+                try
+                {
+                    var partitionsMap = await brokers.GetValidPartitionsForTopicsAsync(topicMap.Keys, token).ConfigureAwait(false);
+                    var brokerMap = BuildBrokerMap(topicMap, partitionsMap);
+                    var results = await SendMessagesAsync(brokerMap, token).ConfigureAwait(false);
 
-                topicMap = ProcessResults(topicMap, brokerMap, results);
+                    topicMap = ProcessResults(topicMap, brokerMap, results);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Log.Information("Error sending: {ex}", ex);
+                    caughtException = ex;
+                    token.ThrowIfCancellationRequested();
+                }
                 if (topicMap != null)
                 {
-                    await brokers.BackoffAndRefresh(token).ConfigureAwait(false);
+                    var canContinue = await backoffs.BackoffIfAllowedAsync(token).ConfigureAwait(false);
+                    if (!canContinue)
+                    {
+                        if (caughtException != null)
+                        {
+                            throw caughtException;
+                        }
+                        else
+                        {
+                            throw new ResponseTimeoutException("Timeout sending");
+                        }
+                    }
+                    await brokers.RefreshAsync(token).ConfigureAwait(false);
                 }
             }
         }
@@ -129,8 +157,9 @@ namespace SimpleKafka
                 };
                 var brokerId = brokerKvp.Key;
                 tasks.Add(
-                    brokers[brokerId]
-                        .SendRequestAsync(request, token)
+                    brokers
+                        .RunBrokerCommand(brokerId, c => 
+                            c.SendRequestAsync(request, token))
                         .ContinueWith(task => results.Add(brokerId, task.Result), token)
                     );
             }

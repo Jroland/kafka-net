@@ -47,6 +47,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BackoffHandler.cs" />
     <Compile Include="FixedPartitioner.cs" />
     <Compile Include="Int32Partitioner.cs" />
     <Compile Include="Int32Serializer.cs" />
@@ -80,6 +81,7 @@
     <Compile Include="Protocol\Protocol.cs" />
     <Compile Include="Protocol\Topic.cs" />
     <Compile Include="ReceivedKafkaMessage.cs" />
+    <Compile Include="StringPartitioner.cs" />
     <Compile Include="StringSerializer.cs" />
     <Compile Include="TopicPartitionOffset.cs" />
     <Compile Include="TopicSelector.cs" />

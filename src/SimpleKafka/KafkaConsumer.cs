@@ -80,7 +80,7 @@ namespace SimpleKafka
 
         public async Task CommitAsync(IEnumerable<TopicPartitionOffset> offsets, CancellationToken token)
         {
-            var coordinator = await GetOffsetCoordinatorConnectionAsync(token).ConfigureAwait(false);
+            var coordinatorId = await GetOffsetCoordinatorIdAsync(token).ConfigureAwait(false);
             var offsetCommits = new List<OffsetCommit>();
             foreach (var offset in offsets) {
                 var offsetCommit = new OffsetCommit {
@@ -98,7 +98,8 @@ namespace SimpleKafka
                 OffsetCommits = offsetCommits
             };
 
-            var responses = await coordinator.SendRequestAsync(request, token).ConfigureAwait(false);
+            var responses = await brokers.RunBrokerCommand(coordinatorId, c => 
+                c.SendRequestAsync(request, token)).ConfigureAwait(false);
             foreach (var response in responses)
             {
                 if (response.Error != ErrorResponseCode.NoError)
@@ -108,21 +109,59 @@ namespace SimpleKafka
             }
         }
 
-        private async Task<KafkaConnection> GetOffsetCoordinatorConnectionAsync(CancellationToken token)
+        private async Task<int> GetOffsetCoordinatorIdAsync(CancellationToken token)
         {
             var map = await brokers.BuildOffsetCoordinatorMapAsync(token, consumerGroup).ConfigureAwait(false);
             var coordinator = map[consumerGroup];
-            return brokers[coordinator];
+            return coordinator;
         }
 
         public async Task<List<ReceivedKafkaMessage<TKey,TValue>>> ReceiveAsync(CancellationToken token)
         {
-            var brokerMap = await brokers.BuildBrokerMapAsync(token, topicMap).ConfigureAwait(false);
-            await RetrieveAnyTopicOffsets(token, brokerMap).ConfigureAwait(false);
-            await RetrieveAnyConsumerOffsets(token, brokerMap).ConfigureAwait(false);
-            var tasks = CreateFetchTasks(token, brokerMap);
-            var taskResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+            var backoffs = new BackoffHandler();
+            while (true)
+            {
+                Exception caughtException = null;
 
+                try
+                {
+                    var brokerMap = await brokers.BuildBrokerMapAsync(token, topicMap).ConfigureAwait(false);
+                    await RetrieveAnyTopicOffsets(token, brokerMap).ConfigureAwait(false);
+                    await RetrieveAnyConsumerOffsets(token, brokerMap).ConfigureAwait(false);
+                    var tasks = CreateFetchTasks(token, brokerMap);
+                    var taskResults = await Task.WhenAll(tasks).ConfigureAwait(false);
+
+                    var messages = DecodeResults(taskResults);
+                    return messages;
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Log.Information("Error receiving: {ex}", ex);
+                    caughtException = ex;
+                }
+                token.ThrowIfCancellationRequested();
+
+                if (!await backoffs.BackoffIfAllowedAsync(token).ConfigureAwait(false))
+                {
+                    if (caughtException != null)
+                    {
+                        throw caughtException;
+                    }
+                    else
+                    {
+                        throw new ResponseTimeoutException("Error receiving");
+                    }
+                }
+                await brokers.RefreshAsync(token).ConfigureAwait(false);
+            }
+        }
+
+        private List<ReceivedKafkaMessage<TKey, TValue>> DecodeResults(List<FetchResponse>[] taskResults)
+        {
             var messages = new List<ReceivedKafkaMessage<TKey, TValue>>();
             foreach (var taskResult in taskResults)
             {
@@ -131,12 +170,13 @@ namespace SimpleKafka
                     if (fetchResponse.Error != (int)ErrorResponseCode.NoError)
                     {
                         Log.Error("Error in fetch response {error} for {topic}/{partition}", fetchResponse.Error, fetchResponse.Topic, fetchResponse.PartitionId);
-                    } else
+                    }
+                    else
                     {
                         var tracker = topicMap[fetchResponse.Topic][fetchResponse.PartitionId];
                         foreach (var message in fetchResponse.Messages)
                         {
-                            var result = new ReceivedKafkaMessage<TKey,TValue>(
+                            var result = new ReceivedKafkaMessage<TKey, TValue>(
                                 fetchResponse.Topic,
                                 keySerializer.Deserialize(message.Key),
                                 valueSerializer.Deserialize(message.Value),
@@ -162,7 +202,8 @@ namespace SimpleKafka
                 var trackerMap = brokerKvp.Value;
                 var request = CreateRequest(trackerMap);
 
-                tasks.Add(brokers[brokerId].SendRequestAsync(request, token));
+                tasks.Add(brokers.RunBrokerCommand(brokerId, c =>
+                    c.SendRequestAsync(request, token)));
             }
 
             return tasks;
@@ -229,7 +270,7 @@ namespace SimpleKafka
                 if (offsets != null)
                 {
                     var request = new OffsetRequest { Offsets = offsets };
-                    var responses = await brokers[brokerKvp.Key].SendRequestAsync(request, token).ConfigureAwait(false);
+                    var responses = await brokers.RunBrokerCommand(brokerKvp.Key, c => c.SendRequestAsync(request, token)).ConfigureAwait(false);
                     foreach (var response in responses)
                     {
                         if (response.Error != ErrorResponseCode.NoError)
@@ -281,8 +322,8 @@ namespace SimpleKafka
                 if (fetches != null)
                 {
                     var request = new OffsetFetchRequest { ConsumerGroup = consumerGroup, Topics = fetches };
-                    var coordinator = await GetOffsetCoordinatorConnectionAsync(token).ConfigureAwait(false);
-                    var responses = await coordinator.SendRequestAsync(request, token).ConfigureAwait(false);
+                    var coordinatorId = await GetOffsetCoordinatorIdAsync(token).ConfigureAwait(false);
+                    var responses = await brokers.RunBrokerCommand(coordinatorId, c => c.SendRequestAsync(request, token)).ConfigureAwait(false);
                     foreach (var response in responses)
                     {
                         if (response.Error != ErrorResponseCode.NoError)

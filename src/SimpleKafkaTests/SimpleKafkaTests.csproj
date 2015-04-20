@@ -46,14 +46,16 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Helpers\IntegrationConfig.cs" />
+    <Compile Include="Helpers\KafkaTestCluster.cs" />
     <Compile Include="Helpers\MessageHelper.cs" />
     <Compile Include="Integration\ConsumerTests.cs" />
-    <Compile Include="Integration\IntegrationHelpers.cs" />
+    <Compile Include="Integration\FailureTests.cs" />
     <Compile Include="Integration\MultiplePartitionTests.cs" />
     <Compile Include="Integration\SimpleTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Unit\KafkaDecoderTests.cs" />
     <Compile Include="Unit\KafkaEncoderTests.cs" />
+    <Compile Include="Unit\PartitionerTests.cs" />
     <Compile Include="Unit\ProtocolBaseRequestTests.cs" />
     <Compile Include="Unit\ProtocolMessageTests.cs" />
   </ItemGroup>
@@ -70,9 +72,7 @@
       <Name>SimpleKafka</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="MicroBenchmarks\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

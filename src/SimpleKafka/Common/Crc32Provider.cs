@@ -23,11 +23,6 @@ namespace SimpleKafka.Common
             PolynomialTable = InitializeTable(DefaultPolynomial);
         }
 
-        public static UInt32 Compute(byte[] buffer)
-        {
-            return ~CalculateHash(buffer, 0, buffer.Length);
-        }
-
         public static UInt32 Compute(byte[] buffer, int offset, int length)
         {
             return ~CalculateHash(buffer, offset, length);

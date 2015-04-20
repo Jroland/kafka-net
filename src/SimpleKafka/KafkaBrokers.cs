@@ -11,12 +11,27 @@ namespace SimpleKafka
 {
     public class KafkaBrokers : IDisposable
     {
-        private readonly Random backoffGenerator = new Random();
         private readonly HashSet<Uri> brokers = new HashSet<Uri>();
         private readonly Dictionary<string, Partition[]> topicToPartitions = new Dictionary<string, Partition[]>(StringComparer.CurrentCultureIgnoreCase);
 
         private readonly Dictionary<int, KafkaConnection> connections = new Dictionary<int, KafkaConnection>();
-        public KafkaConnection this[int brokerId]
+
+        public async Task<T> RunBrokerCommand<T>(int brokerId, Func<KafkaConnection, Task<T>> operation)
+        {
+            var connection = this[brokerId];
+            try
+            {
+                return await operation(connection).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                connection.Dispose();
+                connections.Remove(brokerId);
+                throw;
+            }
+        }
+
+        private KafkaConnection this[int brokerId]
         {
             get
             {
@@ -37,20 +52,6 @@ namespace SimpleKafka
             }
         }
 
-
-        private bool IsLeaderElectionTakingPlaceForTopicAndPartition(string topic, int partition)
-        {
-            var partitionsMap = topicToPartitions.TryGetValue(topic);
-            if (partitionsMap == null)
-            {
-                return false;
-            }
-            else
-            {
-                var partitionInfo = partitionsMap[partition];
-                return partitionInfo.LeaderId == -1;
-            }
-        }
 
         public async Task<bool> RefreshAsync(CancellationToken token)
         {
@@ -131,16 +132,15 @@ namespace SimpleKafka
 
         public async Task<Dictionary<string, Partition[]>> GetValidPartitionsForTopicsAsync(IEnumerable<string> topics, CancellationToken token)
         {
-            while (true)
+            var result = await GetPartitionsForTopicsAsync(topics, token).ConfigureAwait(false);
+            var anyWithElection = result.Values.Any(partitions => partitions.Any(partition => partition.LeaderId == -1));
+            if (!anyWithElection)
             {
-                var result = await GetPartitionsForTopicsAsync(topics, token).ConfigureAwait(false);
-                var anyWithElection = result.Values.Any(partitions => partitions.Any(partition => partition.LeaderId == -1));
-                if (!anyWithElection)
-                {
-                    return result;
-                }
-
-                await BackoffAndRefresh(token).ConfigureAwait(false);
+                return result;
+            }
+            else
+            {
+                throw new SimpleKafka.Protocol.LeaderNotFoundException("Not all leaders found");
             }
         }
 
@@ -175,30 +175,11 @@ namespace SimpleKafka
             return partitions;
         }
 
-        public async Task<int> GetLeaderForTopicAndPartitionAsync(string topic, int partitionId, CancellationToken token)
-        {
-            while (true)
-            {
-                var partitions = await GetPartitionsForTopicAsync(topic, token).ConfigureAwait(false);
-                var partition = GetPartitionIfReady(topic, partitionId, partitions);
-
-                if (partition != null)
-                {
-                    return partition.LeaderId;
-                }
-                else
-                {
-                    token.ThrowIfCancellationRequested();
-                    await BackoffAndRefresh(token).ConfigureAwait(false);
-                }
-            }
-        }
-
         private static Partition GetPartitionIfReady(string topic, int partitionId, Partition[] partitions)
         {
             if (partitionId >= partitions.Length)
             {
-                throw new IndexOutOfRangeException("Topic " + topic + ", partition " + partitionId + " is too big. Only have " + partitions.Length + " partitions");
+                throw new InvalidPartitionException("Topic {0} partition {1} is too big. Only have {2} partitions", topic, partitionId, partitions.Length);
             }
 
             var partition = partitions[partitionId];
@@ -219,6 +200,8 @@ namespace SimpleKafka
             {
                 await RefreshAsync(token).ConfigureAwait(false);
             }
+
+            var backoffs = new BackoffHandler();
 
             var ready = false;
             while (!ready)
@@ -247,7 +230,11 @@ namespace SimpleKafka
 
                 if (!ready)
                 {
-                    await BackoffAndRefresh(token).ConfigureAwait(false);
+                    if (!await backoffs.BackoffIfAllowedAsync(token).ConfigureAwait(false))
+                    {
+                        throw new InvalidPartitionException("Cannot build broker map");
+                    }
+                    await RefreshAsync(token);
                 }
             }
 
@@ -268,16 +255,6 @@ namespace SimpleKafka
             return brokerMap;
         }
 
-        public async Task BackoffAndRefresh(CancellationToken token)
-        {
-            Log.Verbose("Waiting before trying again");
-            await Task.Delay(backoffGenerator.Next(1000, 10000)).ConfigureAwait(false);
-            var refreshed = await RefreshAsync(token).ConfigureAwait(false);
-            if (!refreshed)
-            {
-                throw new KeyNotFoundException("Failed to refresh brokers");
-            }
-        }
 
         internal Partition[] GetPartitionsForTopic(string topic)
         {
@@ -364,17 +341,12 @@ namespace SimpleKafka
 
         private async Task RefreshBrokersAsync(Broker[] latestBrokers, CancellationToken token)
         {
-            var previousBrokers = new HashSet<Uri>(brokers);
-            var previousConnections = connections.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             foreach (var broker in latestBrokers)
             {
                 var uri = broker.Address;
 
                 if (!brokers.Contains(uri)) {
                     brokers.Add(uri);
-                } else
-                {
-                    previousBrokers.Remove(uri);
                 }
 
                 var currentConnection = connections.TryGetValue(broker.BrokerId);
@@ -382,21 +354,7 @@ namespace SimpleKafka
                 {
                     var newConnection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(uri, token).ConfigureAwait(false);
                     connections.Add(broker.BrokerId, newConnection);
-                } else
-                {
-                    previousConnections.Remove(broker.BrokerId);
                 }
-            }
-
-            foreach (var oldBroker in previousBrokers)
-            {
-                brokers.Remove(oldBroker);
-            }
-
-            foreach (var oldConnectionKvp in previousConnections)
-            {
-                connections.Remove(oldConnectionKvp.Key);
-                oldConnectionKvp.Value.Dispose();
             }
         }
 

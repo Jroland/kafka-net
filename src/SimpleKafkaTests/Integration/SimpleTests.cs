@@ -17,18 +17,26 @@ namespace SimpleKafkaTests.Integration
     [Category("Integration")]
     class SimpleTests
     {
-        [SetUp]
-        public void Setup()
+        private KafkaTestCluster testCluster;
+
+        [OneTimeSetUp]
+        public void BuildTestCluster()
         {
-            IntegrationHelpers.dockerHost = "tcp://server.home:2375";
-            IntegrationHelpers.zookeeperHost = "server.home";
-            IntegrationHelpers.dockerOptions = "";
+            testCluster = new KafkaTestCluster("server.home", 1);
         }
 
-    [Test]
+        [OneTimeTearDown]
+        public void DestroyTestCluster()
+        {
+            testCluster.Dispose();
+            testCluster = null;
+        }
+
+        [Test]
         public async Task TestProducingWorksOk()
         {
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(IntegrationConfig.IntegrationUri).ConfigureAwait(true))
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic())
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
             {
                 var request = new ProduceRequest
                 {
@@ -38,7 +46,7 @@ namespace SimpleKafkaTests.Integration
                      {
                          new Payload
                          {
-                              Topic = IntegrationConfig.IntegrationTopic,
+                              Topic = temporaryTopic.Name,
                               Partition = 0,
                               Codec = MessageCodec.CodecNone,
                               Messages = new List<Message>
@@ -50,24 +58,27 @@ namespace SimpleKafkaTests.Integration
                 };
 
                 var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                Console.WriteLine(response);
+                Assert.That(response, Has.Count.EqualTo(1));
+                var first = response.First();
+                Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
             }
         }
 
         [Test]
         public async Task TestFetchingWorksOk()
         {
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(IntegrationConfig.IntegrationUri).ConfigureAwait(true))
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic())
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
             {
                 var request = new FetchRequest
                 {
-                    MaxWaitTime = 1000,
+                    MaxWaitTime = 0,
                     MinBytes = 1000,
                     Fetches = new List<Fetch>
                      {
                          new Fetch
                          {
-                              Topic = IntegrationConfig.IntegrationTopic,
+                              Topic = temporaryTopic.Name,
                               PartitionId = 0,
                               MaxBytes = 1024,
                               Offset = 0
@@ -76,33 +87,27 @@ namespace SimpleKafkaTests.Integration
                 };
 
                 var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                Console.WriteLine(response);
+                Assert.That(response, Has.Count.EqualTo(1));
+                var first = response.First();
+                Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
+                Assert.That(first.Messages, Has.Count.EqualTo(0));
             }
         }
 
         [Test]
         public async Task TestListingAllTopicsWorksOk()
         {
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(IntegrationConfig.IntegrationUri).ConfigureAwait(true))
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic())
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
             {
                 var request = new MetadataRequest { };
                 var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
                 Assert.That(response, Is.Not.Null);
-                var first = response;
-                {
-                    foreach (var broker in first.Brokers)
-                    {
-                        Console.WriteLine("{0},{1},{2},{3}", broker.Address, broker.BrokerId, broker.Host, broker.Port);
-                    }
-                    foreach (var topic in first.Topics)
-                    {
-                        Console.WriteLine("{0},{1}", topic.ErrorCode, topic.Name);
-                        foreach (var partition in topic.Partitions)
-                        {
-                            Console.WriteLine("{0},{1},{2},{3},{4}", partition.ErrorCode, partition.Isrs.Length, partition.LeaderId, partition.PartitionId, partition.Replicas.Length);
-                        }
-                    }
-                }
+                Assert.That(response.Brokers, Has.Length.EqualTo(1));
+                Assert.That(response.Topics, Has.Length.EqualTo(1));
+                Assert.That(response.Topics[0].Name, Is.EqualTo(temporaryTopic.Name));
+                Assert.That(response.Topics[0].ErrorCode, Is.EqualTo(ErrorResponseCode.NoError));
+                Assert.That(response.Topics[0].Partitions, Has.Length.EqualTo(1));
             }
 
         }
@@ -110,7 +115,8 @@ namespace SimpleKafkaTests.Integration
         [Test]
         public async Task TestOffsetWorksOk()
         {
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(IntegrationConfig.IntegrationUri).ConfigureAwait(true))
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic())
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
             {
                 var request = new OffsetRequest
                 {
@@ -118,7 +124,7 @@ namespace SimpleKafkaTests.Integration
                      {
                          new Offset
                          {
-                              Topic = IntegrationConfig.IntegrationTopic,
+                              Topic = temporaryTopic.Name,
                                MaxOffsets = 1,
                                PartitionId = 0,
                                Time = -1
@@ -127,17 +133,155 @@ namespace SimpleKafkaTests.Integration
                 };
 
                 var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
-                Console.WriteLine(response);
+                Assert.That(response, Has.Count.EqualTo(1));
+                var first = response.First();
+                Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
+            }
+        }
+
+        [Test]
+        public async Task TestMultipleOffsetWorksOk()
+        {
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic(partitions:2))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            {
+                var topic = temporaryTopic.Name;
+                var request = new OffsetRequest
+                {
+                    Offsets = new List<Offset>
+                     {
+                         new Offset
+                         {
+                              Topic = topic,
+                               MaxOffsets = 1,
+                               PartitionId = 0,
+                               Time = -1
+                         },
+                         new Offset
+                         {
+                              Topic = topic,
+                               MaxOffsets = 1,
+                               PartitionId = 1,
+                               Time = -1
+                         }
+
+                     }
+                };
+
+                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                Assert.That(response, Has.Count.EqualTo(2));
+                Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.NoError));
+                Assert.That(response[1].Error, Is.EqualTo(ErrorResponseCode.NoError));
+            }
+        }
+
+        [Test]
+        public async Task TestOffsetCommitWorksOk()
+        {
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic())
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            {
+                var request = new OffsetCommitRequest
+                {
+                    OffsetCommits = new List<OffsetCommit>
+                    {
+                         new OffsetCommit
+                         {
+                              Topic = temporaryTopic.Name,
+                              Offset = 0
+                         }
+                     }
+                };
+
+                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                Assert.That(response, Has.Count.EqualTo(1));
+                Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.Unknown));
+            }
+        }
+
+        [Test]
+        public async Task TestMultipleOffsetCommitsWorksOk()
+        {
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic(partitions:2))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            {
+                var request = new OffsetCommitRequest
+                {
+                    OffsetCommits = 
+                        Enumerable
+                            .Range(0, 2)
+                            .Select(i => new OffsetCommit {
+                                Topic = temporaryTopic.Name,
+                                PartitionId = i,
+                                Offset = 0
+                            })
+                            .ToList()
+                };
+
+                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                Assert.That(response, Has.Count.EqualTo(2));
+                Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.Unknown));
+                Assert.That(response[1].Error, Is.EqualTo(ErrorResponseCode.Unknown));
+            }
+        }
+
+        [Test]
+        public async Task TestOffsetFetchWorksOk()
+        {
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic())
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            {
+                var request = new OffsetFetchRequest
+                {
+                    Topics = new List<OffsetFetch>
+                    {
+                        new OffsetFetch {
+                            Topic = temporaryTopic.Name,
+                            PartitionId = 0
+                        }
+                     }
+                };
+
+                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                Assert.That(response, Has.Count.EqualTo(1));
+                Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.Unknown));
+            }
+        }
+
+        [Test]
+        public async Task TestMultipleOffsetFetchesWorkOk()
+        {
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic(partitions:2))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            {
+                var topic = temporaryTopic.Name;
+                var request = new OffsetFetchRequest
+                {
+                    Topics =
+                        Enumerable
+                            .Range(0, 2)
+                            .Select(i => new OffsetFetch
+                            {
+                                Topic = topic,
+                                PartitionId = i
+                            })
+                            .ToList()
+                };
+
+                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                Assert.That(response, Has.Count.EqualTo(2));
+                Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.Unknown));
+                Assert.That(response[1].Error, Is.EqualTo(ErrorResponseCode.Unknown));
             }
         }
 
         [Test]
         public async Task TestNewTopicProductionWorksOk()
         {
-            using (var temporaryTopic = IntegrationHelpers.CreateTemporaryTopic())
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(IntegrationConfig.IntegrationUri).ConfigureAwait(true))
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic())
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
             {
-                var topic = temporaryTopic.Topic;
+                var topic = temporaryTopic.Name;
                 {
                     var request = new MetadataRequest
                     {
@@ -453,11 +597,9 @@ namespace SimpleKafkaTests.Integration
         [Test]
         public async Task TestSimpleKafkaBrokerWorksOk()
         {
-            using (var brokers = new KafkaBrokers(IntegrationConfig.IntegrationUri))
+            using (var brokers = new KafkaBrokers(testCluster.CreateBrokerUris()))
             {
                 await brokers.RefreshAsync(CancellationToken.None);
-                Console.WriteLine(brokers);
-
             }
         }
 
@@ -466,11 +608,12 @@ namespace SimpleKafkaTests.Integration
         {
             var valueSerializer = new StringSerializer();
 
-            using (var brokers = new KafkaBrokers(IntegrationConfig.IntegrationUri))
+            using (var temporaryTopic = testCluster.CreateTemporaryTopic())
+            using (var brokers = new KafkaBrokers(testCluster.CreateBrokerUris()))
             {
                 var producer = KafkaProducer.Create(brokers, valueSerializer);
 
-                await producer.SendAsync(KeyedMessage.Create(IntegrationConfig.IntegrationTopic, "Message"), CancellationToken.None).ConfigureAwait(true);
+                await producer.SendAsync(KeyedMessage.Create(temporaryTopic.Name, "Message"), CancellationToken.None).ConfigureAwait(true);
 
 
             }
