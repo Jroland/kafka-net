@@ -36,7 +36,7 @@ namespace SimpleKafkaTests.Integration
         public async Task TestProducingWorksOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic())
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var request = new ProduceRequest
                 {
@@ -57,7 +57,7 @@ namespace SimpleKafkaTests.Integration
                      }
                 };
 
-                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                var response = await connection.SendRequestAsync(request, CancellationToken.None);
                 Assert.That(response, Has.Count.EqualTo(1));
                 var first = response.First();
                 Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
@@ -68,7 +68,7 @@ namespace SimpleKafkaTests.Integration
         public async Task TestFetchingWorksOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic())
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var request = new FetchRequest
                 {
@@ -86,7 +86,7 @@ namespace SimpleKafkaTests.Integration
                      }
                 };
 
-                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                var response = await connection.SendRequestAsync(request, CancellationToken.None);
                 Assert.That(response, Has.Count.EqualTo(1));
                 var first = response.First();
                 Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
@@ -98,10 +98,10 @@ namespace SimpleKafkaTests.Integration
         public async Task TestListingAllTopicsWorksOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic())
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var request = new MetadataRequest { };
-                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                var response = await connection.SendRequestAsync(request, CancellationToken.None);
                 Assert.That(response, Is.Not.Null);
                 Assert.That(response.Brokers, Has.Length.EqualTo(1));
                 Assert.That(response.Topics, Has.Length.EqualTo(1));
@@ -116,7 +116,7 @@ namespace SimpleKafkaTests.Integration
         public async Task TestOffsetWorksOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic())
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var request = new OffsetRequest
                 {
@@ -132,7 +132,7 @@ namespace SimpleKafkaTests.Integration
                      }
                 };
 
-                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                var response = await connection.SendRequestAsync(request, CancellationToken.None);
                 Assert.That(response, Has.Count.EqualTo(1));
                 var first = response.First();
                 Assert.That(first.Error, Is.EqualTo(ErrorResponseCode.NoError));
@@ -143,7 +143,7 @@ namespace SimpleKafkaTests.Integration
         public async Task TestMultipleOffsetWorksOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic(partitions:2))
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var topic = temporaryTopic.Name;
                 var request = new OffsetRequest
@@ -168,7 +168,7 @@ namespace SimpleKafkaTests.Integration
                      }
                 };
 
-                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                var response = await connection.SendRequestAsync(request, CancellationToken.None);
                 Assert.That(response, Has.Count.EqualTo(2));
                 Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.NoError));
                 Assert.That(response[1].Error, Is.EqualTo(ErrorResponseCode.NoError));
@@ -179,7 +179,7 @@ namespace SimpleKafkaTests.Integration
         public async Task TestOffsetCommitWorksOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic())
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var request = new OffsetCommitRequest
                 {
@@ -193,7 +193,7 @@ namespace SimpleKafkaTests.Integration
                      }
                 };
 
-                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                var response = await connection.SendRequestAsync(request, CancellationToken.None);
                 Assert.That(response, Has.Count.EqualTo(1));
                 Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.Unknown));
             }
@@ -203,7 +203,7 @@ namespace SimpleKafkaTests.Integration
         public async Task TestMultipleOffsetCommitsWorksOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic(partitions:2))
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var request = new OffsetCommitRequest
                 {
@@ -218,7 +218,7 @@ namespace SimpleKafkaTests.Integration
                             .ToList()
                 };
 
-                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                var response = await connection.SendRequestAsync(request, CancellationToken.None);
                 Assert.That(response, Has.Count.EqualTo(2));
                 Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.Unknown));
                 Assert.That(response[1].Error, Is.EqualTo(ErrorResponseCode.Unknown));
@@ -229,7 +229,7 @@ namespace SimpleKafkaTests.Integration
         public async Task TestOffsetFetchWorksOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic())
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var request = new OffsetFetchRequest
                 {
@@ -242,7 +242,7 @@ namespace SimpleKafkaTests.Integration
                      }
                 };
 
-                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                var response = await connection.SendRequestAsync(request, CancellationToken.None);
                 Assert.That(response, Has.Count.EqualTo(1));
                 Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.Unknown));
             }
@@ -252,7 +252,7 @@ namespace SimpleKafkaTests.Integration
         public async Task TestMultipleOffsetFetchesWorkOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic(partitions:2))
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var topic = temporaryTopic.Name;
                 var request = new OffsetFetchRequest
@@ -268,7 +268,7 @@ namespace SimpleKafkaTests.Integration
                             .ToList()
                 };
 
-                var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                var response = await connection.SendRequestAsync(request, CancellationToken.None);
                 Assert.That(response, Has.Count.EqualTo(2));
                 Assert.That(response[0].Error, Is.EqualTo(ErrorResponseCode.Unknown));
                 Assert.That(response[1].Error, Is.EqualTo(ErrorResponseCode.Unknown));
@@ -279,7 +279,7 @@ namespace SimpleKafkaTests.Integration
         public async Task TestNewTopicProductionWorksOk()
         {
             using (var temporaryTopic = testCluster.CreateTemporaryTopic())
-            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]).ConfigureAwait(true))
+            using (var connection = await KafkaConnectionFactory.CreateSimpleKafkaConnectionAsync(testCluster.CreateBrokerUris()[0]))
             {
                 var topic = temporaryTopic.Name;
                 {
@@ -293,7 +293,7 @@ namespace SimpleKafkaTests.Integration
                     MetadataResponse response = null;
                     while (response == null)
                     {
-                        response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                        response = await connection.SendRequestAsync(request, CancellationToken.None);
                         if (response.Topics[0].ErrorCode == ErrorResponseCode.LeaderNotAvailable)
                         {
                             response = null;
@@ -337,7 +337,7 @@ namespace SimpleKafkaTests.Integration
                              }
                     };
 
-                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None);
                     Assert.That(response, Is.Not.Null);
 
                     var first = response.First();
@@ -364,7 +364,7 @@ namespace SimpleKafkaTests.Integration
                             }
                     };
 
-                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None);
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
@@ -401,7 +401,7 @@ namespace SimpleKafkaTests.Integration
                              }
                     };
 
-                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None);
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
@@ -422,7 +422,7 @@ namespace SimpleKafkaTests.Integration
                     ConsumerMetadataResponse response = null;
                     while (response == null)
                     {
-                        response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                        response = await connection.SendRequestAsync(request, CancellationToken.None);
                         if (response.Error == ErrorResponseCode.ConsumerCoordinatorNotAvailableCode)
                         {
                             response = null;
@@ -448,7 +448,7 @@ namespace SimpleKafkaTests.Integration
                               }
                     };
 
-                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None);
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
@@ -477,7 +477,7 @@ namespace SimpleKafkaTests.Integration
                                    }
                                }
                     };
-                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None);
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
@@ -500,7 +500,7 @@ namespace SimpleKafkaTests.Integration
                               }
                     };
 
-                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None);
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
@@ -528,7 +528,7 @@ namespace SimpleKafkaTests.Integration
                             }
                     };
 
-                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None);
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
@@ -580,7 +580,7 @@ namespace SimpleKafkaTests.Integration
                             }
                     };
 
-                    var response = await connection.SendRequestAsync(request, CancellationToken.None).ConfigureAwait(true);
+                    var response = await connection.SendRequestAsync(request, CancellationToken.None);
                     Assert.That(response, Has.Count.EqualTo(1));
                     var first = response.First();
 
@@ -613,7 +613,7 @@ namespace SimpleKafkaTests.Integration
             {
                 var producer = KafkaProducer.Create(brokers, valueSerializer);
 
-                await producer.SendAsync(KeyedMessage.Create(temporaryTopic.Name, "Message"), CancellationToken.None).ConfigureAwait(true);
+                await producer.SendAsync(KeyedMessage.Create(temporaryTopic.Name, "Message"), CancellationToken.None);
 
 
             }

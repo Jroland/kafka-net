@@ -33,11 +33,11 @@ namespace SimpleKafkaTests.Integration
                 using (var brokers = new KafkaBrokers(cluster.CreateBrokerUris()))
                 {
                     var producer = KafkaProducer.Create(brokers, new StringSerializer());
-                    await producer.SendAsync(KeyedMessage.Create(topic, "Test"), CancellationToken.None).ConfigureAwait(true);
+                    await producer.SendAsync(KeyedMessage.Create(topic, "Test"), CancellationToken.None);
 
                     var consumer = KafkaConsumer.Create(topic, brokers, new StringSerializer(),
                         new TopicSelector { Topic = topic, Partition = 0, Offset = 0 });
-                    var result = await consumer.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var result = await consumer.ReceiveAsync(CancellationToken.None);
 
                     Assert.That(result, Has.Count.EqualTo(1));
                     var first = result[0];
@@ -93,14 +93,14 @@ namespace SimpleKafkaTests.Integration
                 {
                     {
                         var producer = KafkaProducer.Create(brokers, new StringSerializer());
-                        await producer.SendAsync(KeyedMessage.Create(topic, "Test 0"), CancellationToken.None).ConfigureAwait(true);
+                        await producer.SendAsync(KeyedMessage.Create(topic, "Test 0"), CancellationToken.None);
                     }
 
 
                     {
                         var consumer = KafkaConsumer.Create(topic, brokers, new StringSerializer(),
                             new TopicSelector { Topic = topic, Partition = 0, Offset = 0 });
-                        var result = await consumer.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                        var result = await consumer.ReceiveAsync(CancellationToken.None);
 
                         Assert.That(result, Has.Count.EqualTo(1));
                         var first = result[0];
@@ -114,14 +114,14 @@ namespace SimpleKafkaTests.Integration
 
                     {
                         var producer = KafkaProducer.Create(brokers, new StringSerializer());
-                        await producer.SendAsync(KeyedMessage.Create(topic, "Test 1"), CancellationToken.None).ConfigureAwait(true);
+                        await producer.SendAsync(KeyedMessage.Create(topic, "Test 1"), CancellationToken.None);
                     }
 
 
                     {
                         var consumer = KafkaConsumer.Create(topic, brokers, new StringSerializer(),
                             new TopicSelector { Topic = topic, Partition = 0, Offset = 0 });
-                        var result = await consumer.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                        var result = await consumer.ReceiveAsync(CancellationToken.None);
 
                         Assert.That(result, Has.Count.EqualTo(2));
                         var first = result[0];

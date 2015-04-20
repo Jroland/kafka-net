@@ -54,11 +54,11 @@ namespace SimpleKafkaTests.Integration
                 await producer.SendAsync(new[] {
                     KeyedMessage.Create(topic, 0, "Message to partition 0"),
                     KeyedMessage.Create(topic, 1, "Message to partition 1")
-                }, CancellationToken.None).ConfigureAwait(true);
+                }, CancellationToken.None);
 
                 for (var i = 0; i < consumers.Length; i++)
                 {
-                    var responses = await consumers[i].ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await consumers[i].ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(1));
 
@@ -95,7 +95,7 @@ namespace SimpleKafkaTests.Integration
                         Enumerable
                             .Range(0, numberOfMessages)
                             .Select(i => KeyedMessage.Create(topic, i % numberOfKeys, i % numberOfPartitions, "Message " + i));
-                    await producer.SendAsync(messages, CancellationToken.None).ConfigureAwait(true);
+                    await producer.SendAsync(messages, CancellationToken.None);
                 }
 
                 {
@@ -106,7 +106,7 @@ namespace SimpleKafkaTests.Integration
                             .ToArray();
                     var consumer = KafkaConsumer.Create(defaultConsumerGroup, brokers, keySerializer, valueSerializer, selectors);
 
-                    var responses = await consumer.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await consumer.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Has.Count.EqualTo(numberOfMessages));
                     var received = new bool[numberOfMessages];
                     var offsets = new long[numberOfPartitions];

@@ -46,9 +46,9 @@ namespace SimpleKafkaTests.Integration
                 var consumer = KafkaConsumer.Create(defaultConsumerGroup, brokers, keySerializer, valueSerializer, 
                     new TopicSelector { Partition = 0, Topic = topic });
 
-                await producer.SendAsync(KeyedMessage.Create(topic, "Message"), CancellationToken.None).ConfigureAwait(true);
+                await producer.SendAsync(KeyedMessage.Create(topic, "Message"), CancellationToken.None);
 
-                var responses = await consumer.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                var responses = await consumer.ReceiveAsync(CancellationToken.None);
                 Assert.That(responses, Is.Not.Null);
                 Assert.That(responses, Has.Count.EqualTo(1));
 
@@ -77,14 +77,14 @@ namespace SimpleKafkaTests.Integration
                         KeyedMessage.Create(topic, "1"),
                         KeyedMessage.Create(topic, "2"),
                         KeyedMessage.Create(topic, "3"),
-                        }, CancellationToken.None).ConfigureAwait(true);
+                        }, CancellationToken.None);
                 }
 
                 {
                     var earliest = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer, 
                         new TopicSelector { Partition = 0, Topic = topic, DefaultOffsetSelection = OffsetSelectionStrategy.Earliest });
 
-                    var responses = await earliest.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await earliest.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(3));
 
@@ -100,7 +100,7 @@ namespace SimpleKafkaTests.Integration
                     var latest = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer, 
                         new TopicSelector { Partition = 0, Topic = topic, DefaultOffsetSelection = OffsetSelectionStrategy.Last });
 
-                    var responses = await latest.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await latest.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(1));
 
@@ -116,7 +116,7 @@ namespace SimpleKafkaTests.Integration
                     var latest = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer,
                         new TopicSelector { Partition = 0, Topic = topic, DefaultOffsetSelection = OffsetSelectionStrategy.Next });
 
-                    var responses = await latest.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await latest.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(0));
 
@@ -126,7 +126,7 @@ namespace SimpleKafkaTests.Integration
                     var specified = KafkaConsumer.Create(defaultConsumerGroup, brokers, valueSerializer,
                         new TopicSelector { Partition = 0, Topic = topic, DefaultOffsetSelection = OffsetSelectionStrategy.Specified, Offset = 1 });
 
-                    var responses = await specified.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await specified.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(2));
 
@@ -158,7 +158,7 @@ namespace SimpleKafkaTests.Integration
                         KeyedMessage.Create(topic, "1"),
                         KeyedMessage.Create(topic, "2"),
                         KeyedMessage.Create(topic, "3"),
-                        }, CancellationToken.None).ConfigureAwait(true);
+                        }, CancellationToken.None);
                 }
 
                 {
@@ -167,7 +167,7 @@ namespace SimpleKafkaTests.Integration
                             DefaultOffsetSelection = OffsetSelectionStrategy.NextUncommitted, 
                             FailureOffsetSelection = OffsetSelectionStrategy.Earliest });
 
-                    var responses = await noPreviousCommits.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await noPreviousCommits.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(3));
 
@@ -180,7 +180,7 @@ namespace SimpleKafkaTests.Integration
 
                     await noPreviousCommits.CommitAsync(new[] { 
                         new TopicPartitionOffset { Topic = topic, Partition = 0, Offset = 0 } 
-                    }, CancellationToken.None).ConfigureAwait(true); ;
+                    }, CancellationToken.None); ;
                 }
 
                 {
@@ -193,7 +193,7 @@ namespace SimpleKafkaTests.Integration
                             FailureOffsetSelection = OffsetSelectionStrategy.Earliest
                         });
 
-                    var responses = await previousCommit.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await previousCommit.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(2));
 
@@ -216,7 +216,7 @@ namespace SimpleKafkaTests.Integration
                             FailureOffsetSelection = OffsetSelectionStrategy.Earliest
                         });
 
-                    var responses = await previousCommitAgain.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await previousCommitAgain.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(2));
 
@@ -229,7 +229,7 @@ namespace SimpleKafkaTests.Integration
 
                     await previousCommitAgain.CommitAsync(new[] { 
                         new TopicPartitionOffset { Topic = topic, Partition = 0, Offset = 1 } 
-                    }, CancellationToken.None).ConfigureAwait(true); ;
+                    }, CancellationToken.None); ;
                 }
 
                 {
@@ -242,7 +242,7 @@ namespace SimpleKafkaTests.Integration
                             FailureOffsetSelection = OffsetSelectionStrategy.Earliest
                         });
 
-                    var responses = await secondCommit.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await secondCommit.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(1));
 
@@ -255,7 +255,7 @@ namespace SimpleKafkaTests.Integration
 
                     await secondCommit.CommitAsync(new[] { 
                         new TopicPartitionOffset { Topic = topic, Partition = 0, Offset = 2 } 
-                    }, CancellationToken.None).ConfigureAwait(true); ;
+                    }, CancellationToken.None); ;
                 }
 
                 {
@@ -268,7 +268,7 @@ namespace SimpleKafkaTests.Integration
                             FailureOffsetSelection = OffsetSelectionStrategy.Earliest
                         });
 
-                    var responses = await thirdCommit.ReceiveAsync(CancellationToken.None).ConfigureAwait(true);
+                    var responses = await thirdCommit.ReceiveAsync(CancellationToken.None);
                     Assert.That(responses, Is.Not.Null);
                     Assert.That(responses, Has.Count.EqualTo(0));
 
