@@ -19,6 +19,7 @@ namespace KafkaNet
     /// </summary>
     public class KafkaTcpSocket : IKafkaTcpSocket
     {
+        public Action OnServerDisconnected; 
         public Action<int> OnReconnectionAttempt;
         public Action<int> OnReadFromSocketAttempt;
         public Action<int> OnBytesReceived;
@@ -32,7 +33,7 @@ namespace KafkaNet
         private readonly AsyncCollection<SocketPayloadReadTask> _readTaskQueue = new AsyncCollection<SocketPayloadReadTask>();
 
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
-        private CancellationTokenRegistration _disposeRegistration;
+        private readonly CancellationTokenRegistration _disposeRegistration;
         private readonly IKafkaLog _log;
         private readonly KafkaEndpoint _endpoint;
         private readonly TimeSpan _maximumReconnectionTimeout;
@@ -154,6 +155,7 @@ namespace KafkaNet
 
                     if (ex is ServerDisconnectedException)
                     {
+                        if (OnServerDisconnected != null) OnServerDisconnected();
                         _log.ErrorFormat(ex.Message);
                         continue;
                     }
@@ -184,8 +186,8 @@ namespace KafkaNet
                     .Where(x => x.IsFaulted && x.Exception != null)
                     .SelectMany(x => x.Exception.InnerExceptions)
                     .FirstOrDefault();
-                if (exception != null) 
-                    throw exception;
+
+                if (exception != null) throw exception;
 
                 if (sendDataReady.IsCompleted) writeTask = ProcessSentTasksAsync(netStream, _sendTaskQueue.Pop());
                 if (readDataReady.IsCompleted) readTask = ProcessReadTaskAsync(netStream, _readTaskQueue.Pop());
@@ -268,6 +270,7 @@ namespace KafkaNet
 
             using (sendTask)
             {
+                var failed = false;
                 var sw = Stopwatch.StartNew();
                 try
                 {
@@ -278,15 +281,11 @@ namespace KafkaNet
 
                     await netStream.WriteAsync(sendTask.Payload.Buffer, 0, sendTask.Payload.Buffer.Length);
 
-                    StatisticsTracker.DecrementGauge(StatisticGauge.ActiveWriteOperation);
-                    StatisticsTracker.CompleteNetworkWrite(sendTask.Payload, sw.ElapsedMilliseconds, false);
                     sendTask.Tcp.TrySetResult(sendTask.Payload);
                 }
                 catch (Exception ex)
                 {
-                    StatisticsTracker.DecrementGauge(StatisticGauge.ActiveWriteOperation);
-                    StatisticsTracker.CompleteNetworkWrite(sendTask.Payload, sw.ElapsedMilliseconds, true);
-
+                    failed = true;
                     if (_disposeToken.IsCancellationRequested)
                     {
                         var exception = new ObjectDisposedException("Object is disposing.");
@@ -296,6 +295,11 @@ namespace KafkaNet
 
                     sendTask.Tcp.TrySetException(ex);
                     throw;
+                }
+                finally
+                {
+                    StatisticsTracker.DecrementGauge(StatisticGauge.ActiveWriteOperation);
+                    StatisticsTracker.CompleteNetworkWrite(sendTask.Payload, sw.ElapsedMilliseconds, failed);
                 }
             }
         }
