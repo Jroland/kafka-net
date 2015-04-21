@@ -18,19 +18,30 @@ namespace kafka_tests.Fakes
         private readonly SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(0);
         private readonly TcpListener _listener;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        private TaskCompletionSource<bool> _clientConnectedTrigger = new TaskCompletionSource<bool>();
 
         private readonly Task _clientConnectionHandlerTask = null;
 
         public int ConnectionEventcount = 0;
         public int DisconnectionEventCount = 0;
+        public Task HasClientConnected { get { return _clientConnectedTrigger.Task; } }
 
         public FakeTcpServer(int port)
         {
             _listener = new TcpListener(IPAddress.Any, port);
             _listener.Start();
 
-            OnClientConnected += () => Interlocked.Increment(ref ConnectionEventcount);
-            OnClientDisconnected += () => Interlocked.Increment(ref DisconnectionEventCount);
+            OnClientConnected += () =>
+            {
+                Interlocked.Increment(ref ConnectionEventcount);
+                _clientConnectedTrigger.TrySetResult(true);
+            };
+
+            OnClientDisconnected += () =>
+            {
+                Interlocked.Increment(ref DisconnectionEventCount);
+                _clientConnectedTrigger = new TaskCompletionSource<bool>();
+            };
 
             _clientConnectionHandlerTask = StartHandlingClientRequestAsync();
         }
@@ -92,6 +103,7 @@ namespace kafka_tests.Fakes
                             var connectTask = stream.ReadAsync(buffer, 0, buffer.Length, _disposeToken.Token);
 
                             var bytesReceived = await connectTask;
+
                             if (bytesReceived > 0)
                             {
                                 if (OnBytesReceived != null) OnBytesReceived(buffer.Take(bytesReceived).ToArray());
