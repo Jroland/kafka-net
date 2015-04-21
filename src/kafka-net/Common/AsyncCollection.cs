@@ -25,7 +25,7 @@ namespace KafkaNet.Common
             IsCompleted = true;
         }
 
-        public Task OnDataAvailable(CancellationToken token)
+        public Task OnHasDataAvailable(CancellationToken token)
         {
             return _dataAvailableEvent.WaitAsync().WithCancellation(token);
         }
@@ -47,6 +47,12 @@ namespace KafkaNet.Common
             {
                 Add(item);
             }
+        }
+        
+        public T Pop()
+        {
+            T data;
+            return TryTake(out data) ? data : default(T);
         }
 
         public async Task<List<T>> TakeAsync(int count, TimeSpan timeout, CancellationToken token)
@@ -78,7 +84,18 @@ namespace KafkaNet.Common
                 Interlocked.Add(ref _dataInBufferCount, -1 * batch.Count);
             }
         }
-        
+
+        public void DrainAndApply(Action<T> appliedFunc)
+        {
+            T data;
+            while (_bag.TryTake(out data))
+            {
+                appliedFunc(data);
+            }
+
+            TriggerDataAvailability();
+        }
+
         public IEnumerable<T> Drain()
         {
             T data;

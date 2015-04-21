@@ -190,6 +190,21 @@ namespace KafkaNet.Common
         }
 
         /// <summary>
+        /// Mainly used for testing, allows waiting on a single task without throwing exceptions.
+        /// </summary>
+        public static void SafeWait(this Task source, TimeSpan timeout)
+        {
+            try
+            {
+                source.Wait(timeout);
+            }
+            catch
+            {
+                //ignore an exception that happens in this source
+            }
+        }
+
+        /// <summary>
         /// Splits a collection into given batch sizes and returns as an enumerable of batches.
         /// </summary>
         public static IEnumerable<IEnumerable<T>> Batch<T>(this IEnumerable<T> collection, int batchSize)

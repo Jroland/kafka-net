@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
@@ -19,22 +20,27 @@ namespace KafkaNet
     public class KafkaTcpSocket : IKafkaTcpSocket
     {
         public Action<int> OnReconnectionAttempt;
+        public Action<int> OnReadFromSocketAttempt;
+        public Action<int> OnBytesReceived;
+        public Action<KafkaDataPayload> OnWriteToSocketAttempt;
 
-        private const int DefaultReconnectionTimeout = 500;
+        private const int DefaultReconnectionTimeout = 100;
         private const int DefaultReconnectionTimeoutMultiplier = 2;
         private const int MaxReconnectionTimeoutMinutes = 5;
 
+        private readonly AsyncCollection<SocketPayloadSendTask> _sendTaskQueue = new AsyncCollection<SocketPayloadSendTask>();
+        private readonly AsyncCollection<SocketPayloadReadTask> _readTaskQueue = new AsyncCollection<SocketPayloadReadTask>();
+
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        private CancellationTokenRegistration _disposeRegistration;
         private readonly IKafkaLog _log;
         private readonly KafkaEndpoint _endpoint;
         private readonly TimeSpan _maximumReconnectionTimeout;
 
+        private readonly Task _socketTask;
         private readonly AsyncLock _clientLock = new AsyncLock();
-        private readonly AsyncLock _writeLock = new AsyncLock();
-        private readonly AsyncLock _readLock = new AsyncLock();
         private TcpClient _client;
         private int _disposeCount;
-        private readonly Task _clientConnectingTask = null;
 
         /// <summary>
         /// Construct socket and open connection to a specified server.
@@ -47,6 +53,16 @@ namespace KafkaNet
             _log = log;
             _endpoint = endpoint;
             _maximumReconnectionTimeout = maximumReconnectionTimeout ?? TimeSpan.FromMinutes(MaxReconnectionTimeoutMinutes);
+
+            //dedicate a long running task to the read/write operations
+            _socketTask = Task.Factory.StartNew(DedicatedSocketTask, TaskCreationOptions.LongRunning);
+
+            _disposeRegistration = _disposeToken.Token.Register(() =>
+            {
+                _sendTaskQueue.CompleteAdding();
+                _readTaskQueue.CompleteAdding();
+            });
+
         }
 
         #region Interface Implementation...
@@ -62,7 +78,7 @@ namespace KafkaNet
         /// <returns>Returns a byte[] array with the size of readSize.</returns>
         public Task<byte[]> ReadAsync(int readSize)
         {
-            return EnsureReadAsync(readSize, _disposeToken.Token);
+            return EnqueueReadTask(readSize, CancellationToken.None);
         }
 
         /// <summary>
@@ -73,7 +89,7 @@ namespace KafkaNet
         /// <returns>Returns a byte[] array with the size of readSize.</returns>
         public Task<byte[]> ReadAsync(int readSize, CancellationToken cancellationToken)
         {
-            return EnsureReadAsync(readSize, cancellationToken);
+            return EnqueueReadTask(readSize, cancellationToken);
         }
 
         /// <summary>
@@ -81,11 +97,10 @@ namespace KafkaNet
         /// </summary>
         /// <param name="payload">The buffer data to send.</param>
         /// <returns>Returns Task handle to the write operation with size of written bytes..</returns>
-        public Task<int> WriteAsync(KafkaDataPayload payload)
+        public Task<KafkaDataPayload> WriteAsync(KafkaDataPayload payload)
         {
-            return WriteAsync(payload, _disposeToken.Token);
+            return WriteAsync(payload, CancellationToken.None);
         }
-
 
         /// <summary>
         /// Write the buffer data to the server.
@@ -93,82 +108,195 @@ namespace KafkaNet
         /// <param name="payload">The buffer data to send.</param>
         /// <param name="cancellationToken">A cancellation token which will cancel the request.</param>
         /// <returns>Returns Task handle to the write operation with size of written bytes..</returns>
-        public Task<int> WriteAsync(KafkaDataPayload payload, CancellationToken cancellationToken)
+        public Task<KafkaDataPayload> WriteAsync(KafkaDataPayload payload, CancellationToken cancellationToken)
         {
-            return EnsureWriteAsync(payload, cancellationToken);
+            return EnqueueWriteTask(payload, cancellationToken);
         }
         #endregion
 
-        private async Task<int> EnsureWriteAsync(KafkaDataPayload payload, CancellationToken cancellationToken)
+        private Task<KafkaDataPayload> EnqueueWriteTask(KafkaDataPayload payload, CancellationToken cancellationToken)
         {
+            var sendTask = new SocketPayloadSendTask(payload, cancellationToken);
+            _sendTaskQueue.Add(sendTask);
             StatisticsTracker.QueueNetworkWrite(_endpoint, payload);
-            var sw = Stopwatch.StartNew();
-            try
+            return sendTask.Tcp.Task;
+        }
+
+        private Task<byte[]> EnqueueReadTask(int readSize, CancellationToken cancellationToken)
+        {
+            var readTask = new SocketPayloadReadTask(readSize, cancellationToken);
+            _readTaskQueue.Add(readTask);
+            //TODO queue network read for statistics
+            return readTask.Tcp.Task;
+        }
+
+        private void DedicatedSocketTask()
+        {
+            while (_disposeToken.IsCancellationRequested == false)
             {
-                var netStream = await GetStreamAsync().ConfigureAwait(false);
-                using (await _writeLock.LockAsync(cancellationToken).ConfigureAwait(false))
+                try
                 {
-                    sw.Restart();
-                    StatisticsTracker.IncrementActiveWrite();
-                    
-                    //writing to network stream is not thread safe
-                    //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
-                    await netStream.WriteAsync(payload.Buffer, 0, payload.Buffer.Length, cancellationToken).ConfigureAwait(false);
-                    
-                    StatisticsTracker.DecrementActiveWrite();
-                    StatisticsTracker.CompleteNetworkWrite(payload, sw.ElapsedMilliseconds, false);
-                    return payload.Buffer.Length;
+                    //block here until we can get connections then start loop pushing data through network stream
+                    var netStream = GetStreamAsync().Result;
+
+                    ProcessNetworkstreamTasks(netStream);
                 }
-            }
-            catch
-            {
-                if (_disposeToken.IsCancellationRequested) throw new ObjectDisposedException("Object is disposing.");
-                StatisticsTracker.DecrementActiveWrite();
-                StatisticsTracker.CompleteNetworkWrite(payload, sw.ElapsedMilliseconds, true);
-                throw;
+                catch (Exception ex)
+                {
+                    if (_disposeToken.IsCancellationRequested)
+                    {
+                        _log.WarnFormat("KafkaTcpSocket thread shutting down because of a dispose call.");
+                        var disposeException = new ObjectDisposedException("Object is disposing.");
+                        _sendTaskQueue.DrainAndApply(t => t.Tcp.TrySetException(disposeException));
+                        _readTaskQueue.DrainAndApply(t => t.Tcp.TrySetException(disposeException));
+                        return;
+                    }
+
+                    if (ex is ServerDisconnectedException)
+                    {
+                        _log.ErrorFormat(ex.Message);
+                        continue;
+                    }
+
+                    _log.ErrorFormat("Exception occured in Socket handler task.  Exception: {0}", ex);
+                }
             }
         }
 
-        private async Task<byte[]> EnsureReadAsync(int readSize, CancellationToken cancellationToken)
+        private void ProcessNetworkstreamTasks(NetworkStream netStream)
         {
-            try
+            Task writeTask = Task.FromResult(true);
+            Task readTask = Task.FromResult(true);
+
+            //reading/writing from network steam is not thread safe
+            //Read and write operations can be performed simultaneously on an instance of the NetworkStream class without the need for synchronization. 
+            //As long as there is one unique thread for the write operations and one unique thread for the read operations, there will be no cross-interference 
+            //between read and write threads and no synchronization is required. 
+            //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
+            while (_disposeToken.IsCancellationRequested == false && netStream != null)
             {
-                var result = new List<byte>();
-                var bytesReceived = 0;
+                Task sendDataReady = Task.WhenAll(writeTask, _sendTaskQueue.OnHasDataAvailable(_disposeToken.Token));
+                Task readDataReady = Task.WhenAll(readTask, _readTaskQueue.OnHasDataAvailable(_disposeToken.Token));
 
-                while (bytesReceived < readSize)
+                Task.WaitAny(sendDataReady, readDataReady);
+
+                var exception = new[] {writeTask, readTask}
+                    .Where(x => x.IsFaulted && x.Exception != null)
+                    .SelectMany(x => x.Exception.InnerExceptions)
+                    .FirstOrDefault();
+                if (exception != null) 
+                    throw exception;
+
+                if (sendDataReady.IsCompleted) writeTask = ProcessSentTasksAsync(netStream, _sendTaskQueue.Pop());
+                if (readDataReady.IsCompleted) readTask = ProcessReadTaskAsync(netStream, _readTaskQueue.Pop());
+            }
+        }
+
+        private async Task ProcessReadTaskAsync(NetworkStream netStream, SocketPayloadReadTask readTask)
+        {
+            using (readTask)
+            {
+                try
                 {
-                    readSize = readSize - bytesReceived;
-                    var buffer = new byte[readSize];
+                    StatisticsTracker.IncrementGauge(StatisticGauge.ActiveReadOperation);
+                    var readSize = readTask.ReadSize;
+                    var result = new List<byte>(readSize);
+                    var bytesReceived = 0;
 
-                    var netStream = await GetStreamAsync().ConfigureAwait(false);
-
-                    using (await _readLock.LockAsync(cancellationToken).ConfigureAwait(false))
+                    while (bytesReceived < readSize)
                     {
-                        //reading from network stream is not thread safe
-                        //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
-                        bytesReceived = await netStream.ReadAsync(buffer, 0, readSize, cancellationToken)
-                            .WithCancellation(cancellationToken).ConfigureAwait(false);
+                        readSize = readSize - bytesReceived;
+                        var buffer = new byte[readSize];
+
+                        if (OnReadFromSocketAttempt != null) OnReadFromSocketAttempt(readSize);
+
+                        bytesReceived = await netStream.ReadAsync(buffer, 0, readSize, readTask.CancellationToken)
+                            .WithCancellation(readTask.CancellationToken).ConfigureAwait(false);
+
+                        if (OnBytesReceived != null) OnBytesReceived(bytesReceived);
 
                         if (bytesReceived <= 0)
                         {
-                            await Disconnect().ConfigureAwait(false); //_client is dead, clean it up and throw
-                            throw new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _endpoint));
+                            using (_client)
+                            {
+                                _client = null;
+                                throw new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _endpoint));
+                            }
                         }
 
                         result.AddRange(buffer.Take(bytesReceived));
                     }
+
+                    readTask.Tcp.TrySetResult(result.ToArray());
                 }
-                return result.ToArray();
+                catch (Exception ex)
+                {
+                    if (_disposeToken.IsCancellationRequested)
+                    {
+                        var exception = new ObjectDisposedException("Object is disposing.");
+                        readTask.Tcp.TrySetException(exception);
+                        throw exception;
+                    }
+
+                    if (ex is ServerDisconnectedException)
+                    {
+                        readTask.Tcp.TrySetException(ex);
+                        throw;
+                    }
+
+                    //if an exception made us lose a connection throw disconnected exception
+                    if (_client == null || _client.Connected == false)
+                    {
+                        var exception = new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _endpoint));
+                        readTask.Tcp.TrySetException(exception);
+                        throw exception;
+                    }
+
+                    readTask.Tcp.TrySetException(ex);
+                    throw;
+                }
+                finally
+                {
+                    StatisticsTracker.DecrementGauge(StatisticGauge.ActiveReadOperation);
+                }
             }
-            catch
+        }
+
+        private async Task ProcessSentTasksAsync(NetworkStream netStream, SocketPayloadSendTask sendTask)
+        {
+            if (sendTask == null) return;
+
+            using (sendTask)
             {
-                if (_disposeToken.IsCancellationRequested) throw new ObjectDisposedException("Object is disposing.");
+                var sw = Stopwatch.StartNew();
+                try
+                {
+                    sw.Restart();
+                    StatisticsTracker.IncrementGauge(StatisticGauge.ActiveWriteOperation);
 
-                //if an exception made us lose a connection throw disconnected exception
-                if (_client != null && _client.Connected == false) throw new ServerDisconnectedException(string.Format("Lost connection to server: {0}", _endpoint));
+                    if (OnWriteToSocketAttempt != null) OnWriteToSocketAttempt(sendTask.Payload);
 
-                throw;
+                    await netStream.WriteAsync(sendTask.Payload.Buffer, 0, sendTask.Payload.Buffer.Length);
+
+                    StatisticsTracker.DecrementGauge(StatisticGauge.ActiveWriteOperation);
+                    StatisticsTracker.CompleteNetworkWrite(sendTask.Payload, sw.ElapsedMilliseconds, false);
+                    sendTask.Tcp.TrySetResult(sendTask.Payload);
+                }
+                catch (Exception ex)
+                {
+                    StatisticsTracker.DecrementGauge(StatisticGauge.ActiveWriteOperation);
+                    StatisticsTracker.CompleteNetworkWrite(sendTask.Payload, sw.ElapsedMilliseconds, true);
+
+                    if (_disposeToken.IsCancellationRequested)
+                    {
+                        var exception = new ObjectDisposedException("Object is disposing.");
+                        sendTask.Tcp.TrySetException(exception);
+                        throw exception;
+                    }
+
+                    sendTask.Tcp.TrySetException(ex);
+                    throw;
+                }
             }
         }
 
@@ -182,7 +310,7 @@ namespace KafkaNet
                     _client = await ReEstablishConnectionAsync().ConfigureAwait(false);
                 }
 
-                return _client.GetStream();
+                return _client == null ? null : _client.GetStream();
             }
         }
 
@@ -194,7 +322,7 @@ namespace KafkaNet
         {
             var attempts = 1;
             var reconnectionDelay = DefaultReconnectionTimeout;
-            _log.WarnFormat("No connection to:{0}.  Attempting to re-connect...", _endpoint);
+            _log.WarnFormat("No connection to:{0}.  Attempting to connect...", _endpoint);
 
             _client = null;
 
@@ -213,7 +341,7 @@ namespace KafkaNet
                     reconnectionDelay = reconnectionDelay * DefaultReconnectionTimeoutMultiplier;
                     reconnectionDelay = Math.Min(reconnectionDelay, (int)_maximumReconnectionTimeout.TotalMilliseconds);
 
-                    _log.WarnFormat("Failed re-connection to:{0}.  Will retry in:{1}", _endpoint, reconnectionDelay);
+                    _log.WarnFormat("Failed connection to:{0}.  Will retry in:{1}", _endpoint, reconnectionDelay);
                 }
 
                 await Task.Delay(TimeSpan.FromMilliseconds(reconnectionDelay), _disposeToken.Token).ConfigureAwait(false);
@@ -222,29 +350,65 @@ namespace KafkaNet
             return _client;
         }
 
-        private async Task Disconnect()
-        {
-            using (await _clientLock.LockAsync(_disposeToken.Token).ConfigureAwait(false))
-            using (_client)
-            {
-                _client = null;
-            }
-        }
-
         public void Dispose()
         {
             if (Interlocked.Increment(ref _disposeCount) != 1) return;
             if (_disposeToken != null) _disposeToken.Cancel();
 
             using (_disposeToken)
+            using (_disposeRegistration)
             using (_client)
-            using (_readLock)
-            using (_writeLock)
+            using (_socketTask)
             {
-                if (_clientConnectingTask != null)
-                {
-                    _clientConnectingTask.Wait(TimeSpan.FromSeconds(5));
-                }
+                _socketTask.SafeWait(TimeSpan.FromSeconds(30));
+            }
+        }
+    }
+
+    public class SocketPayloadReadTask : IDisposable
+    {
+        public CancellationToken CancellationToken { get; private set; }
+        public TaskCompletionSource<byte[]> Tcp { get; set; }
+        public int ReadSize { get; set; }
+
+        private readonly CancellationTokenRegistration _cancellationTokenRegistration;
+
+        public SocketPayloadReadTask(int readSize, CancellationToken cancellationToken)
+        {
+            CancellationToken = cancellationToken;
+            Tcp = new TaskCompletionSource<byte[]>();
+            ReadSize = readSize;
+            _cancellationTokenRegistration = cancellationToken.Register(() => Tcp.TrySetCanceled());
+        }
+
+        public void Dispose()
+        {
+            using (_cancellationTokenRegistration)
+            {
+
+            }
+        }
+    }
+
+    public class SocketPayloadSendTask : IDisposable
+    {
+        public TaskCompletionSource<KafkaDataPayload> Tcp { get; set; }
+        public KafkaDataPayload Payload { get; set; }
+
+        private readonly CancellationTokenRegistration _cancellationTokenRegistration;
+
+        public SocketPayloadSendTask(KafkaDataPayload payload, CancellationToken cancellationToken)
+        {
+            Tcp = new TaskCompletionSource<KafkaDataPayload>();
+            Payload = payload;
+            _cancellationTokenRegistration = cancellationToken.Register(() => Tcp.TrySetCanceled());
+        }
+
+        public void Dispose()
+        {
+            using (_cancellationTokenRegistration)
+            {
+
             }
         }
     }

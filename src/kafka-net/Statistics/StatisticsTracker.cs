@@ -46,14 +46,36 @@ namespace KafkaNet.Statistics
             ProduceRequestStatistics.Enqueue(new ProduceRequestStatistic(messageCount, payloadBytes, compressedBytes));
         }
 
-        public static void IncrementActiveWrite()
+        public static void IncrementGauge(StatisticGauge gauge)
         {
-            Interlocked.Increment(ref _gauges.ActiveWrites);
+            switch (gauge)
+            {
+                case StatisticGauge.ActiveReadOperation:
+                    Interlocked.Increment(ref _gauges.ActiveReadOperation);
+                    break;
+                case StatisticGauge.ActiveWriteOperation:
+                    Interlocked.Increment(ref _gauges.ActiveWriteOperation);
+                    break;
+                case StatisticGauge.QueuedWriteOperation:
+                    Interlocked.Increment(ref _gauges.QueuedWriteOperation);
+                    break;
+            }
         }
 
-        public static void DecrementActiveWrite()
+        public static void DecrementGauge(StatisticGauge gauge)
         {
-            Interlocked.Decrement(ref _gauges.ActiveWrites);
+            switch (gauge)
+            {
+                case StatisticGauge.ActiveReadOperation:
+                    Interlocked.Decrement(ref _gauges.ActiveReadOperation);
+                    break;
+                case StatisticGauge.ActiveWriteOperation:
+                    Interlocked.Decrement(ref _gauges.ActiveWriteOperation);
+                    break;
+                case StatisticGauge.QueuedWriteOperation:
+                    Interlocked.Decrement(ref _gauges.QueuedWriteOperation);
+                    break;
+            }
         }
 
         public static void QueueNetworkWrite(KafkaEndpoint endpoint, KafkaDataPayload payload)
@@ -62,7 +84,7 @@ namespace KafkaNet.Statistics
 
             var stat = new NetworkWriteStatistic(endpoint, payload);
             NetworkWriteQueuedIndex.TryAdd(payload.CorrelationId, stat);
-            Interlocked.Increment(ref _gauges.QueuedWriteActions);
+            Interlocked.Increment(ref _gauges.QueuedWriteOperation);
         }
 
         public static void CompleteNetworkWrite(KafkaDataPayload payload, long milliseconds, bool failed)
@@ -75,8 +97,15 @@ namespace KafkaNet.Statistics
                 stat.SetCompleted(milliseconds, failed);
                 CompletedNetworkWriteStatistics.Enqueue(stat);
             }
-            Interlocked.Decrement(ref _gauges.QueuedWriteActions);
+            Interlocked.Decrement(ref _gauges.QueuedWriteOperation);
         }
+    }
+
+    public enum StatisticGauge
+    {
+        QueuedWriteOperation,
+        ActiveWriteOperation,
+        ActiveReadOperation
     }
 
     public class StatisticsSummary
@@ -112,7 +141,7 @@ namespace KafkaNet.Statistics
                             OldestBatchInQueue = e.Max(x => x.TotalDuration),
                             BytesQueued = e.Sum(x => x.Payload.Buffer.Length),
                             QueuedMessages = e.Sum(x => x.Payload.MessageCount),
-                            QueuedBatchCount = Gauges.QueuedWriteActions,
+                            QueuedBatchCount = Gauges.QueuedWriteOperation,
                         }
                     }).ToList();
 
@@ -186,8 +215,9 @@ namespace KafkaNet.Statistics
 
     public class Gauges
     {
-        public int ActiveWrites;
-        public int QueuedWriteActions;
+        public int ActiveWriteOperation;
+        public int ActiveReadOperation;
+        public int QueuedWriteOperation;
     }
 
     public class NetworkWriteStatistic

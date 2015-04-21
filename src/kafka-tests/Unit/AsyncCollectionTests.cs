@@ -23,11 +23,11 @@ namespace kafka_tests.Unit
         {
             var aq = new AsyncCollection<bool>();
 
-            Assert.That(aq.OnDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
 
             aq.Add(true);
 
-            Assert.That(aq.OnDataAvailable(CancellationToken.None).IsCompleted, Is.True, "Task should indicate data available.");
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.True, "Task should indicate data available.");
         }
 
         [Test]
@@ -37,11 +37,11 @@ namespace kafka_tests.Unit
 
             aq.Add(true);
 
-            Assert.That(aq.OnDataAvailable(CancellationToken.None).IsCompleted, Is.True, "Task should indicate data available.");
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.True, "Task should indicate data available.");
 
             bool data;
             aq.TryTake(out data);
-            Assert.That(aq.OnDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
         }
 
         [Test]
@@ -52,7 +52,7 @@ namespace kafka_tests.Unit
             var cancelToken = new CancellationTokenSource();
             Task.Delay(TimeSpan.FromMilliseconds(100)).ContinueWith(t => cancelToken.Cancel());
 
-            await aq.OnDataAvailable(cancelToken.Token);
+            await aq.OnHasDataAvailable(cancelToken.Token);
         }
 
         [Test]
@@ -63,10 +63,10 @@ namespace kafka_tests.Unit
             aq.Add(true);
             aq.Add(true);
 
-            Assert.That(aq.OnDataAvailable(CancellationToken.None).IsCompleted, Is.True, "Task should indicate data available.");
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.True, "Task should indicate data available.");
 
             var drained = aq.Drain().ToList();
-            Assert.That(aq.OnDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
         }
 
         [Test]
@@ -74,11 +74,11 @@ namespace kafka_tests.Unit
         {
             var aq = new AsyncCollection<bool>();
 
-            Assert.That(aq.OnDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
 
             bool data;
             Assert.That(aq.TryTake(out data), Is.False, "TryTake should report false on empty collection.");
-            Assert.That(aq.OnDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
         }
 
         [Test]
