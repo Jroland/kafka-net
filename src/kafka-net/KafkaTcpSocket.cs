@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
@@ -369,7 +368,7 @@ namespace KafkaNet
         }
     }
 
-    public class SocketPayloadReadTask : IDisposable
+    class SocketPayloadReadTask : IDisposable
     {
         public CancellationToken CancellationToken { get; private set; }
         public TaskCompletionSource<byte[]> Tcp { get; set; }
@@ -394,7 +393,7 @@ namespace KafkaNet
         }
     }
 
-    public class SocketPayloadSendTask : IDisposable
+    class SocketPayloadSendTask : IDisposable
     {
         public TaskCompletionSource<KafkaDataPayload> Tcp { get; set; }
         public KafkaDataPayload Payload { get; set; }
