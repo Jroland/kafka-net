@@ -154,10 +154,10 @@ namespace KafkaNet
                             {
                                 var response = responses.FirstOrDefault(); //we only asked for one response
 
-                                HandleResponseErrors(fetch, response);
-
                                 if (response != null && response.Messages.Count > 0)
                                 {
+                                    HandleResponseErrors(fetch, response);
+
                                     foreach (var message in response.Messages)
                                     {
                                         _fetchResponseQueue.Add(message, _disposeToken.Token);

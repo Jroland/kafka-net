@@ -286,7 +286,6 @@ namespace kafka_tests.Unit
             Assert.That(take1.Result.Count, Is.EqualTo(expected));
             Assert.That(take2.Result.Count, Is.EqualTo(expected));
             Assert.That(take3.Result.Count, Is.EqualTo(expected));
-            Assert.That(collection.Count, Is.LessThan(max - (expected * 3)));
         }
         #endregion
 
