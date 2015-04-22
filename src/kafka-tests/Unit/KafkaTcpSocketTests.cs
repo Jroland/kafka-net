@@ -74,35 +74,6 @@ namespace kafka_tests.Unit
 
         #region Dispose Tests...
         [Test]
-        public void DisposedMergedCancellationTokenShouldNotDisposeChildTokens()
-        {
-            var c1notdisposed = new CancellationTokenSource();
-            var c2notdisposed = new CancellationTokenSource();
-
-            var merge = CancellationTokenSource.CreateLinkedTokenSource(c1notdisposed.Token, c2notdisposed.Token);
-
-            using (merge)
-            {
-
-            }
-
-            Assert.That(c1notdisposed.Token.IsCancellationRequested, Is.False);
-            Assert.That(c2notdisposed.Token.IsCancellationRequested, Is.False);
-
-            Exception capturedDisposeException = null;
-            try
-            {
-                Assert.That(merge.Token.IsCancellationRequested, Is.False);
-            }
-            catch (ObjectDisposedException ex)
-            {
-                capturedDisposeException = ex;
-            }
-
-            Assert.That(capturedDisposeException, Is.Not.Null);
-        }
-
-        [Test]
         public void KafkaTcpSocketShouldDisposeEvenWhilePollingToReconnect()
         {
             int connectionAttempt = 0;
@@ -127,9 +98,10 @@ namespace kafka_tests.Unit
         public void KafkaTcpSocketShouldDisposeEvenWhileAwaitingReadAndThrowException()
         {
             using (var server = new FakeTcpServer(FakeServerPort))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 int readSize = 0;
-                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
+
                 test.OnReadFromSocketAttempt += i => readSize = i;
 
                 var taskResult = test.ReadAsync(4);
@@ -176,12 +148,11 @@ namespace kafka_tests.Unit
         public void ReadShouldCancelWhileAwaitingResponse()
         {
             using (var server = new FakeTcpServer(FakeServerPort))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 var count = 0;
                 var semaphore = new SemaphoreSlim(0);
                 var token = new CancellationTokenSource();
-
-                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
                 test.ReadAsync(4, token.Token).ContinueWith(t =>
                     {
@@ -287,11 +258,10 @@ namespace kafka_tests.Unit
         public void ReadShouldBeAbleToReceiveMoreThanOnce()
         {
             using (var server = new FakeTcpServer(FakeServerPort))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 const int firstMessage = 99;
                 const string secondMessage = "testmessage";
-
-                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
                 Console.WriteLine("Sending first message to receive...");
                 server.SendDataAsync(firstMessage.ToBytes());
@@ -311,11 +281,10 @@ namespace kafka_tests.Unit
         public void ReadShouldBeAbleToReceiveMoreThanOnceAsyncronously()
         {
             using (var server = new FakeTcpServer(FakeServerPort))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 const int firstMessage = 99;
                 const int secondMessage = 100;
-
-                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
                 Console.WriteLine("Sending first message to receive...");
                 server.SendDataAsync(firstMessage.ToBytes());
@@ -334,6 +303,7 @@ namespace kafka_tests.Unit
         public void ReadShouldNotLoseDataFromStreamOverMultipleReads()
         {
             using (var server = new FakeTcpServer(FakeServerPort))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 const int firstMessage = 99;
                 const string secondMessage = "testmessage";
@@ -341,8 +311,6 @@ namespace kafka_tests.Unit
                 var payload = new KafkaMessagePacker()
                     .Pack(firstMessage)
                     .Pack(secondMessage, StringPrefixEncoding.None);
-
-                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
                 //send the combined payload
                 server.SendDataAsync(payload.PayloadNoLength());
@@ -459,11 +427,11 @@ namespace kafka_tests.Unit
         public void WriteAsyncShouldSendData()
         {
             using (var server = new FakeTcpServer(FakeServerPort))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 const int testData = 99;
                 int result = 0;
 
-                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
                 server.OnBytesReceived += data => result = data.ToInt32();
 
                 test.WriteAsync(testData.ToBytes().ToPayload()).Wait(TimeSpan.FromSeconds(1));
@@ -476,11 +444,11 @@ namespace kafka_tests.Unit
         public void WriteAsyncShouldAllowMoreThanOneWrite()
         {
             using (var server = new FakeTcpServer(FakeServerPort))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 const int testData = 99;
                 var results = new List<byte>();
 
-                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
                 server.OnBytesReceived += results.AddRange;
 
                 Task.WaitAll(test.WriteAsync(testData.ToBytes().ToPayload()), test.WriteAsync(testData.ToBytes().ToPayload()));
@@ -497,10 +465,9 @@ namespace kafka_tests.Unit
             var expected = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
             using (var server = new FakeTcpServer(FakeServerPort))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 server.OnBytesReceived += data => write.AddRange(data.Batch(4).Select(x => x.ToArray().ToInt32()));
-
-                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
                 var tasks = Enumerable.Range(1, 10)
                     .SelectMany(i => new[]
@@ -522,10 +489,9 @@ namespace kafka_tests.Unit
             var write = new List<int>();
 
             using (var server = new FakeTcpServer(FakeServerPort))
+            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
                 server.OnBytesReceived += data => write.AddRange(data.Batch(4).Select(x => x.ToArray().ToInt32()));
-
-                var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl);
 
                 var tasks = Enumerable.Range(1, 10000)
                     .SelectMany(i => new[]
@@ -558,7 +524,7 @@ namespace kafka_tests.Unit
 
                 //create a buffer write that will take a long time
                 var taskResult = test.WriteAsync(
-                    new KafkaDataPayload { Buffer = Enumerable.Range(0, 1000000).Select(b => (byte)b).ToArray() }, 
+                    new KafkaDataPayload { Buffer = Enumerable.Range(0, 1000000).Select(b => (byte)b).ToArray() },
                     token.Token);
 
                 token.Cancel();
