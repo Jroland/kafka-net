@@ -89,7 +89,7 @@ namespace kafka_tests.Unit
             var count = 0;
             var alock = new AsyncLock();
 
-            var firstCall = Task.Factory.StartNew(async () =>
+            var firstCall = Task.Run(async () =>
             {
                 using (await alock.LockAsync())
                 {
@@ -121,7 +121,7 @@ namespace kafka_tests.Unit
             var count = 0;
             var alock = new AsyncLock();
 
-            Task.Factory.StartNew(async () =>
+            Task.Run(async () =>
             {
                 using (await alock.LockAsync().ConfigureAwait(false))
                 {
@@ -135,7 +135,7 @@ namespace kafka_tests.Unit
 
             TaskTest.WaitFor(() => count > 0);
 
-            Task.Factory.StartNew(async () =>
+            Task.Run(async () =>
             {
                 Console.WriteLine("Second call waiting Id:{0}", Thread.CurrentThread.ManagedThreadId);
                 using (await alock.LockAsync().ConfigureAwait(false))
@@ -143,7 +143,7 @@ namespace kafka_tests.Unit
                     Console.WriteLine("Past lock Id:{0}", Thread.CurrentThread.ManagedThreadId);
                     Interlocked.Increment(ref count);
                 }
-            }, TaskCreationOptions.LongRunning);
+            });
 
             Assert.That(count, Is.EqualTo(1), "Only one task should have gotten past lock.");
 

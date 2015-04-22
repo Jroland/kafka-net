@@ -55,7 +55,8 @@ namespace KafkaNet
             _maximumReconnectionTimeout = maximumReconnectionTimeout ?? TimeSpan.FromMinutes(MaxReconnectionTimeoutMinutes);
 
             //dedicate a long running task to the read/write operations
-            _socketTask = Task.Factory.StartNew(DedicatedSocketTask, TaskCreationOptions.LongRunning);
+            _socketTask = Task.Factory.StartNew(DedicatedSocketTask, CancellationToken.None,
+                TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
             _disposeRegistration = _disposeToken.Token.Register(() =>
             {

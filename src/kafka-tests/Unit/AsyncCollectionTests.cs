@@ -104,7 +104,7 @@ namespace kafka_tests.Unit
             const int size = 20;
             var aq = new AsyncCollection<bool>();
 
-            Task.Factory.StartNew(() =>
+            Task.Run(() =>
             {
                 //this should take 2000ms to complete
                 for (int i = 0; i < size; i++)
@@ -204,7 +204,7 @@ namespace kafka_tests.Unit
             var dataTask = collection.TakeAsync(10, TimeSpan.FromMilliseconds(5000), CancellationToken.None);
 
 
-            var highVolumeAdding = Task.Factory.StartNew(() =>
+            var highVolumeAdding = Task.Run(() =>
             {
                 //high volume of data adds
                 while (exit == false)

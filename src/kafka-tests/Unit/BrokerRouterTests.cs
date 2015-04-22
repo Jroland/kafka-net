@@ -82,7 +82,7 @@ namespace kafka_tests.Unit
             });
 
             _mockKafkaConnection1.Setup(x => x.SendAsync(It.IsAny<IKafkaRequest<MetadataResponse>>()))
-                      .Returns(() => Task.Factory.StartNew(() => new List<MetadataResponse> { CreateMetaResponse() }));
+                      .Returns(() => Task.Run(() => new List<MetadataResponse> { CreateMetaResponse() }));
 
             var topics = router.GetTopicMetadata(TestTopic);
             _mockKafkaConnectionFactory.Verify(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 2), It.IsAny<TimeSpan>(), It.IsAny<IKafkaLog>(), null), Times.Once());

@@ -112,7 +112,7 @@ namespace KafkaNet
 
         private Task ConsumeTopicPartitionAsync(string topic, int partitionId)
         {
-            return Task.Factory.StartNew(async () =>
+            return Task.Run(async () =>
             {
                 try
                 {

@@ -104,7 +104,7 @@ namespace kafka_tests.Unit
             {
                 var messages = new[] { new Message("1") };
 
-                Task.Factory.StartNew(async () =>
+                Task.Run(async () =>
                 {
                     var t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
                     Interlocked.Increment(ref count);
@@ -250,7 +250,7 @@ namespace kafka_tests.Unit
             var producer = new Producer(routerProxy.Create()) { BatchSize = 1001, BatchDelayTime = TimeSpan.FromSeconds(100) };
             using (producer)
             {
-                var senderTask = Task.Factory.StartNew(() =>
+                var senderTask = Task.Run(() =>
                 {
                     for (int i = 0; i < 1000; i++)
                     {
@@ -274,7 +274,7 @@ namespace kafka_tests.Unit
             var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 1) { BatchSize = 10, BatchDelayTime = TimeSpan.FromMilliseconds(500) };
             using (producer)
             {
-                var senderTask = Task.Factory.StartNew(async () =>
+                var senderTask = Task.Run(async () =>
                 {
                     for (int i = 0; i < 3; i++)
                     {
