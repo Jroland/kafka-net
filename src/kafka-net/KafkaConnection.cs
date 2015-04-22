@@ -21,7 +21,7 @@ namespace KafkaNet
     /// </summary>
     public class KafkaConnection : IKafkaConnection
     {
-        private const int DefaultResponseTimeoutMs = 30000;
+        private const int DefaultResponseTimeoutMs = 60000;
 
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
         private readonly IScheduledTimer _responseTimeoutTimer;
@@ -49,7 +49,7 @@ namespace KafkaNet
             _responseTimeoutMS = responseTimeoutMs ?? TimeSpan.FromMilliseconds(DefaultResponseTimeoutMs);
             _responseTimeoutTimer = new ScheduledTimer()
                 .Do(ResponseTimeoutCheck)
-                .Every(TimeSpan.FromMilliseconds(100))
+                .Every(TimeSpan.FromSeconds(1))
                 .StartingAt(DateTime.Now.Add(_responseTimeoutMS))
                 .Begin();
 
@@ -111,9 +111,11 @@ namespace KafkaNet
                 try
                 {
                     AddAsyncRequestItemToResponseQueue(asyncRequest);
-                    await _client.WriteAsync(request.Encode()).ConfigureAwait(false);
+                    await _client.WriteAsync(request.Encode())
+                        .ContinueWith(t => asyncRequest.MarkRequestAsSent(t.Exception))
+                        .ConfigureAwait(false);
                 }
-                catch (OperationCanceledException ex)
+                catch (OperationCanceledException)
                 {
                     TriggerMessageTimeout(asyncRequest);
                 }
@@ -228,8 +230,10 @@ namespace KafkaNet
                 //only allow one response timeout checker to run at a time.
                 _timeoutSemaphore.Wait();
 
-                var timeouts = _requestIndex.Values.Where(x =>
-                    x.CreatedOnUtc.Add(_responseTimeoutMS) < DateTime.UtcNow || _disposeToken.IsCancellationRequested).ToList();
+                var timeouts = _requestIndex.Values
+                    .Where(x => x.RequestSent)
+                    .Where(x => x.RequestSentOnUtc.Add(_responseTimeoutMS) < DateTime.UtcNow || _disposeToken.IsCancellationRequested)
+                    .ToList();
 
                 foreach (var timeout in timeouts)
                 {
@@ -245,7 +249,6 @@ namespace KafkaNet
         private void AddAsyncRequestItemToResponseQueue(AsyncRequestItem requestItem)
         {
             if (requestItem == null) return;
-            requestItem.CreatedOnUtc = DateTime.UtcNow;
             if (_requestIndex.TryAdd(requestItem.CorrelationId, requestItem) == false)
                 throw new ApplicationException("Failed to register request for async response.");
         }
@@ -299,13 +302,25 @@ namespace KafkaNet
             public AsyncRequestItem(int correlationId)
             {
                 CorrelationId = correlationId;
-                CreatedOnUtc = DateTime.UtcNow;
                 ReceiveTask = new TaskCompletionSource<byte[]>();
             }
 
             public int CorrelationId { get; private set; }
             public TaskCompletionSource<byte[]> ReceiveTask { get; private set; }
-            public DateTime CreatedOnUtc { get; set; }
+            public DateTime RequestSentOnUtc { get; private set; }
+            public bool RequestSent { get; private set; }
+
+            public void MarkRequestAsSent(Exception ex)
+            {
+                if (ex != null)
+                {
+                    ReceiveTask.TrySetException(ex);
+                    throw ex;
+                }
+
+                RequestSentOnUtc = DateTime.UtcNow;
+                RequestSent = true;
+            }
         }
         #endregion
     }
