@@ -21,7 +21,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		..\.gitignore = ..\.gitignore
 		..\LICENSE = ..\LICENSE
 		..\README.md = ..\README.md
-		..\RELEASE_NOTES.md = ..\RELEASE_NOTES.md
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Testing", "Testing", "{204BDC88-0B3E-4E9D-9140-CF0DDF184FE8}"

@@ -93,6 +93,9 @@ namespace kafka_tests.Unit
             using (var socket = new KafkaTcpSocket(mockLog.Object, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, log: mockLog.Object))
             {
+                var disconnected = false;
+                socket.OnServerDisconnected += () => disconnected = true;
+
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
 
@@ -101,7 +104,8 @@ namespace kafka_tests.Unit
                 Assert.That(server.DisconnectionEventCount, Is.EqualTo(1));
 
                 //Wait a while for the client to notice the disconnect and log
-                Thread.Sleep(15);
+                TaskTest.WaitFor(() => disconnected);
+                
 
                 //should log an exception and keep going
                 mockLog.Verify(x => x.ErrorFormat(It.IsAny<string>(), It.IsAny<Exception>()));
@@ -122,6 +126,9 @@ namespace kafka_tests.Unit
             using (var socket = new KafkaTcpSocket(mockLog.Object, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, log: mockLog.Object))
             {
+                var receivedData = false;
+                socket.OnBytesReceived += i => receivedData = true;
+
                 //send correlation message
                 server.SendDataAsync(CreateCorrelationMessage(correlationId)).Wait(TimeSpan.FromSeconds(5));
 
@@ -129,7 +136,7 @@ namespace kafka_tests.Unit
                 TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
 
-                Thread.Sleep(10);
+                TaskTest.WaitFor(() => receivedData);
 
                 //should log a warning and keep going
                 mockLog.Verify(x => x.WarnFormat(It.IsAny<string>(), It.Is<int>(o => o == correlationId)));
@@ -198,7 +205,7 @@ namespace kafka_tests.Unit
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(100), log: _log))
             {
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
+                server.HasClientConnected.Wait(TimeSpan.FromSeconds(3));
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
 
                 var tasks = new[]
@@ -213,8 +220,8 @@ namespace kafka_tests.Unit
                 TaskTest.WaitFor(() => tasks.Any(t => t.IsFaulted));
                 foreach (var task in tasks)
                 {
-                    Assert.That(task.IsFaulted, Is.True);
-                    Assert.That(task.Exception.InnerException, Is.TypeOf<ResponseTimeoutException>());
+                    Assert.That(task.IsFaulted, Is.True, "Task should have faulted.");
+                    Assert.That(task.Exception.InnerException, Is.TypeOf<ResponseTimeoutException>(), "Task fault should be of type ResponseTimeoutException.");
                 }
             }
         }

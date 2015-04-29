@@ -246,7 +246,7 @@ namespace kafka_tests.Unit
                 Assert.That(sendLastByte, Is.True, "Last byte should have sent.");
 
                 Console.WriteLine("Ensuring task unblocks...");
-                TaskTest.WaitFor(() => bytesReceived > 3);
+                TaskTest.WaitFor(() => resultTask.IsCompleted);
                 Assert.That(bytesReceived, Is.EqualTo(4), "Should have received 4 bytes.");
                 Assert.That(resultTask.IsCompleted, Is.True, "Task should have completed.");
                 Assert.That(sendCompleted, Is.EqualTo(1), "Task ContinueWith should have executed.");

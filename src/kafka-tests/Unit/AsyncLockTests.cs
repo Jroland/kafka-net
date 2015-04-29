@@ -27,10 +27,10 @@ namespace kafka_tests.Unit
                 using (await alock.LockAsync(token.Token))
                 {
                     Interlocked.Increment(ref count);
-                    Thread.Sleep(20);
+                    Thread.Sleep(100);
                 }
             }
-            Assert.That(count, Is.EqualTo(1));
+            Assert.That(count, Is.EqualTo(1), "Only the first call should succeed.  The second should timeout.");
         }
 
         [Test]
@@ -121,7 +121,7 @@ namespace kafka_tests.Unit
             var count = 0;
             var alock = new AsyncLock();
 
-            Task.Run(async () =>
+            Task.Factory.StartNew(async () =>
             {
                 using (await alock.LockAsync().ConfigureAwait(false))
                 {
@@ -135,7 +135,7 @@ namespace kafka_tests.Unit
 
             TaskTest.WaitFor(() => count > 0);
 
-            Task.Run(async () =>
+            Task.Factory.StartNew(async () =>
             {
                 Console.WriteLine("Second call waiting Id:{0}", Thread.CurrentThread.ManagedThreadId);
                 using (await alock.LockAsync().ConfigureAwait(false))

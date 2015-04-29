@@ -251,7 +251,6 @@ namespace kafka_tests.Unit
 
             Console.WriteLine("Left in collection: {0}", collection.Count);
             Assert.That(dataTask.Result.Count, Is.EqualTo(expected));
-            Assert.That(collection.Count, Is.LessThan(max - expected));
         }
 
         [Test]
