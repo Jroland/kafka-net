@@ -20,7 +20,7 @@ namespace StatisticsTestLoader
         {
             var options = new KafkaOptions(servers) { Log = new ConsoleLogger() };
             _router = new BrokerRouter(options);
-            _producer = new Producer(_router, maximumMessageBuffer: 5000, maximumAsyncRequests: 10) { BatchSize = 1000, BatchDelayTime = TimeSpan.FromSeconds(5) };
+            _producer = new Producer(_router, maximumMessageBuffer: 5000, maximumAsyncRequests: 10) { BatchSize = 1000, BatchDelayTime = TimeSpan.FromSeconds(1) };
 
             StatisticsTracker.OnStatisticsHeartbeat += StatisticsTracker_OnStatisticsHeartbeat;
         }
@@ -79,7 +79,7 @@ namespace StatisticsTestLoader
                 {
                     Console.WriteLine("POSTING: {0}, {1}", topicBatch.Count(), _producer.BufferCount);
                     var result = await _producer
-                        .SendMessageAsync(topicBatch.Key, topicBatch.Select(x => new Message(x.Record, x.Key)), acks: 1, codec: MessageCodec.CodecGzip)
+                        .SendMessageAsync(topicBatch.Key, topicBatch.Select(x => x.Message), acks: 0, codec: MessageCodec.CodecGzip)
                         .ConfigureAwait(false);
 
                     if (result.Any(x => x.Error != (int)ErrorResponseCode.NoError))
@@ -88,9 +88,7 @@ namespace StatisticsTestLoader
                     }
                     else
                     {
-                        var offset = topicBatch.Max(x => x.Offset);
                         await SetStoredOffsetAsync(topicBatch.Key, topicBatch.Max(x => x.Offset)).ConfigureAwait(false);
-                        //Console.WriteLine("Topic:{0} Count:{1} Offset:{2}", topicBatch.Key, topicBatch.Count(), offset);
                     }
                 }
             }

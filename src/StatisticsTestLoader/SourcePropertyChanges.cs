@@ -77,7 +77,7 @@ namespace StatisticsTestLoader
                         {
                             if (records.ContainsKey(change.Key))
                             {
-                                change.Record = records[change.Key].ToString();
+                                change.AddDocument(records[change.Key].ToString());
                                 data.Add(change);
                             }
                         }

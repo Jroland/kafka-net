@@ -42,7 +42,7 @@ namespace StatisticsTestLoader
                 try
                 {
                     var index = kafka.GetStoredOffset(source.Topic);
-                    foreach (var batchEnumerable in source.Poll(index).Batch(1000))
+                    foreach (var batchEnumerable in source.Poll(index).Batch(500))
                     {
                         var batch = batchEnumerable.ToList();
 
