@@ -281,6 +281,7 @@ namespace KafkaNet
 
                     foreach (var task in sendTasks)
                     {
+                        //TODO when we dont ask for an ACK, result is an empty list.  Which FirstOrDefault returns null.  Dont like this...
                         task.MessagesSent.ForEach(x => x.Tcs.TrySetResult(task.Task.Result.FirstOrDefault()));
                     }
                 }
