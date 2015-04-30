@@ -14,7 +14,7 @@
     <summary>Native C# client for Apache Kafka.</summary>
     <copyright>Copyright James Roland 2014</copyright>
     <tags>C# Apache Kafka</tags>
-    <releaseNotes>https://github.com/Jroland/kafka-net/blob/master/RELEASE_NOTES.md</releaseNotes>
+    <releaseNotes>https://github.com/Jroland/kafka-net/releases</releaseNotes>
   </metadata>
   <files>
     <file src="bin\*" target="lib\net45" />
