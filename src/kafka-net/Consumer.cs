@@ -140,7 +140,7 @@ namespace KafkaNet
 
                             var fetchRequest = new FetchRequest
                                 {
-                                    MaxWaitTime = (int)_options.MaxWaitTimeForMinimumBytes.TotalMilliseconds,
+                                    MaxWaitTime = (int)Math.Min((long)int.MaxValue, _options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
                                     MinBytes = _options.MinimumBytes,
                                     Fetches = fetches
                                 };
