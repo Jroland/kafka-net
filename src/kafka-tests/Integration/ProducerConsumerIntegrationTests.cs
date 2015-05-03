@@ -74,6 +74,44 @@ namespace kafka_tests.Integration
             }
         }
 
+
+        [Test]
+        public void AsyncConsumerShouldConsumeInSameOrderAsProduced()
+        {
+            var expected = new List<string> { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19" };
+            var testId = Guid.NewGuid().ToString();
+
+            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
+            using (var producer = new Producer(router))
+            {
+
+                var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
+
+                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router),
+                    offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
+                {
+
+                    for (int i = 0; i < 20; i++)
+                    {
+                        producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString(), testId) }).Wait();
+                    }
+                    List<Message> results = new List<Message>();
+
+                    for (int i = 0; i < 20; i++)
+                    {
+                        results.Add(consumer.ConsumeNextAsync().Result);
+                    }
+
+                    //ensure the produced messages arrived
+                    Console.WriteLine("Message order:  {0}", string.Join(", ", results.Select(x => x.Value.ToUtf8String()).ToList()));
+
+                    Assert.That(results.Count, Is.EqualTo(20));
+                    Assert.That(results.Select(x => x.Value.ToUtf8String()).ToList(), Is.EqualTo(expected), "Expected the message list in the correct order.");
+                    Assert.That(results.Any(x => x.Key.ToUtf8String() != testId), Is.False);
+                }
+            }
+        }
+
         [Test]
         public void ConsumerShouldBeAbleToSeekBackToEarlierOffset()
         {

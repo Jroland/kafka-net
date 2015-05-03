@@ -54,6 +54,12 @@ namespace KafkaNet
         {
             _options.Log.DebugFormat("Consumer: Beginning consumption of topic: {0}", _options.Topic);
             EnsurePartitionPollingThreads();
+            // need a separate method with yield, otherwise EnsurePartitionPollingThreads() is not called until enumeration, e.g. ToArray()
+            return DoConsume(cancellationToken);
+        }
+
+        private IEnumerable<Message> DoConsume(CancellationToken? cancellationToken = null)
+        {
             while (true)
             {
                 try
@@ -79,8 +85,14 @@ namespace KafkaNet
             }
         }
 
+
+        public async Task<Message> ConsumeNextAsync()
+        {
+            return await ConsumeNextAsync(new TimeSpan(int.MaxValue), CancellationToken.None);
+        }
+
         /// <summary>
-        /// Pull next message for consumption asynchronously
+        /// Pull a next message for consumption asynchronously
         /// </summary>
         public async Task<Message> ConsumeNextAsync(TimeSpan timeout, CancellationToken token)
         {
