@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using KafkaNet.Common;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 
@@ -18,7 +20,8 @@ namespace KafkaNet
     public class Consumer : IMetadataQueries, IDisposable
     {
         private readonly ConsumerOptions _options;
-        private readonly BlockingCollection<Message> _fetchResponseQueue;
+        private readonly AsyncCollection<Message> _fetchResponseCollection;
+        private readonly SemaphoreSlim _boundedCapacitySemaphore;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
         private readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
@@ -31,9 +34,10 @@ namespace KafkaNet
         public Consumer(ConsumerOptions options, params OffsetPosition[] positions)
         {
             _options = options;
-            _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
+            _fetchResponseCollection = new AsyncCollection<Message>(new ConcurrentQueue<Message>());
+            _boundedCapacitySemaphore = new SemaphoreSlim(_options.ConsumerBufferSize, _options.ConsumerBufferSize);
             _metadataQueries = new MetadataQueries(_options.Router);
-            
+
             SetOffsetPosition(positions);
         }
 
@@ -50,7 +54,57 @@ namespace KafkaNet
         {
             _options.Log.DebugFormat("Consumer: Beginning consumption of topic: {0}", _options.Topic);
             EnsurePartitionPollingThreads();
-            return _fetchResponseQueue.GetConsumingEnumerable(cancellationToken ?? CancellationToken.None);
+            while (true)
+            {
+                try
+                {
+                    // blocking wait for data
+                    _fetchResponseCollection.OnHasDataAvailable(cancellationToken ?? CancellationToken.None).Wait();
+                }
+                catch (AggregateException e)
+                {
+                    if (e.InnerException is TaskCanceledException)
+                    {
+                        throw new OperationCanceledException();
+                    }
+                    throw;
+                }
+                Message data;
+                // do not call OnHasDataAvailable if data is available
+                while (_fetchResponseCollection.TryTake(out data))
+                {
+                    _boundedCapacitySemaphore.Release();
+                    yield return data;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Pull next message for consumption asynchronously
+        /// </summary>
+        public async Task<Message> ConsumeNextAsync(TimeSpan timeout, CancellationToken token)
+        {
+            // this will only iterlocked.increment/decrement(_ensureOneThread) and compare to 1 on each call
+            EnsurePartitionPollingThreads();
+
+            if (_fetchResponseCollection.IsCompleted)
+            {
+                var tcs = new TaskCompletionSource<Message>();
+                tcs.SetCanceled();
+                return await tcs.Task;
+            }
+            try
+            {
+                var result = (await _fetchResponseCollection.TakeAsync(1, timeout, token)).Single();
+                _boundedCapacitySemaphore.Release();
+                return result;
+            }
+            catch (Exception e)
+            {
+                var tcs = new TaskCompletionSource<Message>();
+                tcs.SetException(e);
+                return await tcs.Task;
+            }
         }
 
         /// <summary>
@@ -139,11 +193,11 @@ namespace KafkaNet
                             var fetches = new List<Fetch> { fetch };
 
                             var fetchRequest = new FetchRequest
-                                {
-                                    MaxWaitTime = (int)Math.Min((long)int.MaxValue, _options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
-                                    MinBytes = _options.MinimumBytes,
-                                    Fetches = fetches
-                                };
+                            {
+                                MaxWaitTime = (int)Math.Min((long)int.MaxValue, _options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
+                                MinBytes = _options.MinimumBytes,
+                                Fetches = fetches
+                            };
 
                             //make request and post to queue
                             var route = _options.Router.SelectBrokerRoute(topic, partitionId);
@@ -160,7 +214,8 @@ namespace KafkaNet
 
                                     foreach (var message in response.Messages)
                                     {
-                                        _fetchResponseQueue.Add(message, _disposeToken.Token);
+                                        await _boundedCapacitySemaphore.WaitAsync(_disposeToken.Token);
+                                        _fetchResponseCollection.Add(message);
 
                                         if (_disposeToken.IsCancellationRequested) return;
                                     }
@@ -173,8 +228,8 @@ namespace KafkaNet
                                 }
                             }
 
-							//no message received from server wait a while before we try another long poll
-	                        await Task.Delay(_options.BackoffInterval);
+                            //no message received from server wait a while before we try another long poll
+                            await Task.Delay(_options.BackoffInterval);
                         }
                         catch (BufferUnderRunException ex)
                         {
