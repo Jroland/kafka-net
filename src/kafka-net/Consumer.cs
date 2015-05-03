@@ -173,8 +173,8 @@ namespace KafkaNet
                                 }
                             }
 
-                            //no message received from server wait a while before we try another long poll
-                            Thread.Sleep(_options.BackoffInterval);
+							//no message received from server wait a while before we try another long poll
+	                        await Task.Delay(_options.BackoffInterval);
                         }
                         catch (BufferUnderRunException ex)
                         {
