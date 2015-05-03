@@ -105,18 +105,9 @@ namespace KafkaNet
                 tcs.SetCanceled();
                 return await tcs.Task;
             }
-            try
-            {
-                var result = (await _fetchResponseCollection.TakeAsync(1, timeout, token)).Single();
-                _boundedCapacitySemaphore.Release();
-                return result;
-            }
-            catch (Exception e)
-            {
-                var tcs = new TaskCompletionSource<Message>();
-                tcs.SetException(e);
-                return await tcs.Task;
-            }
+            var result = (await _fetchResponseCollection.TakeAsync(1, timeout, token)).Single();
+            _boundedCapacitySemaphore.Release();
+            return result;
         }
 
         /// <summary>
