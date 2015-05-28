@@ -16,7 +16,7 @@ namespace KafkaNet.Statistics
         public static event Action<StatisticsSummary> OnStatisticsHeartbeat;
 
         private static readonly IScheduledTimer HeartbeatTimer;
-        private static readonly Gauges _gauges = new Gauges();
+        private static readonly Gauges Gauges = new Gauges();
         private static readonly ConcurrentCircularBuffer<ProduceRequestStatistic> ProduceRequestStatistics = new ConcurrentCircularBuffer<ProduceRequestStatistic>(500);
         private static readonly ConcurrentCircularBuffer<NetworkWriteStatistic> CompletedNetworkWriteStatistics = new ConcurrentCircularBuffer<NetworkWriteStatistic>(500);
         private static readonly ConcurrentDictionary<int, NetworkWriteStatistic> NetworkWriteQueuedIndex = new ConcurrentDictionary<int, NetworkWriteStatistic>();
@@ -37,7 +37,7 @@ namespace KafkaNet.Statistics
                 OnStatisticsHeartbeat(new StatisticsSummary(ProduceRequestStatistics.ToList(),
                     NetworkWriteQueuedIndex.Values.ToList(),
                     CompletedNetworkWriteStatistics.ToList(),
-                    _gauges));
+                    Gauges));
             }
         }
 
@@ -51,13 +51,13 @@ namespace KafkaNet.Statistics
             switch (gauge)
             {
                 case StatisticGauge.ActiveReadOperation:
-                    Interlocked.Increment(ref _gauges.ActiveReadOperation);
+                    Interlocked.Increment(ref Gauges.ActiveReadOperation);
                     break;
                 case StatisticGauge.ActiveWriteOperation:
-                    Interlocked.Increment(ref _gauges.ActiveWriteOperation);
+                    Interlocked.Increment(ref Gauges.ActiveWriteOperation);
                     break;
                 case StatisticGauge.QueuedWriteOperation:
-                    Interlocked.Increment(ref _gauges.QueuedWriteOperation);
+                    Interlocked.Increment(ref Gauges.QueuedWriteOperation);
                     break;
             }
         }
@@ -67,13 +67,13 @@ namespace KafkaNet.Statistics
             switch (gauge)
             {
                 case StatisticGauge.ActiveReadOperation:
-                    Interlocked.Decrement(ref _gauges.ActiveReadOperation);
+                    Interlocked.Decrement(ref Gauges.ActiveReadOperation);
                     break;
                 case StatisticGauge.ActiveWriteOperation:
-                    Interlocked.Decrement(ref _gauges.ActiveWriteOperation);
+                    Interlocked.Decrement(ref Gauges.ActiveWriteOperation);
                     break;
                 case StatisticGauge.QueuedWriteOperation:
-                    Interlocked.Decrement(ref _gauges.QueuedWriteOperation);
+                    Interlocked.Decrement(ref Gauges.QueuedWriteOperation);
                     break;
             }
         }
@@ -84,7 +84,7 @@ namespace KafkaNet.Statistics
 
             var stat = new NetworkWriteStatistic(endpoint, payload);
             NetworkWriteQueuedIndex.TryAdd(payload.CorrelationId, stat);
-            Interlocked.Increment(ref _gauges.QueuedWriteOperation);
+            Interlocked.Increment(ref Gauges.QueuedWriteOperation);
         }
 
         public static void CompleteNetworkWrite(KafkaDataPayload payload, long milliseconds, bool failed)
@@ -97,7 +97,7 @@ namespace KafkaNet.Statistics
                 stat.SetCompleted(milliseconds, failed);
                 CompletedNetworkWriteStatistics.Enqueue(stat);
             }
-            Interlocked.Decrement(ref _gauges.QueuedWriteOperation);
+            Interlocked.Decrement(ref Gauges.QueuedWriteOperation);
         }
     }
 
