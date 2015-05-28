@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 
 namespace KafkaNet.Common
@@ -9,9 +8,7 @@ namespace KafkaNet.Common
     public class ConcurrentCircularBuffer<T> : IEnumerable<T>
     {
         private readonly int _maxSize;
-        private readonly object _lock = new object();
-
-        private int _count = 0;
+        private long _count = 0;
         private int _head = -1;
         readonly T[] _values;
 
@@ -23,42 +20,32 @@ namespace KafkaNet.Common
 
         public int MaxSize { get { return _maxSize; } }
 
-        public int Count
+        public long Count
         {
             get
             {
-                lock (_lock)
-                {
-                    return _count;
-                }
+                return Interlocked.Read(ref _count);
             }
         }
 
         public ConcurrentCircularBuffer<T> Enqueue(T obj)
         {
-            lock (_lock)
-            {
-                if (Interlocked.Increment(ref _head) > (_maxSize - 1))
-                    Interlocked.Exchange(ref _head, 0);
+            if (Interlocked.Increment(ref _head) > (_maxSize - 1))
+                Interlocked.Exchange(ref _head, 0);
 
-                _values[_head] = obj;
+            _values[_head] = obj;
 
-                _count = Math.Min(++_count, _maxSize);
-            }
+            Interlocked.Exchange(ref _count,
+                Math.Min(Interlocked.Increment(ref _count), _maxSize));
 
             return this;
         }
 
-       
-
         public IEnumerator<T> GetEnumerator()
         {
-            lock (_lock)
+            for (int i = 0; i < Count; i++)
             {
-                for (int i = 0; i < _count; i++)
-                {
-                    yield return _values[i];
-                }
+                yield return _values[i];
             }
         }
 
