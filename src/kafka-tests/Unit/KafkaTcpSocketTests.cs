@@ -529,7 +529,7 @@ namespace kafka_tests.Unit
 
                 token.Cancel();
 
-                taskResult.SafeWait(TimeSpan.FromMilliseconds(1000));
+                taskResult.SafeWait(TimeSpan.FromMilliseconds(5000));
 
                 Assert.That(taskResult.IsCanceled, Is.True, "Task should have cancelled.");
             }
