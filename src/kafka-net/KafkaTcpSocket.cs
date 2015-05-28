@@ -18,24 +18,24 @@ namespace KafkaNet
     /// </summary>
     public class KafkaTcpSocket : IKafkaTcpSocket
     {
-        public Action OnServerDisconnected; 
-        public Action<int> OnReconnectionAttempt;
-        public Action<int> OnReadFromSocketAttempt;
-        public Action<int> OnBytesReceived;
-        public Action<KafkaDataPayload> OnWriteToSocketAttempt;
+        public event Action OnServerDisconnected;
+        public event Action<int> OnReconnectionAttempt;
+        public event Action<int> OnReadFromSocketAttempt;
+        public event Action<int> OnBytesReceived;
+        public event Action<KafkaDataPayload> OnWriteToSocketAttempt;
 
         private const int DefaultReconnectionTimeout = 100;
         private const int DefaultReconnectionTimeoutMultiplier = 2;
         private const int MaxReconnectionTimeoutMinutes = 5;
-
-        private readonly AsyncCollection<SocketPayloadSendTask> _sendTaskQueue = new AsyncCollection<SocketPayloadSendTask>();
-        private readonly AsyncCollection<SocketPayloadReadTask> _readTaskQueue = new AsyncCollection<SocketPayloadReadTask>();
 
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly CancellationTokenRegistration _disposeRegistration;
         private readonly IKafkaLog _log;
         private readonly KafkaEndpoint _endpoint;
         private readonly TimeSpan _maximumReconnectionTimeout;
+
+        private readonly AsyncCollection<SocketPayloadSendTask> _sendTaskQueue;
+        private readonly AsyncCollection<SocketPayloadReadTask> _readTaskQueue;
 
         private readonly Task _socketTask;
         private readonly AsyncLock _clientLock = new AsyncLock();
@@ -53,6 +53,9 @@ namespace KafkaNet
             _log = log;
             _endpoint = endpoint;
             _maximumReconnectionTimeout = maximumReconnectionTimeout ?? TimeSpan.FromMinutes(MaxReconnectionTimeoutMinutes);
+
+            _sendTaskQueue = new AsyncCollection<SocketPayloadSendTask>();
+            _readTaskQueue = new AsyncCollection<SocketPayloadReadTask>();
 
             //dedicate a long running task to the read/write operations
             _socketTask = Task.Factory.StartNew(DedicatedSocketTask, CancellationToken.None,
@@ -127,7 +130,6 @@ namespace KafkaNet
         {
             var readTask = new SocketPayloadReadTask(readSize, cancellationToken);
             _readTaskQueue.Add(readTask);
-            //TODO queue network read for statistics
             return readTask.Tcp.Task;
         }
 
@@ -182,7 +184,7 @@ namespace KafkaNet
 
                 Task.WaitAny(sendDataReady, readDataReady);
 
-                var exception = new[] {writeTask, readTask}
+                var exception = new[] { writeTask, readTask }
                     .Where(x => x.IsFaulted && x.Exception != null)
                     .SelectMany(x => x.Exception.InnerExceptions)
                     .FirstOrDefault();
@@ -278,8 +280,7 @@ namespace KafkaNet
                     StatisticsTracker.IncrementGauge(StatisticGauge.ActiveWriteOperation);
 
                     if (OnWriteToSocketAttempt != null) OnWriteToSocketAttempt(sendTask.Payload);
-
-                    await netStream.WriteAsync(sendTask.Payload.Buffer, 0, sendTask.Payload.Buffer.Length);
+                    await netStream.WriteAsync(sendTask.Payload.Buffer, 0, sendTask.Payload.Buffer.Length).ConfigureAwait(false);
 
                     sendTask.Tcp.TrySetResult(sendTask.Payload);
                 }
