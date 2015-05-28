@@ -13,7 +13,12 @@ namespace KafkaNet.Common
     public sealed class AsyncManualResetEvent
     {
         private TaskCompletionSource<bool> _tcs;
-        
+
+        public bool IsOpen
+        {
+            get { return _tcs.Task.IsCompleted; }
+        }
+
         /// <summary>
         /// Async version of a manual reset event.
         /// </summary>
@@ -39,7 +44,7 @@ namespace KafkaNet.Common
         /// <summary>
         /// Set the event and complete, releasing all WaitAsync requests.
         /// </summary>
-        public void Set()
+        public void Open()
         {
             _tcs.TrySetResult(true);
         }
@@ -47,14 +52,14 @@ namespace KafkaNet.Common
         /// <summary>
         /// Reset the event making all WaitAsync requests block, does nothing if already reset.
         /// </summary>
-        public void Reset()
+        public void Close()
         {
             while (true)
             {
                 var tcs = _tcs;
                 if (!tcs.Task.IsCompleted || Interlocked.CompareExchange(ref _tcs, new TaskCompletionSource<bool>(), tcs) == tcs)
                     return;
-            } 
+            }
         }
     }
 }

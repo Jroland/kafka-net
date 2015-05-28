@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
+using kafka_tests.Helpers;
 using NUnit.Framework;
 
 namespace kafka_tests.Unit
@@ -70,18 +72,6 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void TryTakeShouldReturnFalseOnEmpty()
-        {
-            var aq = new AsyncCollection<bool>();
-
-            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
-
-            bool data;
-            Assert.That(aq.TryTake(out data), Is.False, "TryTake should report false on empty collection.");
-            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
-        }
-
-        [Test]
         public async void CollectionShouldReportCorrectBufferCount()
         {
             var collection = new AsyncCollection<int>();
@@ -97,7 +87,34 @@ namespace kafka_tests.Unit
             Assert.That(collection.Count, Is.EqualTo(0));
         }
 
+        [Test]
+        [Ignore("Currently remove max buffer feature.")]
+        public void CollectionShouldBlockOnMaxBuffer()
+        {
+            var collection = new AsyncCollection<int>();
+            var task = Task.Factory.StartNew(() => collection.AddRange(Enumerable.Range(0, 10)));
+            TaskTest.WaitFor(() => collection.Count >= 9);
+            Assert.That(collection.Count, Is.EqualTo(9), "Buffer should block at 9 items.");
+            Assert.That(task.IsCompleted, Is.False, "Task should be blocking on last item.");
+            var item = collection.Pop();
+            TaskTest.WaitFor(() => task.IsCompleted);
+            Assert.That(task.IsCompleted, Is.True, "Task should complete after room is made in buffer.");
+            Assert.That(collection.Count, Is.EqualTo(9), "There should now be 9 items in the buffer.");
+        }
+
         #region Take Tests...
+        [Test]
+        public void TryTakeShouldReturnFalseOnEmpty()
+        {
+            var aq = new AsyncCollection<bool>();
+
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
+
+            bool data;
+            Assert.That(aq.TryTake(out data), Is.False, "TryTake should report false on empty collection.");
+            Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
+        }
+
         [Test]
         public async void TakeAsyncShouldOnlyWaitTimeoutAndReturnWhatItHas()
         {
@@ -286,11 +303,53 @@ namespace kafka_tests.Unit
             Assert.That(take2.Result.Count, Is.EqualTo(expected));
             Assert.That(take3.Result.Count, Is.EqualTo(expected));
         }
+
+        [Test]
+        public void AddRangeShouldBePerformant()
+        {
+            var sw = Stopwatch.StartNew();
+            var collection = new AsyncCollection<int>();
+            collection.AddRange(Enumerable.Range(0, 1000000));
+            sw.Stop();
+            Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+        }
+
+        [Test]
+        public async void TakeAsyncShouldBePerformant()
+        {
+            const int dataSize = 1000000;
+            var collection = new AsyncCollection<int>();
+            collection.AddRange(Enumerable.Range(0, dataSize));
+            var sw = Stopwatch.StartNew();
+            var list = await collection.TakeAsync(dataSize, TimeSpan.FromSeconds(1), CancellationToken.None);
+            sw.Stop();
+            Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
+            Assert.That(list.Count, Is.EqualTo(dataSize));
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+        }
+
+        [Test]
+        public void AddAndRemoveShouldBePerformant()
+        {
+            const int dataSize = 1000000;
+            var collection = new AsyncCollection<int>();
+
+            var sw = Stopwatch.StartNew();
+            var receivedData = new List<int>();
+            Parallel.Invoke(
+                () => collection.AddRange(Enumerable.Range(0, dataSize)),
+                () => receivedData = collection.TakeAsync(dataSize, TimeSpan.FromSeconds(5), CancellationToken.None).Result);
+            sw.Stop();
+            Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
+            Assert.That(receivedData.Count, Is.EqualTo(dataSize));
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+        }
         #endregion
 
 
         #region CompletedTests Tests...
-        
+
         [Test]
         [ExpectedException(typeof(ObjectDisposedException))]
         public void CompletedCollectionShouldPreventMoreItemsAdded()

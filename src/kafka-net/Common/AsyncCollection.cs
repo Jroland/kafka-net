@@ -10,12 +10,12 @@ namespace KafkaNet.Common
     {
         private readonly object _lock = new object();
         private readonly AsyncManualResetEvent _dataAvailableEvent = new AsyncManualResetEvent();
-        private readonly ConcurrentBag<T> _bag = new ConcurrentBag<T>();
+        private readonly ConcurrentQueue<T> _queue = new ConcurrentQueue<T>();
         private long _dataInBufferCount = 0;
 
         public int Count
         {
-            get { return _bag.Count + (int)Interlocked.Read(ref _dataInBufferCount); }
+            get { return _queue.Count + (int)Interlocked.Read(ref _dataInBufferCount); }
         }
 
         public bool IsCompleted { get; private set; }
@@ -37,18 +37,26 @@ namespace KafkaNet.Common
                 throw new ObjectDisposedException("AsyncCollection has been marked as complete.  No new documents can be added.");
             }
 
-            _bag.Add(data);
+            _queue.Enqueue(data);
+
             TriggerDataAvailability();
         }
 
         public void AddRange(IEnumerable<T> data)
         {
+            if (IsCompleted)
+            {
+                throw new ObjectDisposedException("AsyncCollection has been marked as complete.  No new documents can be added.");
+            }
+
             foreach (var item in data)
             {
-                Add(item);
+                _queue.Enqueue(item);
             }
+
+            TriggerDataAvailability();
         }
-        
+
         public T Pop()
         {
             T data;
@@ -88,7 +96,7 @@ namespace KafkaNet.Common
         public void DrainAndApply(Action<T> appliedFunc)
         {
             T data;
-            while (_bag.TryTake(out data))
+            while (_queue.TryDequeue(out data))
             {
                 appliedFunc(data);
             }
@@ -99,7 +107,7 @@ namespace KafkaNet.Common
         public IEnumerable<T> Drain()
         {
             T data;
-            while (_bag.TryTake(out data))
+            while (_queue.TryDequeue(out data))
             {
                 yield return data;
             }
@@ -111,27 +119,38 @@ namespace KafkaNet.Common
         {
             try
             {
-                return _bag.TryTake(out data);
+                return _queue.TryDequeue(out data);
             }
             finally
             {
-                if (_bag.IsEmpty) TriggerDataAvailability();
+                if (_queue.IsEmpty) TriggerDataAvailability();
             }
         }
 
         private void TriggerDataAvailability()
         {
-            lock (_lock)
+            if (_queue.IsEmpty && _dataAvailableEvent.IsOpen)
             {
-                if (_bag.IsEmpty)
+                lock (_lock)
                 {
-                    _dataAvailableEvent.Reset();
-                }
-                else
-                {
-                    _dataAvailableEvent.Set();
+                    if (_queue.IsEmpty && _dataAvailableEvent.IsOpen)
+                    {
+                        _dataAvailableEvent.Close();
+                    }
                 }
             }
+
+            if (_queue.IsEmpty == false && _dataAvailableEvent.IsOpen == false)
+            {
+                lock (_lock)
+                {
+                    if (_queue.IsEmpty == false && _dataAvailableEvent.IsOpen == false)
+                    {
+                        _dataAvailableEvent.Open();
+                    }
+                }
+            }
+
         }
     }
 }
