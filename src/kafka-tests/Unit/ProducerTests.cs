@@ -298,6 +298,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
+        [Ignore("Removed the max message limit.  Caused performance problems.  Will find a better way.")]
         public void ProducerShouldBlockEvenOnMessagesInTransit()
         {
             //with max buffer set below the batch size, this should cause the producer to block until batch delay time.

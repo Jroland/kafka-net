@@ -108,7 +108,7 @@ namespace KafkaNet
         /// <param name="timeout">Interal kafka timeout to wait for the requested level of ack to occur before returning. Defaults to 1000ms.</param>
         /// <param name="codec">The codec to apply to the message collection.  Defaults to none.</param>
         /// <returns>List of ProduceResponses from each partition sent to or empty list if acks = 0.</returns>
-        public Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1,
+        public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1,
             TimeSpan? timeout = null, MessageCodec codec = MessageCodec.CodecNone)
         {
             if (_stopToken.IsCancellationRequested)
@@ -126,15 +126,11 @@ namespace KafkaNet
 
             _asyncCollection.AddRange(batch);
 
-            return Task.WhenAll(batch.Select(x => x.Tcs.Task))
-                        .ContinueWith(t =>
-                        {
-                            t.ThrowOnFault();
+            await Task.WhenAll(batch.Select(x => x.Tcs.Task));
 
-                            return batch.Select(topicMessage => topicMessage.Tcs.Task.Result)
+            return batch.Select(topicMessage => topicMessage.Tcs.Task.Result)
                                 .Distinct()
                                 .ToList();
-                        });
         }
 
         /// <summary>

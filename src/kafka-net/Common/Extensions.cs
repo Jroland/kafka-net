@@ -234,18 +234,5 @@ namespace KafkaNet.Common
             
             return new ApplicationException("Unknown exception occured.");
         }
-
-        /// <summary>
-        /// Extracts a concrete exception out of a Continue with result.
-        /// </summary>
-        public static void ThrowOnFault(this Task task)
-        {
-            if (task.IsFaulted == false) return;
-            if (task.Exception != null)
-                throw task.Exception.Flatten();
-
-            throw new ApplicationException("Unknown exception occured.");
-        }
-
     }
 }
