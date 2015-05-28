@@ -12,7 +12,7 @@ namespace KafkaNet.Protocol
         public static byte[] Zip(byte[] bytes)
         {
             using (var destination = new MemoryStream())
-            using (var gzip = new GZipStream(destination, CompressionMode.Compress, true))
+            using (var gzip = new GZipStream(destination, CompressionLevel.Fastest, false))
             {
                 gzip.Write(bytes, 0, bytes.Length);
                 gzip.Flush();
@@ -25,7 +25,7 @@ namespace KafkaNet.Protocol
         {
             using (var source = new MemoryStream(bytes))
             using (var destination = new MemoryStream())
-            using (var gzip = new GZipStream(source, CompressionMode.Decompress, true))
+            using (var gzip = new GZipStream(source, CompressionMode.Decompress, false))
             {
                 gzip.CopyTo(destination);
                 gzip.Flush();
