@@ -15,7 +15,7 @@ namespace kafka_tests.Unit
     {
         [Test]
         [ExpectedException(typeof(OperationCanceledException))]
-        public async void AsyncLockShouldCancelShouldThrowOperationCanceledException()
+        public async void AsyncLockCancelShouldThrowOperationCanceledException()
         {
             var count = 0;
             var token = new CancellationTokenSource(TimeSpan.FromMilliseconds(10));
@@ -48,7 +48,7 @@ namespace kafka_tests.Unit
                     using (await alock.LockAsync(token.Token))
                     {
                         Interlocked.Increment(ref count);
-                        Thread.Sleep(20);
+                        Thread.Sleep(100);
                     }
                 }
             }
