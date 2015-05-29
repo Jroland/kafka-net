@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading;
@@ -47,6 +45,11 @@ namespace KafkaNet.Common
             if (value == null) return string.Empty;
 
             return Encoding.UTF8.GetString(value);
+        }
+
+        public static KafkaDataPayload ToPayload(this byte[] data)
+        {
+            return new KafkaDataPayload {Buffer = data};
         }
 
         public static byte[] ToBytes(this string value)
@@ -109,7 +112,9 @@ namespace KafkaNet.Common
         {
             var tcs = new TaskCompletionSource<bool>();
 
-            using (cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs))
+            var cancelRegistration = cancellationToken.Register(source => ((TaskCompletionSource<bool>) source).TrySetResult(true), tcs);
+            
+            using (cancelRegistration)
             {
                 if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
                 {
@@ -132,7 +137,9 @@ namespace KafkaNet.Common
         {
             var tcs = new TaskCompletionSource<bool>();
 
-            using (cancellationToken.Register(source => ((TaskCompletionSource<bool>) source).TrySetResult(true), tcs))
+            var cancelRegistration = cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs);
+
+            using (cancelRegistration)
             {
                 if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
                 {
@@ -180,6 +187,21 @@ namespace KafkaNet.Common
             }
 
             return tcs.Task;
+        }
+
+        /// <summary>
+        /// Mainly used for testing, allows waiting on a single task without throwing exceptions.
+        /// </summary>
+        public static void SafeWait(this Task source, TimeSpan timeout)
+        {
+            try
+            {
+                source.Wait(timeout);
+            }
+            catch
+            {
+                //ignore an exception that happens in this source
+            }
         }
 
         /// <summary>

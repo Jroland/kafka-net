@@ -54,9 +54,9 @@ namespace kafka_tests.Unit
                 .StartingAt(DateTime.Now)
                 .Every(TimeSpan.FromMilliseconds(1000));
 
-            Task.Factory.StartNew(() => sut.Begin());
-            Task.Factory.StartNew(() => sut.Begin());
-            Task.Factory.StartNew(() => sut.Begin());
+            Task.Run(() => sut.Begin());
+            Task.Run(() => sut.Begin());
+            Task.Run(() => sut.Begin());
                 
 
             Thread.Sleep(200);

@@ -31,7 +31,7 @@ namespace kafka_tests.Fakes
             get { return true; }
         }
 
-        public Task SendAsync(byte[] payload)
+        public Task SendAsync(KafkaDataPayload payload)
         {
             throw new NotImplementedException();
         }

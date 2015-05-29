@@ -21,8 +21,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		..\.gitignore = ..\.gitignore
 		..\LICENSE = ..\LICENSE
 		..\README.md = ..\README.md
-		..\RELEASE_NOTES.md = ..\RELEASE_NOTES.md
 	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Testing", "Testing", "{204BDC88-0B3E-4E9D-9140-CF0DDF184FE8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -45,5 +46,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{53E0B3CE-6C41-4C8A-8B66-9BD03667B1E0} = {204BDC88-0B3E-4E9D-9140-CF0DDF184FE8}
 	EndGlobalSection
 EndGlobal

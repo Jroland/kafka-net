@@ -30,16 +30,16 @@ namespace KafkaNet
         /// <summary>
         /// Convenience function to write full buffer data to the server.
         /// </summary>
-        /// <param name="buffer">The buffer data to send.</param>
-        /// <returns>Returns Task handle to the write operation.</returns>
-        Task WriteAsync(byte[] buffer);
+        /// <param name="payload">The buffer data to send.</param>
+        /// <returns>Returns Task handle to the write operation with size of written bytes.</returns>
+        Task<KafkaDataPayload> WriteAsync(KafkaDataPayload payload);
 
         /// <summary>
         /// Write the buffer data to the server.
         /// </summary>
-        /// <param name="buffer">The buffer data to send.</param>
+        /// <param name="payload">The buffer data to send.</param>
         /// <param name="cancellationToken">A cancellation token which will cancel the request.</param>
-        /// <returns>Returns Task handle to the write operation.</returns>
-        Task WriteAsync(byte[] buffer, CancellationToken cancellationToken);
+        /// <returns>Returns Task handle to the write operation ith size of written bytes..</returns>
+        Task<KafkaDataPayload> WriteAsync(KafkaDataPayload payload, CancellationToken cancellationToken);
     }
 }

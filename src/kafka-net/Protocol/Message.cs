@@ -7,7 +7,7 @@ using KafkaNet.Common;
 namespace KafkaNet.Protocol
 {
     /// <summary>
-    /// Payload represents a collection of messages to be posted to a specified Topic on specified Partition.
+    /// Buffer represents a collection of messages to be posted to a specified Topic on specified Partition.
     /// </summary>
     public class Payload
     {
@@ -155,7 +155,7 @@ namespace KafkaNet.Protocol
             using (var stream = new BigEndianBinaryReader(payload.Skip(4)))
             {
                 if (crc.SequenceEqual(stream.CrcHash()) == false)
-                    throw new FailCrcCheckException("Payload did not match CRC validation.");
+                    throw new FailCrcCheckException("Buffer did not match CRC validation.");
 
                 var message = new Message
                 {

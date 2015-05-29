@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
@@ -15,6 +13,52 @@ namespace kafka_tests.Unit
     [Category("Unit")]
     public class AsyncLockTests
     {
+        [Test]
+        [ExpectedException(typeof(OperationCanceledException))]
+        public async void AsyncLockCancelShouldThrowOperationCanceledException()
+        {
+            var count = 0;
+            var token = new CancellationTokenSource(TimeSpan.FromMilliseconds(10));
+            var alock = new AsyncLock();
+
+            for (int i = 0; i < 2; i++)
+            {
+                //the second call will timeout
+                using (await alock.LockAsync(token.Token))
+                {
+                    Interlocked.Increment(ref count);
+                    Thread.Sleep(100);
+                }
+            }
+            Assert.That(count, Is.EqualTo(1), "Only the first call should succeed.  The second should timeout.");
+        }
+
+        [Test]
+        public async void AsyncLockCancelShouldNotAllowInsideLock()
+        {
+            var count = 0;
+            var token = new CancellationTokenSource(TimeSpan.FromMilliseconds(10));
+            var alock = new AsyncLock();
+
+            try
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    //the second call will timeout
+                    using (await alock.LockAsync(token.Token))
+                    {
+                        Interlocked.Increment(ref count);
+                        Thread.Sleep(100);
+                    }
+                }
+            }
+            catch 
+            {
+            }
+
+            Assert.That(count, Is.EqualTo(1));
+        }
+
         [Test]
         public void AsyncLockShouldAllowMultipleStackedWaits()
         {
@@ -45,7 +89,7 @@ namespace kafka_tests.Unit
             var count = 0;
             var alock = new AsyncLock();
 
-            var firstCall = Task.Factory.StartNew(async () =>
+            var firstCall = Task.Run(async () =>
             {
                 using (await alock.LockAsync())
                 {
@@ -99,7 +143,7 @@ namespace kafka_tests.Unit
                     Console.WriteLine("Past lock Id:{0}", Thread.CurrentThread.ManagedThreadId);
                     Interlocked.Increment(ref count);
                 }
-            }, TaskCreationOptions.LongRunning);
+            });
 
             Assert.That(count, Is.EqualTo(1), "Only one task should have gotten past lock.");
 

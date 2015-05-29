@@ -21,7 +21,7 @@ namespace TestHarness
             };
 
             //start an out of process thread that runs a consumer that will write all received messages to the console
-            Task.Factory.StartNew(() =>
+            Task.Run(() =>
             {
                 var consumer = new Consumer(new ConsumerOptions(topicName, new BrokerRouter(options)) { Log = new ConsoleLog() });
                 foreach (var data in consumer.Consume())

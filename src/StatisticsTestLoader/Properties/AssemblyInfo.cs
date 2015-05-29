@@ -5,12 +5,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("kafka-net-client")]
+[assembly: AssemblyTitle("StatisticsTestLoader")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("kafka-net-client")]
-[assembly: AssemblyCopyright("Copyright © James Roland 2014")]
+[assembly: AssemblyProduct("StatisticsTestLoader")]
+[assembly: AssemblyCopyright("Copyright ©  2015")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("099a9a7b-557c-427f-8129-aadbdc1eee8a")]
+[assembly: Guid("8dd28590-dd14-465d-a029-d6a7223ce45e")]
 
 // Version information for an assembly consists of the following four values:
 //

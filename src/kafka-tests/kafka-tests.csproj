@@ -77,6 +77,7 @@
     <Compile Include="Unit\AsyncLockTests.cs" />
     <Compile Include="Unit\BigEndianBinaryReaderTests.cs" />
     <Compile Include="Unit\BigEndianBinaryWriterTests.cs" />
+    <Compile Include="Unit\CircularBufferTests.cs" />
     <Compile Include="Unit\FakeTcpServerTests.cs" />
     <Compile Include="Unit\KafkaConnectionTests.cs" />
     <Compile Include="Unit\KafkaEndpointTests.cs" />
@@ -88,8 +89,8 @@
     <Compile Include="Unit\MetadataQueriesTests.cs" />
     <Compile Include="Unit\ConsumerTests.cs" />
     <Compile Include="Unit\DefaultPartitionSelectorTests.cs" />
-    <Compile Include="Unit\NagleBlockingCollectionTests.cs" />
     <Compile Include="Unit\ProducerTests.cs" />
+    <Compile Include="Unit\ProtocolTests.cs" />
     <Compile Include="Unit\ProtocolBaseRequestTests.cs" />
     <Compile Include="Unit\ProtocolMessageTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

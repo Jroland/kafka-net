@@ -10,31 +10,57 @@ namespace KafkaNet.Common
     {
         private readonly object _lock = new object();
         private readonly AsyncManualResetEvent _dataAvailableEvent = new AsyncManualResetEvent();
-        private readonly ConcurrentBag<T> _bag = new ConcurrentBag<T>();
+        private readonly ConcurrentQueue<T> _queue = new ConcurrentQueue<T>();
+        private long _dataInBufferCount = 0;
 
         public int Count
         {
-            get { return _bag.Count; }
+            get { return _queue.Count + (int)Interlocked.Read(ref _dataInBufferCount); }
         }
 
-        public Task OnDataAvailable(CancellationToken token)
+        public bool IsCompleted { get; private set; }
+
+        public void CompleteAdding()
+        {
+            IsCompleted = true;
+        }
+
+        public Task OnHasDataAvailable(CancellationToken token)
         {
             return _dataAvailableEvent.WaitAsync().WithCancellation(token);
         }
 
         public void Add(T data)
         {
-            _bag.Add(data);
+            if (IsCompleted)
+            {
+                throw new ObjectDisposedException("AsyncCollection has been marked as complete.  No new documents can be added.");
+            }
+
+            _queue.Enqueue(data);
+
             TriggerDataAvailability();
         }
 
         public void AddRange(IEnumerable<T> data)
         {
+            if (IsCompleted)
+            {
+                throw new ObjectDisposedException("AsyncCollection has been marked as complete.  No new documents can be added.");
+            }
+
             foreach (var item in data)
             {
-                _bag.Add(item);
+                _queue.Enqueue(item);
             }
+
             TriggerDataAvailability();
+        }
+
+        public T Pop()
+        {
+            T data;
+            return TryTake(out data) ? data : default(T);
         }
 
         public async Task<List<T>> TakeAsync(int count, TimeSpan timeout, CancellationToken token)
@@ -50,7 +76,8 @@ namespace KafkaNet.Common
                     while (TryTake(out data))
                     {
                         batch.Add(data);
-                        if (--count <= 0) return batch;
+                        Interlocked.Increment(ref _dataInBufferCount);
+                        if (--count <= 0 || timeoutTask.IsCompleted) return batch;
                     }
                 } while (await Task.WhenAny(_dataAvailableEvent.WaitAsync(), timeoutTask) != timeoutTask);
 
@@ -60,24 +87,27 @@ namespace KafkaNet.Common
             {
                 return batch;
             }
-        }
-
-        public bool TryTake(out T data)
-        {
-            try
-            {
-                return _bag.TryTake(out data);
-            }
             finally
             {
-                if (_bag.IsEmpty) TriggerDataAvailability();
+                Interlocked.Add(ref _dataInBufferCount, -1 * batch.Count);
             }
+        }
+
+        public void DrainAndApply(Action<T> appliedFunc)
+        {
+            T data;
+            while (_queue.TryDequeue(out data))
+            {
+                appliedFunc(data);
+            }
+
+            TriggerDataAvailability();
         }
 
         public IEnumerable<T> Drain()
         {
             T data;
-            while (_bag.TryTake(out data))
+            while (_queue.TryDequeue(out data))
             {
                 yield return data;
             }
@@ -85,19 +115,42 @@ namespace KafkaNet.Common
             TriggerDataAvailability();
         }
 
+        public bool TryTake(out T data)
+        {
+            try
+            {
+                return _queue.TryDequeue(out data);
+            }
+            finally
+            {
+                if (_queue.IsEmpty) TriggerDataAvailability();
+            }
+        }
+
         private void TriggerDataAvailability()
         {
-            lock (_lock)
+            if (_queue.IsEmpty && _dataAvailableEvent.IsOpen)
             {
-                if (_bag.IsEmpty)
+                lock (_lock)
                 {
-                    _dataAvailableEvent.Reset();
-                }
-                else
-                {
-                    _dataAvailableEvent.Set();
+                    if (_queue.IsEmpty && _dataAvailableEvent.IsOpen)
+                    {
+                        _dataAvailableEvent.Close();
+                    }
                 }
             }
+
+            if (_queue.IsEmpty == false && _dataAvailableEvent.IsOpen == false)
+            {
+                lock (_lock)
+                {
+                    if (_queue.IsEmpty == false && _dataAvailableEvent.IsOpen == false)
+                    {
+                        _dataAvailableEvent.Open();
+                    }
+                }
+            }
+
         }
     }
 }

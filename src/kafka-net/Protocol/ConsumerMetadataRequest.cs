@@ -14,7 +14,7 @@ namespace KafkaNet.Protocol
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.ConsumerMetadataRequest; } }
         public string ConsumerGroup { get; set; }
 
-        public byte[] Encode()
+        public KafkaDataPayload Encode()
         {
             return EncodeConsumerMetadataRequest(this);
         }
@@ -25,11 +25,16 @@ namespace KafkaNet.Protocol
             return DecodeConsumerMetadataResponse(payload);
         }
 
-        private byte[] EncodeConsumerMetadataRequest(ConsumerMetadataRequest request)
+        private KafkaDataPayload EncodeConsumerMetadataRequest(ConsumerMetadataRequest request)
         {
             using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
             {
-                return message.Payload();
+                return new KafkaDataPayload
+                {
+                    Buffer = message.Payload(),
+                    CorrelationId = request.CorrelationId,
+                    ApiKey = ApiKey
+                };
             }
         }
 

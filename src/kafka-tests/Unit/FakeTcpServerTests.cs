@@ -2,6 +2,7 @@
 using System.Net.Sockets;
 using System.Threading;
 using KafkaNet.Common;
+using kafka_tests.Fakes;
 using NUnit.Framework;
 using kafka_tests.Helpers;
 

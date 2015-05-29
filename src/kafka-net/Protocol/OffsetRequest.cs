@@ -13,7 +13,7 @@ namespace KafkaNet.Protocol
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Offset; } }
         public List<Offset> Offsets { get; set; }
 
-        public byte[] Encode()
+        public KafkaDataPayload Encode()
         {
             return EncodeOffsetRequest(this);
         }
@@ -23,14 +23,14 @@ namespace KafkaNet.Protocol
             return DecodeOffsetResponse(payload);
         }
 
-        private byte[] EncodeOffsetRequest(OffsetRequest request)
+        private KafkaDataPayload EncodeOffsetRequest(OffsetRequest request)
         {
             if (request.Offsets == null) request.Offsets = new List<Offset>();
             using (var message = EncodeHeader(request))
             {
                 var topicGroups = request.Offsets.GroupBy(x => x.Topic).ToList();
                 message.Pack(ReplicaId)
-                       .Pack(topicGroups.Count);
+                    .Pack(topicGroups.Count);
 
                 foreach (var topicGroup in topicGroups)
                 {
@@ -49,7 +49,12 @@ namespace KafkaNet.Protocol
                     }
                 }
 
-                return message.Payload();
+                return new KafkaDataPayload
+                {
+                    Buffer = message.Payload(),
+                    CorrelationId = request.CorrelationId,
+                    ApiKey = ApiKey
+                };
             }
         }
 

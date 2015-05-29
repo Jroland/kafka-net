@@ -112,7 +112,7 @@ namespace KafkaNet
 
         private Task ConsumeTopicPartitionAsync(string topic, int partitionId)
         {
-            return Task.Factory.StartNew(async () =>
+            return Task.Run(async () =>
             {
                 try
                 {
@@ -140,7 +140,7 @@ namespace KafkaNet
 
                             var fetchRequest = new FetchRequest
                                 {
-                                    MaxWaitTime = (int)_options.MaxWaitTimeForMinimumBytes.TotalMilliseconds,
+                                    MaxWaitTime = (int)Math.Min((long)int.MaxValue, _options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
                                     MinBytes = _options.MinimumBytes,
                                     Fetches = fetches
                                 };
@@ -154,10 +154,10 @@ namespace KafkaNet
                             {
                                 var response = responses.FirstOrDefault(); //we only asked for one response
 
-                                HandleResponseErrors(fetch, response);
-
                                 if (response != null && response.Messages.Count > 0)
                                 {
+                                    HandleResponseErrors(fetch, response);
+
                                     foreach (var message in response.Messages)
                                     {
                                         _fetchResponseQueue.Add(message, _disposeToken.Token);
