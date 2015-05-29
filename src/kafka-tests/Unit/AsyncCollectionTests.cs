@@ -86,22 +86,7 @@ namespace kafka_tests.Unit
             Assert.That(data.Count, Is.EqualTo(10));
             Assert.That(collection.Count, Is.EqualTo(0));
         }
-
-        [Test]
-        [Ignore("Currently remove max buffer feature.")]
-        public void CollectionShouldBlockOnMaxBuffer()
-        {
-            var collection = new AsyncCollection<int>();
-            var task = Task.Factory.StartNew(() => collection.AddRange(Enumerable.Range(0, 10)));
-            TaskTest.WaitFor(() => collection.Count >= 9);
-            Assert.That(collection.Count, Is.EqualTo(9), "Buffer should block at 9 items.");
-            Assert.That(task.IsCompleted, Is.False, "Task should be blocking on last item.");
-            var item = collection.Pop();
-            TaskTest.WaitFor(() => task.IsCompleted);
-            Assert.That(task.IsCompleted, Is.True, "Task should complete after room is made in buffer.");
-            Assert.That(collection.Count, Is.EqualTo(9), "There should now be 9 items in the buffer.");
-        }
-
+        
         #region Take Tests...
         [Test]
         public void TryTakeShouldReturnFalseOnEmpty()
@@ -346,7 +331,6 @@ namespace kafka_tests.Unit
             Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
         }
         #endregion
-
 
         #region CompletedTests Tests...
 

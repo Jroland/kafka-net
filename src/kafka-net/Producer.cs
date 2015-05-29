@@ -24,8 +24,10 @@ namespace KafkaNet
 
         private readonly CancellationTokenSource _stopToken = new CancellationTokenSource();
         private readonly int _maximumAsyncRequests;
+        private readonly int _maximumMessageBuffer;
         private readonly AsyncCollection<TopicMessage> _asyncCollection;
         private readonly SemaphoreSlim _semaphoreMaximumAsync;
+        private readonly SemaphoreSlim _semaphoreMaximumMessages;
         private readonly IMetadataQueries _metadataQueries;
         private readonly Task _postTask;
 
@@ -84,9 +86,11 @@ namespace KafkaNet
         {
             BrokerRouter = brokerRouter;
             _maximumAsyncRequests = maximumAsyncRequests;
+            _maximumMessageBuffer = maximumMessageBuffer;
             _metadataQueries = new MetadataQueries(BrokerRouter);
             _asyncCollection = new AsyncCollection<TopicMessage>();
             _semaphoreMaximumAsync = new SemaphoreSlim(maximumAsyncRequests, maximumAsyncRequests);
+            _semaphoreMaximumMessages = new SemaphoreSlim(maximumMessageBuffer, maximumMessageBuffer);
 
             BatchSize = DefaultBatchSize;
             BatchDelayTime = TimeSpan.FromMilliseconds(DefaultBatchDelayMS);
@@ -124,13 +128,19 @@ namespace KafkaNet
                 Message = message
             }).ToList();
 
-            _asyncCollection.AddRange(batch);
+
+            foreach (var item in batch)
+            {
+                await _semaphoreMaximumMessages.WaitAsync(_stopToken.Token);
+                item.Tcs.Task.ContinueWith(t => _semaphoreMaximumMessages.Release());
+                _asyncCollection.Add(item);
+            }
 
             await Task.WhenAll(batch.Select(x => x.Tcs.Task));
-
+            
             return batch.Select(topicMessage => topicMessage.Tcs.Task.Result)
-                                .Distinct()
-                                .ToList();
+                .Distinct()
+                .ToList();
         }
 
         /// <summary>
@@ -237,10 +247,10 @@ namespace KafkaNet
             foreach (var ackLevelBatch in messages.GroupBy(batch => new { batch.Acks, batch.Timeout }))
             {
                 var messageByRouter = ackLevelBatch.Select(batch => new
-                {
-                    TopicMessage = batch,
-                    Route = BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Message.Key),
-                })
+                                            {
+                                                TopicMessage = batch,
+                                                Route = BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Message.Key),
+                                            })
                                          .GroupBy(x => new { x.Route, x.TopicMessage.Topic, x.TopicMessage.Codec });
 
                 var sendTasks = new List<BrokerRouteSendBatch>();
