@@ -236,7 +236,7 @@ namespace KafkaNet
             else
             {
                 asyncRequestItem.ReceiveTask.TrySetException(new ResponseTimeoutException(
-                    string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.",
+                    string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}.",
                         _responseTimeoutMS)));
             }
         }
