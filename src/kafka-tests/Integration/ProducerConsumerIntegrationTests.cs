@@ -207,14 +207,13 @@ namespace kafka_tests.Integration
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
 
                 //create consumer with buffer size of 1 (should block upstream)
-                int p = 6;
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router) { ConsumerBufferSize = 1, PartitionWhitelist = { p } },
-                    offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
+                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router) { ConsumerBufferSize = 1 },
+                      offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
 
                     for (int i = 0; i < 20; i++)
                     {
-                        producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString(), testId) }, 1, null, MessageCodec.CodecNone, p).Wait();
+                        producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString(), testId) }).Wait();
                     }
 
                     for (int i = 0; i < 20; i++)
