@@ -151,6 +151,52 @@ namespace kafka_tests.Integration
         }
 
         [Test]
+        public void ProducerShouldUsePartitionIdInsteadOfMessageKeyToChoosePartition()
+        {
+            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
+            using (var producer = new Producer(router))
+            {
+                var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
+                int partitionId = 0;
+                string key = GetKey_PartitonIdChosenByKeyIsNotEqualToPartitionId(router, partitionId);
+
+                //message should send to PartitionId and not use the key to Select Broker Route !!
+                for (int i = 0; i < 20; i++)
+                {
+                    producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString(), key) }, 1, null, MessageCodec.CodecNone, partitionId).Wait();
+                }
+
+                //consume form partitionId to verify that date is send to currect partion !!.
+                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router) { PartitionWhitelist = { partitionId } },
+                    offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
+                {
+                    for (int i = 0; i < 20; i++)
+                    {
+                        var result = consumer.Consume().Take(1).First();
+                        Assert.That(result.Key.ToUtf8String(), Is.EqualTo(key));
+                        Assert.That(result.Value.ToUtf8String(), Is.EqualTo(i.ToString()));
+                    }
+                }
+            }
+        }
+
+        private static string GetKey_PartitonIdChosenByKeyIsNotEqualToPartitionId(BrokerRouter router,
+            int partitionId)
+        {
+            string key = null;
+            bool partitionEqualsPartitonIdChosedByKey = true;
+            while (partitionEqualsPartitonIdChosedByKey)
+            {
+                var guidkey = Guid.NewGuid();
+                key = guidkey.ToString();
+                int partitonIdChosedByKey = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, guidkey.ToByteArray()).PartitionId;
+                partitionEqualsPartitonIdChosedByKey = partitionId == partitonIdChosedByKey;
+            }
+            return key;
+        }
+
+
+        [Test]
         public void ConsumerShouldNotLoseMessageWhenBlocked()
         {
             var testId = Guid.NewGuid().ToString();
@@ -162,7 +208,7 @@ namespace kafka_tests.Integration
 
                 //create consumer with buffer size of 1 (should block upstream)
                 using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router) { ConsumerBufferSize = 1 },
-                    offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
+                      offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
 
                     for (int i = 0; i < 20; i++)
@@ -198,7 +244,7 @@ namespace kafka_tests.Integration
                      offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
                     Console.WriteLine("Sending {0} test messages", expectedCount);
-                    var response = await producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, 
+                    var response = await producer.SendMessageAsync(IntegrationConfig.IntegrationTopic,
                         Enumerable.Range(0, expectedCount).Select(x => new Message(x.ToString())));
 
                     Assert.That(response.Any(x => x.Error != (int)ErrorResponseCode.NoError), Is.False, "Error occured sending test messages to server.");

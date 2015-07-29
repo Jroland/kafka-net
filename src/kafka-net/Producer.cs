@@ -109,7 +109,7 @@ namespace KafkaNet
         /// <param name="codec">The codec to apply to the message collection.  Defaults to none.</param>
         /// <returns>List of ProduceResponses from each partition sent to or empty list if acks = 0.</returns>
         public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1,
-            TimeSpan? timeout = null, MessageCodec codec = MessageCodec.CodecNone)
+            TimeSpan? timeout = null, MessageCodec codec = MessageCodec.CodecNone, int? partition = null)
         {
             if (_stopToken.IsCancellationRequested)
                 throw new ObjectDisposedException("Cannot send new documents as producer is disposing.");
@@ -121,7 +121,8 @@ namespace KafkaNet
                 Codec = codec,
                 Timeout = timeout.Value,
                 Topic = topic,
-                Message = message
+                Message = message,
+                Partition = partition
             }).ToList();
 
             _asyncCollection.AddRange(batch);
@@ -239,7 +240,7 @@ namespace KafkaNet
                 var messageByRouter = ackLevelBatch.Select(batch => new
                 {
                     TopicMessage = batch,
-                    Route = BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Message.Key),
+                    Route = batch.Partition.HasValue ? BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Partition.Value) : BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Message.Key) 
                 })
                                          .GroupBy(x => new { x.Route, x.TopicMessage.Topic, x.TopicMessage.Codec });
 
@@ -331,6 +332,7 @@ namespace KafkaNet
         public MessageCodec Codec { get; set; }
         public string Topic { get; set; }
         public Message Message { get; set; }
+        public int? Partition { get; set; }
 
         public TopicMessage()
         {
