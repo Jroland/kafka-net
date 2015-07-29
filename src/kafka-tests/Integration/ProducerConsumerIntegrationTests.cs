@@ -158,7 +158,7 @@ namespace kafka_tests.Integration
             {
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
                 int partitionId = 0;
-                string key = GetKey_PartitonIdChosedByKeyIsNotEqualToPartitionId(router, partitionId);
+                string key = GetKey_PartitonIdChosenByKeyIsNotEqualToPartitionId(router, partitionId);
 
                 //message should send to PartitionId and not use the key to Select Broker Route !!
                 for (int i = 0; i < 20; i++)
@@ -180,7 +180,7 @@ namespace kafka_tests.Integration
             }
         }
 
-        private static string GetKey_PartitonIdChosedByKeyIsNotEqualToPartitionId(BrokerRouter router,
+        private static string GetKey_PartitonIdChosenByKeyIsNotEqualToPartitionId(BrokerRouter router,
             int partitionId)
         {
             string key = null;
