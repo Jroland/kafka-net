@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -201,17 +200,18 @@ namespace KafkaNet
                     var sendTask = ProduceAndSendBatchAsync(batch, _stopToken.Token);
 
                     outstandingSendTasks.TryAdd(sendTask, sendTask);
-
-                    var sendTaskCleanup = sendTask.ContinueWith(result =>
+                    try
                     {
-                        if (result.IsFaulted && batch != null)
-                        {
-                            batch.ForEach(x => x.Tcs.TrySetException(result.ExtractException()));
-                        }
+                        await sendTask;
+                    }
+                    catch (Exception ex)
+                    {
+                        batch.ForEach(x => x.Tcs.TrySetException(ex));
+                    }
+                    outstandingSendTasks.TryRemove(sendTask, out sendTask);
 
-                        //TODO add statistics tracking
-                        outstandingSendTasks.TryRemove(sendTask, out sendTask);
-                    });
+
+           
 
                 }
                 catch (Exception ex)
@@ -240,7 +240,7 @@ namespace KafkaNet
                 var messageByRouter = ackLevelBatch.Select(batch => new
                 {
                     TopicMessage = batch,
-                    Route = batch.Partition.HasValue ? BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Partition.Value) : BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Message.Key) 
+                    Route = batch.Partition.HasValue ? BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Partition.Value) : BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Message.Key)
                 })
                                          .GroupBy(x => new { x.Route, x.TopicMessage.Topic, x.TopicMessage.Codec });
 
@@ -264,10 +264,11 @@ namespace KafkaNet
 
                     await _semaphoreMaximumAsync.WaitAsync(cancellationToken).ConfigureAwait(false);
 
+                    var sendGroupTask = group.Key.Route.Connection.SendAsync(request);
                     var brokerSendTask = new BrokerRouteSendBatch
                     {
                         Route = group.Key.Route,
-                        Task = group.Key.Route.Connection.SendAsync(request),
+                        Task = sendGroupTask,
                         MessagesSent = group.Select(x => x.TopicMessage).ToList()
                     };
 

@@ -47,9 +47,10 @@ namespace kafka_tests.Integration
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
             using (var producer = new Producer(router))
             {
-                var result = await producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message("1"), new Message("2"), new Message("3") });
+                var messages=new[] { new Message("1"), new Message("2"), new Message("3")};
+                var result = await producer.SendMessageAsync(IntegrationConfig.IntegrationTopic,messages);
 
-                Assert.That(result.Count, Is.EqualTo(2));
+                Assert.That(result.Count, Is.EqualTo(messages.Count()));
             }
         }
 
@@ -70,7 +71,7 @@ namespace kafka_tests.Integration
 
                 var result = tasks.SelectMany(x => x.Result).Distinct().ToList();
 
-                Assert.That(result.Count, Is.EqualTo(2));
+                Assert.That(result.Count, Is.EqualTo(tasks.Count()));
             }
         }
     }

@@ -280,6 +280,7 @@ namespace KafkaNet
                     StatisticsTracker.IncrementGauge(StatisticGauge.ActiveWriteOperation);
 
                     if (OnWriteToSocketAttempt != null) OnWriteToSocketAttempt(sendTask.Payload);
+                    _log.DebugFormat("Send to netStream WriteAsync CorrelationId:{0}", sendTask.Payload.CorrelationId);
                     await netStream.WriteAsync(sendTask.Payload.Buffer, 0, sendTask.Payload.Buffer.Length).ConfigureAwait(false);
 
                     sendTask.Tcp.TrySetResult(sendTask.Payload);
@@ -399,7 +400,7 @@ namespace KafkaNet
     {
         public TaskCompletionSource<KafkaDataPayload> Tcp { get; set; }
         public KafkaDataPayload Payload { get; set; }
-
+      
         private readonly CancellationTokenRegistration _cancellationTokenRegistration;
 
         public SocketPayloadSendTask(KafkaDataPayload payload, CancellationToken cancellationToken)

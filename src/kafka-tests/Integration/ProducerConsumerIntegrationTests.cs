@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using KafkaNet;
@@ -74,6 +75,139 @@ namespace kafka_tests.Integration
             }
         }
 
+
+        /// <summary>
+        /// order Should remain in the same ack leve and partition
+        /// </summary>
+        /// <returns></returns>
+        [Test]
+        public async Task ConsumerShouldConsumeInSameOrderAsAsyncProduced()
+        {
+            int partition = 0;
+            int numberOfMessage = 200;
+            Debug.WriteLine(String.Format("******************create BrokerRouter***********************"));
+            var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri));
+            int CausesRaceConditionOldVersion = 2;
+            var producer = new Producer(router, CausesRaceConditionOldVersion) { BatchDelayTime = TimeSpan.Zero };//this is slow on purpose
+            //this is not slow  var producer = new Producer(router);
+            Debug.WriteLine(String.Format("******************create producer***********************"));
+            List<OffsetResponse> offsets = await producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic);
+            Debug.WriteLine(String.Format("******************request Offset***********************"));
+            List<Task> sendList = new List<Task>(numberOfMessage);
+            for (int i = 0; i < numberOfMessage; i++)
+            {
+                var sendTask = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString()) }, 1, null, MessageCodec.CodecNone, partition);
+                sendList.Add(sendTask);
+            }
+
+            await Task.WhenAll(sendList.ToArray());
+            Debug.WriteLine(String.Format("******************done send***********************"));
+
+
+            Debug.WriteLine(String.Format("******************create Consumer***********************"));
+            ConsumerOptions consumerOptions = new ConsumerOptions(IntegrationConfig.IntegrationTopic, router);
+            consumerOptions.PartitionWhitelist = new List<int> { partition };
+
+            Consumer consumer = new Consumer(consumerOptions, offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray());
+
+            int expected = 0;
+            Debug.WriteLine(String.Format("******************start Consume***********************"));
+            await Task.Run((() =>
+                  {
+                      var results = consumer.Consume().Take(numberOfMessage).ToList();
+                      Assert.IsTrue(results.Count() == numberOfMessage, "not Consume all ,messages");
+                      Debug.WriteLine(String.Format("******************done Consume***********************"));
+
+                      foreach (Message message in results)
+                      {
+                          Assert.That(message.Value.ToUtf8String(), Is.EqualTo(expected.ToString()),
+                              "Expected the message list in the correct order.");
+                          expected++;
+                      }
+                  }));
+            Debug.WriteLine(String.Format("******************start producer Dispose***********************"));
+            producer.Dispose();
+            Debug.WriteLine(String.Format("******************start consumer Dispose***********************"));
+            consumer.Dispose();
+            Debug.WriteLine(String.Format("******************start router Dispose***********************"));
+            router.Dispose();
+
+        }
+
+
+        [Test]
+        public async Task ConsumerShouldConsumeInSameOrderAsAsyncProduced_dataLoad()
+        {
+            int partition = 0;
+            int numberOfMessage = 10000;
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+
+            Debug.WriteLine(String.Format("******************create BrokerRouter ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+            var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri));
+            stopwatch.Restart();
+            var producer = new Producer(router,1500, maximumMessageBuffer: numberOfMessage/10);
+            Debug.WriteLine(String.Format("******************create producer ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+            stopwatch.Restart();
+            List<OffsetResponse> offsets = await producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic);
+            Debug.WriteLine(String.Format("******************request Offset,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+            stopwatch.Restart();
+            List<Task> sendList = new List<Task>(numberOfMessage);
+            for (int i = 0; i < numberOfMessage; i++)
+            {
+                var sendTask = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString()) }, 1, null, MessageCodec.CodecNone, partition);
+                sendList.Add(sendTask);
+            }
+            TimeSpan maxTimeToRun = TimeSpan.FromSeconds(1);
+            var doneSend = Task.WhenAll(sendList.ToArray());
+            await Task.WhenAny(doneSend, Task.Delay(maxTimeToRun));
+            Assert.IsTrue(doneSend.IsCompleted, "not done to send in time");
+
+            Debug.WriteLine(String.Format("******************done send ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+            stopwatch.Restart();
+
+            ConsumerOptions consumerOptions = new ConsumerOptions(IntegrationConfig.IntegrationTopic, router);
+            consumerOptions.PartitionWhitelist = new List<int> { partition };
+            consumerOptions.MaxWaitTimeForMinimumBytes =TimeSpan.Zero;
+            Consumer consumer = new Consumer(consumerOptions, offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray());
+
+            int expected = 0;
+            Debug.WriteLine(String.Format("******************start Consume ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+         
+            IEnumerable<Message> messages = null;
+            var doneConsume = Task.Run((() =>
+             {
+                 stopwatch.Restart();
+                 messages = consumer.Consume().Take(numberOfMessage).ToArray();
+                 Debug.WriteLine(String.Format("******************done Consume ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+                 stopwatch.Restart();
+             }));
+
+            TimeSpan maxTimeToConsume = TimeSpan.FromSeconds(1);
+            await Task.WhenAny(doneConsume, Task.Delay(maxTimeToConsume));
+
+            Assert.IsTrue(doneConsume.IsCompleted, "not done to Consume in time");
+            Assert.IsTrue(messages.Count() == numberOfMessage, "not Consume all ,messages");
+
+
+            foreach (Message message in messages)
+            {
+                Assert.That(message.Value.ToUtf8String(), Is.EqualTo(expected.ToString()),
+                    "Expected the message list in the correct order.");
+                expected++;
+            }
+            stopwatch.Restart();
+            producer.Dispose();
+            Debug.WriteLine(String.Format("******************start producer Dispose ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+
+            consumer.Dispose();
+            Debug.WriteLine(String.Format("******************start consumer Dispose ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+            stopwatch.Restart();
+
+            router.Dispose();
+            Debug.WriteLine(String.Format("******************start router Dispose,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+
+        }
         [Test]
         public void ConsumerShouldBeAbleToSeekBackToEarlierOffset()
         {
