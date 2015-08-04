@@ -111,7 +111,7 @@ namespace KafkaNet.Protocol
         public int MaxOffsets { get; set; }
     }
 
-    public class OffsetResponse
+    public class OffsetResponse:IBaseResponse
     {
         public string Topic { get; set; }
         public int PartitionId { get; set; }

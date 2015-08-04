@@ -119,7 +119,7 @@ namespace KafkaNet.Protocol
     
     }
 
-    public class OffsetCommitResponse
+    public class OffsetCommitResponse:IBaseResponse
     {
         /// <summary>
         /// The name of the topic this response entry is for.
@@ -132,6 +132,6 @@ namespace KafkaNet.Protocol
         /// <summary>
         /// Error code of exception that occured during the request.  Zero if no error.
         /// </summary>
-        public Int16 Error;
+        public Int16 Error { get; set; }
     }
 }

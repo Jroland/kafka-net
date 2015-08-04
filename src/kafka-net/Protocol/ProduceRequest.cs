@@ -150,7 +150,7 @@ namespace KafkaNet.Protocol
         public Message CompressedMessage { get; set; }
     }
 
-    public class ProduceResponse
+    public class ProduceResponse:IBaseResponse
     {
         /// <summary>
         /// The topic the offset came from.
