@@ -135,18 +135,21 @@ namespace kafka_tests.Integration
         }
 
 
+
         [Test]
-        public async Task ConsumerShouldConsumeInSameOrderAsAsyncProduced_dataLoad()
+        [TestCase(1000, 200)]
+        [TestCase(30000, 900)]
+        [TestCase(50000, 1300)]
+        public async Task ConsumerShouldConsumeInSameOrderAsAsyncProduced_dataLoad(int numberOfMessage, int timeoutInMs)
         {
             int partition = 0;
-            int numberOfMessage = 10000;
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
 
             Debug.WriteLine(String.Format("******************create BrokerRouter ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
             var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri));
             stopwatch.Restart();
-            var producer = new Producer(router,1500, maximumMessageBuffer: numberOfMessage/10);
+            var producer = new Producer(router) { BatchDelayTime = TimeSpan.FromMilliseconds(10), BatchSize = numberOfMessage / 10 };
             Debug.WriteLine(String.Format("******************create producer ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
             stopwatch.Restart();
             List<OffsetResponse> offsets = await producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic);
@@ -158,7 +161,7 @@ namespace kafka_tests.Integration
                 var sendTask = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString()) }, 1, null, MessageCodec.CodecNone, partition);
                 sendList.Add(sendTask);
             }
-            TimeSpan maxTimeToRun = TimeSpan.FromSeconds(1);
+            TimeSpan maxTimeToRun = TimeSpan.FromMilliseconds(timeoutInMs);
             var doneSend = Task.WhenAll(sendList.ToArray());
             await Task.WhenAny(doneSend, Task.Delay(maxTimeToRun));
             Assert.IsTrue(doneSend.IsCompleted, "not done to send in time");
@@ -168,12 +171,12 @@ namespace kafka_tests.Integration
 
             ConsumerOptions consumerOptions = new ConsumerOptions(IntegrationConfig.IntegrationTopic, router);
             consumerOptions.PartitionWhitelist = new List<int> { partition };
-            consumerOptions.MaxWaitTimeForMinimumBytes =TimeSpan.Zero;
+            consumerOptions.MaxWaitTimeForMinimumBytes = TimeSpan.Zero;
             Consumer consumer = new Consumer(consumerOptions, offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray());
 
             int expected = 0;
             Debug.WriteLine(String.Format("******************start Consume ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
-         
+
             IEnumerable<Message> messages = null;
             var doneConsume = Task.Run((() =>
              {
@@ -183,8 +186,7 @@ namespace kafka_tests.Integration
                  stopwatch.Restart();
              }));
 
-            TimeSpan maxTimeToConsume = TimeSpan.FromSeconds(1);
-            await Task.WhenAny(doneConsume, Task.Delay(maxTimeToConsume));
+            await Task.WhenAny(doneConsume, Task.Delay(maxTimeToRun));
 
             Assert.IsTrue(doneConsume.IsCompleted, "not done to Consume in time");
             Assert.IsTrue(messages.Count() == numberOfMessage, "not Consume all ,messages");
