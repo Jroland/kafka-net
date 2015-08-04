@@ -136,7 +136,7 @@ namespace KafkaNet.Protocol
         public int MaxBytes { get; set; }
     }
 
-    public class FetchResponse
+    public class FetchResponse:IBaseResponse
     {
         /// <summary>
         /// The name of the topic this response entry is for.
