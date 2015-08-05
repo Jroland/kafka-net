@@ -1,7 +1,5 @@
-﻿using System;
+﻿
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using KafkaNet.Protocol;
 
@@ -15,6 +13,6 @@ namespace KafkaNet.Interfaces
 
         Task<long> GetOffset(string consumerGroup);
 
-        Task<IEnumerable<Message>> GetMessages(int maxCount, long offset, TimeSpan timeout);
+        Task<IEnumerable<Message>> GetMessages(int maxCount, long offset);
     }
 }
