@@ -74,6 +74,7 @@
     <Compile Include="Integration\OffsetManagementTests.cs" />
     <Compile Include="Integration\ProducerConsumerIntegrationTests.cs" />
     <Compile Include="Integration\ProducerIntegrationTests.cs" />
+    <Compile Include="Integration\ProtocolGatewayTest.cs" />
     <Compile Include="Unit\AsyncCollectionTests.cs" />
     <Compile Include="Unit\AsyncLockTests.cs" />
     <Compile Include="Unit\BigEndianBinaryReaderTests.cs" />
