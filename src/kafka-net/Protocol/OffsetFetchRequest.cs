@@ -110,19 +110,19 @@ namespace KafkaNet.Protocol
         /// <summary>
         /// The name of the topic this response entry is for.
         /// </summary>
-        public string Topic;
+        public string Topic { get; set; }
         /// <summary>
         /// The id of the partition this response is for.
         /// </summary>
-        public Int32 PartitionId;
+        public Int32 PartitionId { get; set; }
         /// <summary>
         /// The offset position saved to the server.
         /// </summary>
-        public Int64 Offset;
+        public Int64 Offset { get; set; }
         /// <summary>
         /// Any arbitrary metadata stored during a CommitRequest.
         /// </summary>
-        public string MetaData;
+        public string MetaData { get; set; }
         /// <summary>
         /// Error code of exception that occured during the request.  Zero if no error.
         /// </summary>
