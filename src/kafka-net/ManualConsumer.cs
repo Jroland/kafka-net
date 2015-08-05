@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Interfaces;
@@ -14,23 +13,29 @@ namespace KafkaNet
     /// </summary>
     public class ManualConsumer : IManualConsumer
     {
-        private string _topic;
-        private int _partitionId;
+        private readonly string _topic;
+        private readonly int _partitionId;
         private readonly SemaphoreSlim _semaphore;
-        private Message[] _messages;
         private Task<FetchResponse> _lastFetchTask;
-        private long _lastConsumedOffset;
+        private readonly ProtocolGateway _gateway;
+        private int _numOfBytesToWaitFor;        
 
-        private const double RatioToMoveToArray = 0.01;
+        private const int MaxWaitTimeForKafka = 100;
+        private const int UseBrokerTimestamp = -1;
+        private const int NoOffsetFound = -1;
 
-        public ManualConsumer(BrokerRouter router, int partitionId, string topic)
+        public ManualConsumer(int partitionId, string topic, ProtocolGateway gateway)
         {
             if (string.IsNullOrEmpty(topic)) throw new ArgumentNullException("topic");
+            if (gateway == null) throw new ArgumentNullException("gateway");
 
+            _gateway = gateway;
             _partitionId = partitionId;
             _topic = topic;
             _semaphore = new SemaphoreSlim(1);
             _lastFetchTask = null;
+
+            _numOfBytesToWaitFor = FetchRequest.DefaultBufferSize;
         }
 
         public async Task UpdateOffset(string consumerGroup, long offset)
@@ -39,9 +44,8 @@ namespace KafkaNet
 
             try
             {
-
-                // TODO: Implement!
-                throw new NotImplementedException();
+                OffsetCommitRequest request = CreateOffsetCommitRequest(offset, consumerGroup);
+                await _gateway.SendProtocolRequest(request, _topic, _partitionId);                                
             }
             finally
             {
@@ -55,9 +59,9 @@ namespace KafkaNet
 
             try
             {
-
-                // TODO: Implement!
-                throw new NotImplementedException();
+                var request = CreateOffsetRequest();
+                var response = await _gateway.SendProtocolRequest(request, _topic, _partitionId);
+                return response.Offsets.Count > 0 ? response.Offsets.First() : NoOffsetFound;
             }
             finally
             {
@@ -71,9 +75,11 @@ namespace KafkaNet
 
             try
             {
+                OffsetFetchRequest offsetFetchrequest = CreateOffsetFetchRequest(consumerGroup);
 
-                // TODO: Implement!
-                throw new NotImplementedException();
+                // TODO: Should also bring timeout?
+                var response = await _gateway.SendProtocolRequest(offsetFetchrequest, _topic, _partitionId);
+                return response.Offset;
             }
             finally
             {
@@ -81,83 +87,122 @@ namespace KafkaNet
             }
         }
 
-        public async Task<IEnumerable<Protocol.Message>> GetMessages(int maxCount, long offset, TimeSpan timeout)
+        public async Task<IEnumerable<Message>> GetMessages(int maxCount, long offset, TimeSpan timeout)
         {
             await _semaphore.WaitAsync();
 
             try
             {
-                FetchResponse response = null;
-
-                if (_lastFetchTask != null)
+                if (_lastFetchTask != null && 
+                    _lastFetchTask.IsCompleted)
                 {
-                    if (_lastFetchTask.IsCompleted)
+                    if (_lastFetchTask.IsFaulted && _lastFetchTask.Exception != null)
                     {
-                        response = _lastFetchTask.Result;
-                    }
-                }
-                else
-                {
-                    int startIndex;
+                        throw _lastFetchTask.Exception;
+                    }                    
 
-                    if (_messages != null &&
-                        TryInRange(_messages, offset, maxCount, out startIndex))
+                    // Checking if the last fetch task has the wanted batch of messages
+                    var messages = _lastFetchTask.Result.Messages;
+                    var startIndex = messages.FindIndex(m => m.Meta.Offset == offset);
+                    if (startIndex != -1 &&
+                        startIndex + maxCount <= messages.Count)
                     {
-                        // the bulk is in range, we can take messages from the array
-                        return new ArraySegment<Message>(_messages, startIndex, maxCount).AsEnumerable();                        
+                        return messages.GetRange(startIndex, maxCount);
                     }
                 }
 
-                // Checking if I have a response
-                if (response == null)
+                // If we arrived here, then we need to make a new fetch request and work with it
+
+                FetchRequest request = CreateFetchRequest(offset);
+
+                var taskToCheck = _gateway.SendProtocolRequest(request, _topic, _partitionId);
+                await Task.WhenAny(taskToCheck, Task.Delay(timeout));
+
+                // Saving the current task
+                _lastFetchTask = taskToCheck;
+
+                if (!taskToCheck.IsCompleted)
                 {
-                    // TODO: Making a fetch request here
-                    Task<FetchResponse> fetchTask = null;
-
-                    await Task.WhenAny(fetchTask, Task.Delay(timeout));
-
-                    if (!fetchTask.IsCompleted)
-                    {
-                        // Didn't manage to fetch this round
-                        _lastFetchTask = fetchTask;
-                        return null;
-                    }
-                }                
-
-                // Checking the ratio..
-                if (response.Messages.Count > 0 &&
-                    (double) maxCount/response.Messages.Count <= RatioToMoveToArray)
+                    // Didn't manage to fetch this round                    
+                    return null;
+                }
+                
+                // Task is completed
+                if (taskToCheck.IsFaulted && taskToCheck.Exception != null)
                 {
-                    // Moving some of the messages to the array
-                    _messages = response.Messages.Skip(maxCount).ToArray();
+                    throw taskToCheck.Exception;
                 }
 
-                // Returning the wanted amount
-                return response.Messages.Take(maxCount);                
+                // We have a response
+                FetchResponse response = taskToCheck.Result;
+
+                if (response.Messages.Count == 0)
+                {
+                    return response.Messages;
+                }
+
+                // Saving the last consumed offset and Returning the wanted amount                
+                var messagesToReturn = response.Messages.Take(maxCount);
+
+                return messagesToReturn;
+            }
+            catch (BufferUnderRunException ex)
+            {
+                _numOfBytesToWaitFor = ex.RequiredBufferSize + ex.MessageHeaderSize;
+                return null;
             }
             finally
             {
                 _semaphore.Release();
-            }
+            }            
         }
 
-        private bool TryInRange(Message[] arrayMessages, long offset, int maxCount, out int startIndex)
+        private FetchRequest CreateFetchRequest(long offset)
         {
-            bool isInRange = false;
-            startIndex = -1;
+            Fetch fetch = new Fetch() { Offset = offset, PartitionId = _partitionId, Topic = _topic };
 
-            if (_messages.First().Meta.Offset <= offset &&
-                _messages.Last().Meta.Offset >= offset + maxCount)
+            FetchRequest request = new FetchRequest()
             {
-                startIndex = Array.FindIndex(_messages, m => m.Meta.Offset == offset);
+                MaxWaitTime = MaxWaitTimeForKafka,
+                MinBytes = _numOfBytesToWaitFor,
+                Fetches = new List<Fetch>() { fetch }
+            };
 
-                if ((startIndex + maxCount) < _messages.Length)
-                {
-                    isInRange = true;
-                }
-            }
+            return request;
+        }
 
-            return isInRange;
+        private OffsetFetchRequest CreateOffsetFetchRequest(string consumerGroup)
+        {
+            OffsetFetch topicFetch = new OffsetFetch() {PartitionId = _partitionId, Topic = _topic};
+            OffsetFetchRequest request = new OffsetFetchRequest()
+            {
+                ConsumerGroup = consumerGroup,
+                Topics = new List<OffsetFetch>() {topicFetch}
+            };
+
+            return request;            
+        }
+
+        private OffsetCommitRequest CreateOffsetCommitRequest(long offset, string consumerGroup)
+        {
+            OffsetCommit commit = new OffsetCommit()
+            {
+                Offset = offset,
+                Topic = _topic,
+                PartitionId = _partitionId,
+                TimeStamp = UseBrokerTimestamp
+            };
+
+            OffsetCommitRequest request = new OffsetCommitRequest() {ConsumerGroup = consumerGroup, OffsetCommits = new List<OffsetCommit>(){commit}};
+            return request;
+        }
+
+        private OffsetRequest CreateOffsetRequest()
+        {
+            Offset offset = new Offset() {PartitionId = _partitionId, Topic = _topic, MaxOffsets = 1};
+
+            OffsetRequest request = new OffsetRequest() {Offsets = new List<Offset>() {offset}};
+            return request;            
         }
     }
 }
