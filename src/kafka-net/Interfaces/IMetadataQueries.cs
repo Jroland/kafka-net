@@ -14,7 +14,7 @@ namespace KafkaNet
         /// </summary>
         /// <param name="topic">The metadata on the requested topic.</param>
         /// <returns>Topic object containing the metadata on the requested topic.</returns>
-        Topic GetTopic(string topic);
+        Topic GetTopicFromCache(string topic);
 
         /// <summary>
         /// Get offsets for each partition from a given topic.

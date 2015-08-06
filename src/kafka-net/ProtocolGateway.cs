@@ -25,13 +25,15 @@ namespace KafkaNet
 
         public async Task<T> SendProtocolRequest<T>(IKafkaRequest<T> request, string topic, int partition) where T : class,IBaseResponse
         {
+
             int retryTime = 0;
             while (retryTime <= _maxRetry)
             {
                 try
                 {
+                    await _brokerRouter.RefreshTopicMetadataThatNoExistOnCache(topic);
                     //find route it can chage after Metadata Refresh
-                    var route = _brokerRouter.SelectBrokerRoute(topic, partition);
+                    var route = _brokerRouter.SelectBrokerRouteFromLocalCache(topic, partition);
                     var responses = await route.Connection.SendAsync(request);
                     var response = responses.FirstOrDefault();
                     if (response == null)

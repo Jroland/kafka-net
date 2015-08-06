@@ -20,6 +20,7 @@ namespace KafkaNet
         private readonly ConsumerOptions _options;
         private readonly BlockingCollection<Message> _fetchResponseQueue;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        private TaskCompletionSource<int> _disposeTask;
         private readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
         private readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
         private readonly IMetadataQueries _metadataQueries;
@@ -33,7 +34,7 @@ namespace KafkaNet
             _options = options;
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
             _metadataQueries = new MetadataQueries(_options.Router);
-            
+            _disposeTask = new TaskCompletionSource<int>();
             SetOffsetPosition(positions);
         }
 
@@ -83,7 +84,8 @@ namespace KafkaNet
                 if (Interlocked.Increment(ref _ensureOneThread) == 1)
                 {
                     _options.Log.DebugFormat("Consumer: Refreshing partitions for topic: {0}", _options.Topic);
-                    var topic = _options.Router.GetTopicMetadata(_options.Topic);
+                    _options.Router.RefreshTopicMetadataThatNoExistOnCache(_options.Topic).Wait();
+                    var topic = _options.Router.GetTopicMetadataFromLocalCache(_options.Topic);
                     if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
                     _topic = topic.First();
 
@@ -146,10 +148,13 @@ namespace KafkaNet
                                 };
 
                             //make request and post to queue
-                            var route = _options.Router.SelectBrokerRoute(topic, partitionId);
+                            var route = _options.Router.SelectBrokerRouteFromLocalCache(topic, partitionId);
 
-                            var responses = await route.Connection.SendAsync(fetchRequest).ConfigureAwait(false);
+                            var taskSend = route.Connection.SendAsync(fetchRequest);
+                            await Task.WhenAny(taskSend, _disposeTask.Task).ConfigureAwait(false);
+                            if (_disposeTask.Task.IsCompleted) return;
 
+                            var responses = await taskSend;//all ready done
                             if (responses.Count > 0)
                             {
                                 var response = responses.FirstOrDefault(); //we only asked for one response
@@ -251,9 +256,9 @@ namespace KafkaNet
                    });
         }
 
-        public Topic GetTopic(string topic)
+        public Topic GetTopicFromCache(string topic)
         {
-            return _metadataQueries.GetTopic(topic);
+            return _metadataQueries.GetTopicFromCache(topic);
         }
 
         public Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
@@ -267,7 +272,7 @@ namespace KafkaNet
 
             _options.Log.DebugFormat("Consumer: Disposing...");
             _disposeToken.Cancel();
-
+            _disposeTask.SetResult(1);
             //wait for all threads to unwind
             foreach (var task in _partitionPollingIndex.Values.Where(task => task != null))
             {

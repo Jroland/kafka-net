@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
@@ -22,7 +23,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public void EnsureGzipCompressedMessageCanSend()
+        public async Task EnsureGzipCompressedMessageCanSend()
         {
             //ensure topic exists
             using (var conn = GetKafkaConnection())
@@ -32,7 +33,8 @@ namespace kafka_tests.Integration
 
             using (var router = new BrokerRouter(_options))
             {
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationCompressionTopic, 0);
+                await router.RefreshTopicMetadataThatNoExistOnCache(IntegrationConfig.IntegrationCompressionTopic);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationCompressionTopic, 0);
 
                 var request = new ProduceRequest
                 {

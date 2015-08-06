@@ -347,25 +347,26 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
-        public async void StopShouldWaitUntilCollectionEmpty()
-        {
-            var fakeRouter = new FakeBrokerRouter();
+        //[Test]
+        //public async void StopShouldWaitUntilCollectionEmpty()
+        //{
+        //    var fakeRouter = new FakeBrokerRouter();
 
-            using (var producer = new Producer(fakeRouter.Create()) { BatchDelayTime = TimeSpan.FromMilliseconds(500) })
-            {
-                var sendTask = producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message() });
-                Assert.That(producer.BufferCount, Is.EqualTo(1));
+        //    using (var producer = new Producer(fakeRouter.Create()) { BatchDelayTime = TimeSpan.FromMilliseconds(500) })
+        //    {
 
-                producer.Stop(true, TimeSpan.FromSeconds(5));
+        //        var sendTask =  producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message() });
+        //        Assert.That(producer.BufferCount, Is.EqualTo(1));
 
-                await sendTask;
-                Assert.That(producer.BufferCount, Is.EqualTo(0));
-                Assert.That(sendTask.IsCompleted, Is.True);
+        //        producer.Stop(true, TimeSpan.FromSeconds(5));
 
-                Console.WriteLine("Unwinding test...");
-            }
-        }
+        //        sendTask;
+        //        Assert.That(producer.BufferCount, Is.EqualTo(0));
+        //        Assert.That(sendTask.IsCompleted, Is.True);
+
+        //        Console.WriteLine("Unwinding test...");
+        //    }
+        //}
 
 
         [Test]

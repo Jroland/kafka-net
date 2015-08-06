@@ -110,6 +110,7 @@ namespace KafkaNet
         public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1,
             TimeSpan? timeout = null, MessageCodec codec = MessageCodec.CodecNone, int? partition = null)
         {
+            await BrokerRouter.RefreshTopicMetadataThatNoExistOnCache(topic);
             if (_stopToken.IsCancellationRequested)
                 throw new ObjectDisposedException("Cannot send new documents as producer is disposing.");
             if (timeout == null) timeout = TimeSpan.FromMilliseconds(DefaultAckTimeoutMS);
@@ -138,9 +139,9 @@ namespace KafkaNet
         /// </summary>
         /// <param name="topic">The name of the topic to get metadata for.</param>
         /// <returns>Topic with metadata information.</returns>
-        public Topic GetTopic(string topic)
+        public Topic GetTopicFromCache(string topic)
         {
-            return _metadataQueries.GetTopic(topic);
+            return _metadataQueries.GetTopicFromCache(topic);
         }
 
 
@@ -211,7 +212,7 @@ namespace KafkaNet
                     outstandingSendTasks.TryRemove(sendTask, out sendTask);
 
 
-           
+
 
                 }
                 catch (Exception ex)
@@ -240,7 +241,7 @@ namespace KafkaNet
                 var messageByRouter = ackLevelBatch.Select(batch => new
                 {
                     TopicMessage = batch,
-                    Route = batch.Partition.HasValue ? BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Partition.Value) : BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Message.Key)
+                    Route = batch.Partition.HasValue ? BrokerRouter.SelectBrokerRouteFromLocalCache(batch.Topic, batch.Partition.Value) : BrokerRouter.SelectBrokerRouteFromLocalCache(batch.Topic, batch.Message.Key)
                 })
                                          .GroupBy(x => new { x.Route, x.TopicMessage.Topic, x.TopicMessage.Codec });
 

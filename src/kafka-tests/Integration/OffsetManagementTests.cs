@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
@@ -33,7 +34,7 @@ namespace kafka_tests.Integration
             {
                 var request = CreateOffsetFetchRequest(Guid.NewGuid().ToString(), partitionId);
 
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var response = conn.Connection.SendAsync(request).Result.FirstOrDefault();
 
@@ -44,12 +45,13 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public void OffsetCommitShouldStoreAndReturnSuccess()
+        public async Task OffsetCommitShouldStoreAndReturnSuccess()
         {
             const int partitionId = 0;
             using (var router = new BrokerRouter(Options))
             {
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
+                await router.RefreshTopicMetadataThatNoExistOnCache(IntegrationConfig.IntegrationTopic);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var commit = CreateOffsetCommitRequest(IntegrationConfig.IntegrationConsumer, partitionId, 10);
                 var response = conn.Connection.SendAsync(commit).Result.FirstOrDefault();
@@ -60,19 +62,19 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public void OffsetCommitShouldStoreOffsetValue()
+        public async Task OffsetCommitShouldStoreOffsetValue()
         {
             const int partitionId = 0;
             const long offset = 99;
 
             using (var router = new BrokerRouter(Options))
             {
-
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
+                await router.RefreshTopicMetadataThatNoExistOnCache(IntegrationConfig.IntegrationTopic);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var commit = CreateOffsetCommitRequest(IntegrationConfig.IntegrationConsumer, partitionId, offset);
                 var commitResponse = conn.Connection.SendAsync(commit).Result.FirstOrDefault();
-                
+
                 Assert.That(commitResponse, Is.Not.Null);
                 Assert.That(commitResponse.Error, Is.EqualTo((int)ErrorResponseCode.NoError));
 
@@ -95,7 +97,7 @@ namespace kafka_tests.Integration
 
             using (var router = new BrokerRouter(Options))
             {
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var commit = CreateOffsetCommitRequest(IntegrationConfig.IntegrationConsumer, partitionId, offset, metadata);
                 var commitResponse = conn.Connection.SendAsync(commit).Result.FirstOrDefault();
@@ -119,9 +121,9 @@ namespace kafka_tests.Integration
         {
             using (var router = new BrokerRouter(Options))
             {
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic);
 
-                var request = new ConsumerMetadataRequest {ConsumerGroup = IntegrationConfig.IntegrationConsumer};
+                var request = new ConsumerMetadataRequest { ConsumerGroup = IntegrationConfig.IntegrationConsumer };
 
                 var response = conn.Connection.SendAsync(request).Result.FirstOrDefault();
 

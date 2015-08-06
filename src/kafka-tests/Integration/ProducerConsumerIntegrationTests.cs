@@ -325,7 +325,7 @@ namespace kafka_tests.Integration
             {
                 var guidkey = Guid.NewGuid();
                 key = guidkey.ToString();
-                int partitonIdChosedByKey = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, guidkey.ToByteArray()).PartitionId;
+                int partitonIdChosedByKey = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, guidkey.ToByteArray()).PartitionId;
                 partitionEqualsPartitonIdChosedByKey = partitionId == partitonIdChosedByKey;
             }
             return key;

@@ -49,18 +49,19 @@ namespace kafka_tests.Unit
                 Assert.That(t.IsFaulted, Is.True);
                 Assert.That(t.Exception.Flatten().ToString(), Is.StringContaining("test 99"));
             }).Wait();
-        } 
+        }
         #endregion
 
         #region GetTopic Tests...
         [Test]
-        public void GetTopicShouldReturnTopic()
+        public async Task GetTopicShouldReturnTopic()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
+            await router.RefreshTopicMetadataThatNoExistOnCache(BrokerRouterProxy.TestTopic);
             var common = new MetadataQueries(router);
 
-            var result = common.GetTopic(BrokerRouterProxy.TestTopic);
+            var result = common.GetTopicFromCache(BrokerRouterProxy.TestTopic);
             Assert.That(result.Name, Is.EqualTo(BrokerRouterProxy.TestTopic));
         }
 
@@ -72,7 +73,7 @@ namespace kafka_tests.Unit
             var router = routerProxy.Create();
             var common = new MetadataQueries(router);
 
-            common.GetTopic("MissingTopic");
+            common.GetTopicFromCache("MissingTopic");
         }
 
         #endregion

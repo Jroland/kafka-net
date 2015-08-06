@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using KafkaNet.Protocol;
 
 namespace KafkaNet
@@ -25,7 +26,7 @@ namespace KafkaNet
         private const int BackoffMilliseconds = 100;
 
         private readonly IKafkaLog _log;
-        
+
         private bool _interrupted;
 
         public KafkaMetadataProvider(IKafkaLog log)
@@ -39,7 +40,7 @@ namespace KafkaNet
         /// <param name="connections">The server connections to query.  Will cycle through the collection, starting at zero until a response is received.</param>
         /// <param name="topics">The collection of topics to get metadata for.</param>
         /// <returns>MetadataResponse validated to be complete.</returns>
-        public MetadataResponse Get(IKafkaConnection[] connections, IEnumerable<string> topics)
+        public async Task<MetadataResponse> Get(IKafkaConnection[] connections, IEnumerable<string> topics)
         {
             var request = new MetadataRequest { Topics = topics.ToList() };
             if (request.Topics.Count <= 0) return null;
@@ -51,7 +52,7 @@ namespace KafkaNet
             do
             {
                 performRetry = false;
-                metadataResponse = GetMetadataResponse(connections, request);
+                metadataResponse = await GetMetadataResponse(connections, request);
                 if (metadataResponse == null) return null;
 
                 foreach (var validation in ValidateResponse(metadataResponse))
@@ -78,21 +79,21 @@ namespace KafkaNet
         {
             if (performRetry && retryAttempt > 0)
             {
-                var backoff = retryAttempt*retryAttempt*BackoffMilliseconds;
+                var backoff = retryAttempt * retryAttempt * BackoffMilliseconds;
                 _log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", backoff);
-                Thread.Sleep(TimeSpan.FromMilliseconds(backoff));
+                Task.Delay (TimeSpan.FromMilliseconds(backoff));
             }
         }
 
-        private MetadataResponse GetMetadataResponse(IKafkaConnection[] connections, MetadataRequest request)
+        private async Task<MetadataResponse> GetMetadataResponse(IKafkaConnection[] connections, MetadataRequest request)
         {
             //try each default broker until we find one that is available
             foreach (var conn in connections)
             {
                 try
                 {
-                    //TODO remove blocking result here!
-                    var response = conn.SendAsync(request).Result;
+
+                    var response = await conn.SendAsync(request);
                     if (response != null && response.Count > 0)
                     {
                         return response.FirstOrDefault();

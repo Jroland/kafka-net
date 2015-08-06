@@ -1,6 +1,9 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 
@@ -19,13 +22,12 @@ namespace KafkaNet
     /// </summary>
     public class BrokerRouter : IBrokerRouter
     {
-        private readonly object _threadLock = new object();
         private readonly KafkaOptions _kafkaOptions;
         private readonly KafkaMetadataProvider _kafkaMetadataProvider;
         private readonly ConcurrentDictionary<KafkaEndpoint, IKafkaConnection> _defaultConnectionIndex = new ConcurrentDictionary<KafkaEndpoint, IKafkaConnection>();
         private readonly ConcurrentDictionary<int, IKafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, IKafkaConnection>();
         private readonly ConcurrentDictionary<string, Topic> _topicIndex = new ConcurrentDictionary<string, Topic>();
-
+        private SemaphoreSlim _taskLocker = new SemaphoreSlim(1);
         public BrokerRouter(KafkaOptions kafkaOptions)
         {
             _kafkaOptions = kafkaOptions;
@@ -53,9 +55,9 @@ namespace KafkaNet
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        public BrokerRoute SelectBrokerRoute(string topic, int partitionId)
+        public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, int partitionId)
         {
-            var cachedTopic = GetTopicMetadata(topic);
+            var cachedTopic = GetTopicMetadataFromLocalCache(topic);
 
             if (cachedTopic.Count <= 0)
                 throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
@@ -76,10 +78,10 @@ namespace KafkaNet
         /// <returns>A broker route for the given topic.</returns>
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        public BrokerRoute SelectBrokerRoute(string topic, byte[] key = null)
+        public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, byte[] key = null)
         {
             //get topic either from cache or server.
-            var cachedTopic = GetTopicMetadata(topic).FirstOrDefault();
+            var cachedTopic = GetTopicMetadataFromLocalCache(topic).FirstOrDefault();
 
             if (cachedTopic == null)
                 throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
@@ -98,18 +100,16 @@ namespace KafkaNet
         /// The topic metadata will by default check the cache first and then if it does not exist it will then
         /// request metadata from the server.  To force querying the metadata from the server use <see cref="RefreshTopicMetadata"/>
         /// </remarks>
-        public List<Topic> GetTopicMetadata(params string[] topics)
+        /// <exception cref="InvalidTopicMetadataException">Condition.</exception>
+        public List<Topic> GetTopicMetadataFromLocalCache(params string[] topics)
         {
             var topicSearchResult = SearchCacheForTopics(topics);
 
             //update metadata for all missing topics
             if (topicSearchResult.Missing.Count > 0)
             {
-                //double check for missing topics and query
-                RefreshTopicMetadata(topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
 
-                var refreshedTopics = topicSearchResult.Missing.Select(GetCachedTopic).Where(x => x != null);
-                topicSearchResult.Topics.AddRange(refreshedTopics);
+                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topicSearchResult.Missing));
             }
 
             return topicSearchResult.Topics;
@@ -121,21 +121,47 @@ namespace KafkaNet
         /// <param name="topics">List of topics to update metadata for.</param>
         /// <remarks>
         /// This method will ignore the cache and initiate a call to the kafka servers for all given topics, updating the cache with the resulting metadata.
-        /// Only call this method to force a metadata update.  For all other queries use <see cref="GetTopicMetadata"/> which uses cached values.
+        /// Only call this method to force a metadata update.  For all other queries use <see cref="GetTopicMetadataFromLocalCache"/> which uses cached values.
         /// </remarks>
-        public void RefreshTopicMetadata(params string[] topics)
+
+
+
+        private string[] _lastTopicsRequest;
+        public async Task RefreshTopicMetadata(params string[] topics)
         {
             //TODO need to remove lock here, try and move to lock free design
-            lock (_threadLock)
+            try
             {
+                bool isRunningTheSameTask = RunningTheSameTask(topics);
+                await _taskLocker.WaitAsync(TimeSpan.FromMinutes(2));
+                if (isRunningTheSameTask) return;
+
+                _lastTopicsRequest = topics;
                 _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
 
                 //get the connections to query against and get metadata
                 var connections = _defaultConnectionIndex.Values.Union(_brokerConnectionIndex.Values).ToArray();
-                var metadataResponse = _kafkaMetadataProvider.Get(connections, topics);
+                var metadataResponse = await _kafkaMetadataProvider.Get(connections, topics);
 
                 UpdateInternalMetadataCache(metadataResponse);
+                _lastTopicsRequest = null;
             }
+            finally
+            {
+                _taskLocker.Release();
+            }
+        }
+
+        private bool RunningTheSameTask(string[] topics)
+        {
+            var last = _lastTopicsRequest;
+            bool isRunning = _taskLocker.CurrentCount > 0;
+            if (isRunning)
+            {
+                bool sameTask = last != null && topics.SequenceEqual(last);
+                return (sameTask);
+            }
+            return false;
         }
 
         private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics)
@@ -164,14 +190,6 @@ namespace KafkaNet
         private BrokerRoute GetCachedRoute(string topic, Partition partition)
         {
             var route = TryGetRouteFromCache(topic, partition);
-
-            //leader could not be found, refresh the broker information and try one more time
-            if (route == null)
-            {
-                RefreshTopicMetadata(topic);
-                route = TryGetRouteFromCache(topic, partition);
-            }
-
             if (route != null) return route;
 
             throw new LeaderNotFoundException(string.Format("Lead broker cannot be found for parition: {0}, leader: {1}", partition.PartitionId, partition.LeaderId));
@@ -192,7 +210,7 @@ namespace KafkaNet
 
             return null;
         }
-        
+
         private void UpdateInternalMetadataCache(MetadataResponse metadata)
         {
 
@@ -246,6 +264,24 @@ namespace KafkaNet
         {
             _defaultConnectionIndex.Values.ToList().ForEach(conn => { using (conn) { } });
             _brokerConnectionIndex.Values.ToList().ForEach(conn => { using (conn) { } });
+        }
+
+
+
+        public async Task RefreshTopicMetadataThatNoExistOnCache(params string[] topics)
+        {
+            var topicSearchResult = SearchCacheForTopics(topics);
+
+            //update metadata for all missing topics
+            if (topicSearchResult.Missing.Count > 0)
+            {
+                //double check for missing topics and query
+                await RefreshTopicMetadata(topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
+
+                var refreshedTopics = topicSearchResult.Missing.Select(GetCachedTopic).Where(x => x != null);
+                topicSearchResult.Topics.AddRange(refreshedTopics);
+            }
+
         }
     }
 

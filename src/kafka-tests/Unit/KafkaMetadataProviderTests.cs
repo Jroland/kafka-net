@@ -51,7 +51,7 @@ namespace kafka_tests.Unit
             var conn = Substitute.For<IKafkaConnection>();
 
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>())
-                .Returns(   x => CreateMetadataResponse(errorCode),
+                .Returns(x => CreateMetadataResponse(errorCode),
                             x => CreateMetadataResponse(errorCode),
                             x => CreateMetadataResponse(errorCode),
                             x => CreateMetadataResponse(ErrorResponseCode.NoError));
@@ -133,7 +133,7 @@ namespace kafka_tests.Unit
         [TestCase(null)]
         [TestCase("")]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
-        public void ShouldThrowExceptionWhenHostIsMissing(string host)
+        public async Task ShouldThrowExceptionWhenHostIsMissing(string host)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -157,6 +157,7 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
+
                 var response = provider.Get(new[] { conn }, new[] { "Test" });
             }
         }

@@ -27,14 +27,15 @@ namespace KafkaNet
         /// <returns></returns>
         public async Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
         {
-            var topicMetadata = GetTopic(topic);
+            await _brokerRouter.RefreshTopicMetadataThatNoExistOnCache(topic);
+            var topicMetadata = GetTopicFromCache(topic);
 
             //send the offset request to each partition leader
             var sendRequests = topicMetadata.Partitions
                 .GroupBy(x => x.PartitionId)
                 .Select(p =>
                     {
-                        var route = _brokerRouter.SelectBrokerRoute(topic, p.Key);
+                        var route = _brokerRouter.SelectBrokerRouteFromLocalCache(topic, p.Key);
                         var request = new OffsetRequest
                                         {
                                             Offsets = new List<Offset>
@@ -61,9 +62,9 @@ namespace KafkaNet
         /// </summary>
         /// <param name="topic">The metadata on the requested topic.</param>
         /// <returns>Topic object containing the metadata on the requested topic.</returns>
-        public Topic GetTopic(string topic)
+        public Topic GetTopicFromCache(string topic)
         {
-            var response = _brokerRouter.GetTopicMetadata(topic);
+            var response = _brokerRouter.GetTopicMetadataFromLocalCache(topic);
 
             if (response.Count <= 0) throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "No metadata could be found for topic: {0}", topic);
 
