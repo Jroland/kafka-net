@@ -43,7 +43,7 @@ namespace KafkaNet
         /// <param name="consumerGroup">The consumer group</param>
         /// <param name="offset">The new offset. must be larger than or equal to zero</param>
         /// <returns></returns>
-        public async Task UpdateOffset(string consumerGroup, long offset)
+        public async Task UpdateOrCreateOffset(string consumerGroup, long offset)
         {
             if (string.IsNullOrEmpty(consumerGroup)) throw new ArgumentNullException("consumerGroup");
             if (offset < 0) throw new ArgumentOutOfRangeException("offset", "offset must be positive or zero");
@@ -95,8 +95,8 @@ namespace KafkaNet
                 if (_lastMessages != null)
                 {
                     var startIndex = _lastMessages.FindIndex(m => m.Meta.Offset == offset);
-                    if (startIndex != -1 &&
-                        startIndex + maxCount <= _lastMessages.Count)
+                    var containsAllMessage = startIndex != -1 && startIndex + maxCount <= _lastMessages.Count;
+                    if (containsAllMessage)
                     {
                         return _lastMessages.GetRange(startIndex, maxCount);
                     }
