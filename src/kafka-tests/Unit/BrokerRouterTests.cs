@@ -152,6 +152,19 @@ namespace kafka_tests.Unit
             await router.RefreshTopicMetadata(TestTopic);
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(2));
         }
+
+        [Test]
+        public async Task SimultaneouslyRefreshTopicMetadataShouldGetDataFromCacheOnSameRequest()
+        {
+            var routerProxy = new BrokerRouterProxy(_kernel);
+            var router = routerProxy.Create();
+            
+            List<Task> x = new List<Task>();
+            x.Add(router.RefreshTopicMetadata(TestTopic));//do not debug
+            x.Add(router.RefreshTopicMetadata(TestTopic));//do not debug
+            await Task.WhenAll(x.ToArray());
+            Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(1));
+        }
         #endregion
 
         #region SelectBrokerRouteAsync Exact Tests...
@@ -260,7 +273,7 @@ namespace kafka_tests.Unit
             var router = routerProxy.BrokerConn0;
             routerProxy.BrokerConn0.MetadataResponseFunction = () => metadataResponse;
             var routerProxy1 = routerProxy.Create();
-       await     routerProxy1.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+            await routerProxy1.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
             routerProxy1.SelectBrokerRouteFromLocalCache(TestTopic);
         }
         #endregion

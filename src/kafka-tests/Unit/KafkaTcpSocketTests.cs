@@ -484,6 +484,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
+        [Category("Z_RunLast")]
         public void WriteShouldHandleLargeVolumeSendAsynchronously()
         {
             var write = new List<int>();
@@ -491,17 +492,13 @@ namespace kafka_tests.Unit
             using (var server = new FakeTcpServer(FakeServerPort))
             using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
             {
+                int numberOfWrite = 10000;
                 server.OnBytesReceived += data => write.AddRange(data.Batch(4).Select(x => x.ToArray().ToInt32()));
-
-                var tasks = Enumerable.Range(1, 10000)
-                    .SelectMany(i => new[]
-                    {
-                        test.WriteAsync(i.ToBytes().ToPayload()),
-                    }).ToArray();
+                var tasks = Enumerable.Range(1, 10000).SelectMany(i => new[] { test.WriteAsync(i.ToBytes().ToPayload()), }).ToArray();
 
                 Task.WaitAll(tasks);
 
-                Assert.That(write.OrderBy(x => x), Is.EqualTo(Enumerable.Range(1, 10000)));
+                Assert.That(write.OrderBy(x => x), Is.EqualTo(Enumerable.Range(1, numberOfWrite)));
             }
         }
 

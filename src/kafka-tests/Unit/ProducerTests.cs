@@ -244,20 +244,23 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public async Task  ProducerShouldAllowFullBatchSizeOfMessagesToQueue()
+        public async void ProducerShouldAllowFullBatchSizeOfMessagesToQueue()
         {
             var routerProxy = new FakeBrokerRouter();
-            var producer = new Producer(routerProxy.Create()) { BatchSize = 1002, BatchDelayTime = TimeSpan.FromSeconds(100) };
+            var producer = new Producer(routerProxy.Create()) { BatchSize = 1001, BatchDelayTime = TimeSpan.FromSeconds(100) };
             using (producer)
             {
-                var senderTask = new List<Task>();
-
-                for (int i = 0; i < 1000; i++)
+                var senderTask = Task.Run(() =>
                 {
-                    senderTask.Add(producer.SendMessageAsync(FakeBrokerRouter.TestTopic,new[] { new Message(i.ToString()) }));
+                    for (int i = 0; i < 1000; i++)
+                    {
+                        producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message(i.ToString()) });
+                    }
+                });
 
-                }
                 await Task.WhenAll(senderTask);
+
+                Assert.That(senderTask.IsCompleted);
                 Assert.That(producer.BufferCount, Is.EqualTo(1000));
             }
         }

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Model;
@@ -117,7 +118,7 @@ namespace kafka_tests.Unit
         [TestCase(ErrorResponseCode.RequestTimedOut)]
         [TestCase(ErrorResponseCode.InvalidMessage)]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
-        public void ShouldThrowExceptionWhenNotARetriableErrorCode(ErrorResponseCode errorCode)
+        public  async Task ShouldThrowExceptionWhenNotARetriableErrorCode(ErrorResponseCode errorCode)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -125,7 +126,7 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
         }
 
@@ -141,7 +142,7 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                    var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
         }
 
@@ -149,16 +150,16 @@ namespace kafka_tests.Unit
         [TestCase(0)]
         [TestCase(-1)]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
-        public void ShouldThrowExceptionWhenPortIsMissing(int port)
+        public async Task ShouldThrowExceptionWhenPortIsMissing(int port)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Returns(x => CreateMetadataResponse(1, "123", port));
 
-            using (var provider = new KafkaMetadataProvider(_log))
+            using (var provider =  new KafkaMetadataProvider(_log))
             {
 
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
         }
 
