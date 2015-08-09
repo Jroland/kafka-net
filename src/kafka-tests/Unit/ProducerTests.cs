@@ -244,23 +244,20 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public async void ProducerShouldAllowFullBatchSizeOfMessagesToQueue()
+        public async Task  ProducerShouldAllowFullBatchSizeOfMessagesToQueue()
         {
             var routerProxy = new FakeBrokerRouter();
-            var producer = new Producer(routerProxy.Create()) { BatchSize = 1001, BatchDelayTime = TimeSpan.FromSeconds(100) };
+            var producer = new Producer(routerProxy.Create()) { BatchSize = 1002, BatchDelayTime = TimeSpan.FromSeconds(100) };
             using (producer)
             {
-                var senderTask = Task.Run(() =>
+                var senderTask = new List<Task>();
+
+                for (int i = 0; i < 1000; i++)
                 {
-                    for (int i = 0; i < 1000; i++)
-                    {
-                        producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message(i.ToString()) });
-                    }
-                });
+                    senderTask.Add(producer.SendMessageAsync(FakeBrokerRouter.TestTopic,new[] { new Message(i.ToString()) }));
 
+                }
                 await Task.WhenAll(senderTask);
-
-                Assert.That(senderTask.IsCompleted);
                 Assert.That(producer.BufferCount, Is.EqualTo(1000));
             }
         }
@@ -271,8 +268,7 @@ namespace kafka_tests.Unit
             int count = 0;
             //with max buffer set below the batch size, this should cause the producer to block until batch delay time.
             var routerProxy = new FakeBrokerRouter();
-            using(var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 1) 
-                                             { BatchSize = 10, BatchDelayTime = TimeSpan.FromMilliseconds(500) })
+            using (var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 1) { BatchSize = 10, BatchDelayTime = TimeSpan.FromMilliseconds(500) })
             {
                 var senderTask = Task.Factory.StartNew(async () =>
                 {
@@ -307,14 +303,14 @@ namespace kafka_tests.Unit
             routerProxy.BrokerConn0.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
             routerProxy.BrokerConn1.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
 
-            var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 5, maximumAsyncRequests: 1) { BatchSize = 1, BatchDelayTime = TimeSpan.FromMilliseconds(500) };
+            var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 5, maximumAsyncRequests: 1) { BatchSize =1 , BatchDelayTime = TimeSpan.FromMilliseconds(500) };
             using (producer)
             {
                 var sendTasks = Enumerable.Range(0, 5)
                     .Select(x => producer.SendMessageAsync(FakeBrokerRouter.TestTopic, new[] { new Message(x.ToString()) }))
                     .ToList();
 
-                
+
                 TaskTest.WaitFor(() => producer.AsyncCount > 0);
                 Assert.That(sendTasks.Any(x => x.IsCompleted) == false, "All the async tasks should be blocking or in transit.");
                 Assert.That(producer.BufferCount, Is.EqualTo(5), "We sent 5 unfinished messages, they should be counted towards the buffer.");

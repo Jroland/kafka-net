@@ -20,7 +20,7 @@ namespace kafka_tests.Integration
         [TestCase(10, 1000)]
         [TestCase(100, 1000)]
         [TestCase(1000, 1000)]
-        public void SendAsyncShouldHandleHighVolumeOfMessages(int amount, int maxAsync)
+        public async Task SendAsyncShouldHandleHighVolumeOfMessages(int amount, int maxAsync)
         {
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
             using (var producer = new Producer(router, maxAsync) { BatchSize = amount / 2 })
@@ -31,14 +31,13 @@ namespace kafka_tests.Integration
                 {
                     tasks[i] = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(Guid.NewGuid().ToString()) });
                 }
-
-                var results = tasks.SelectMany(x => x.Result).ToList();
-
+                var results = await Task.WhenAny(tasks.ToArray());
+           
                 //Because of how responses are batched up and sent to servers, we will usually get multiple responses per requested message batch
                 //So this assertion will never pass
                 //Assert.That(results.Count, Is.EqualTo(amount));
 
-                Assert.That(results.Any(x => x.Error != 0), Is.False, "Should not have received any results as failures.");
+                Assert.That(results.Result.Any(x => x.Error != 0), Is.False, "Should not have received any results as failures.");
             }
         }
 

@@ -125,19 +125,39 @@ namespace KafkaNet
         /// </remarks>
 
 
-
+        private TaskCompletionSource<int> _lastTask;
         private string[] _lastTopicsRequest;
-        public async Task RefreshTopicMetadata(params string[] topics)
+
+        public Task RefreshTopicMetadata(params string[] topics)
+        {
+            return RefreshTopicMetadata(true, topics);
+        }
+
+        private async Task RefreshTopicMetadata(bool forceRefresh, params string[] topics)
         {
             //TODO need to remove lock here, try and move to lock free design
+            var lastTasK = _lastTask;
+            bool isRunningTheSameTask = RunningTheSameTask(topics);
+            if (isRunningTheSameTask)
+            {
+                await lastTasK.Task;
+                return;
+            }
+
             try
             {
-                bool isRunningTheSameTask = RunningTheSameTask(topics);
                 await _taskLocker.WaitAsync(TimeSpan.FromMinutes(2));
-                if (isRunningTheSameTask) return;
 
+                int missingFromCache = SearchCacheForTopics(topics).Missing.Count;
+                if (!forceRefresh && missingFromCache == 0)
+                {
+                    return;
+                }
+                if (isRunningTheSameTask) return;
+                _lastTask = new TaskCompletionSource<int>();
                 _lastTopicsRequest = topics;
-                _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
+                _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}",
+                    string.Join(",", topics));
 
                 //get the connections to query against and get metadata
                 var connections = _defaultConnectionIndex.Values.Union(_brokerConnectionIndex.Values).ToArray();
@@ -145,23 +165,30 @@ namespace KafkaNet
 
                 UpdateInternalMetadataCache(metadataResponse);
                 _lastTopicsRequest = null;
+                _lastTask.TrySetResult(1);
+            }
+            catch (Exception ex)
+            {
+                _lastTask.TrySetException(ex);
+                throw;
             }
             finally
             {
                 _taskLocker.Release();
             }
+
         }
 
         private bool RunningTheSameTask(string[] topics)
         {
             var last = _lastTopicsRequest;
-            bool isRunning = _taskLocker.CurrentCount > 0;
-            if (isRunning)
-            {
+            //bool isRunning = _taskLocker.CurrentCount > 0;
+            //if (isRunning)
+            //{
                 bool sameTask = last != null && topics.SequenceEqual(last);
                 return (sameTask);
-            }
-            return false;
+          //}
+          //return false;
         }
 
         private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics)
@@ -276,7 +303,7 @@ namespace KafkaNet
             if (topicSearchResult.Missing.Count > 0)
             {
                 //double check for missing topics and query
-                await RefreshTopicMetadata(topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
+                await RefreshTopicMetadata(false, topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
 
                 var refreshedTopics = topicSearchResult.Missing.Select(GetCachedTopic).Where(x => x != null);
                 topicSearchResult.Topics.AddRange(refreshedTopics);
