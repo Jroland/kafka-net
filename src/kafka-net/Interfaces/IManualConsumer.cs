@@ -7,7 +7,7 @@ namespace KafkaNet.Interfaces
 {
     public interface IManualConsumer
     {
-        Task UpdateOffset(string consumerGroup, long offset);
+        Task UpdateOrCreateOffset(string consumerGroup, long offset);
 
         Task<long> GetLastOffset();
 
