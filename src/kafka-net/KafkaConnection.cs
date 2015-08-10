@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
@@ -90,6 +91,8 @@ namespace KafkaNet
         /// <typeparam name="T">A Kafka response object return by decode function.</typeparam>
         /// <param name="request">The IKafkaRequest to send to the kafka servers.</param>
         /// <returns></returns>
+
+        //TODO Refactor!!! -need to all send time out? need to set receive time out?
         public async Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
         {
             //assign unique correlationId
@@ -105,9 +108,17 @@ namespace KafkaNet
                     try
                     {
                         AddAsyncRequestItemToResponseQueue(asyncRequest);
-                        await _client.WriteAsync(request.Encode())
-                            .ContinueWith(t => asyncRequest.MarkRequestAsSent(t.Exception, _responseTimeoutMS, TriggerMessageTimeout))
-                            .ConfigureAwait(false);
+                        ExceptionDispatchInfo exceptionDispatchInfo = null;
+                        try
+                        {
+                            await _client.WriteAsync(request.Encode()).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            exceptionDispatchInfo = ExceptionDispatchInfo.Capture(ex);
+                        }
+                        asyncRequest.MarkRequestAsSent(exceptionDispatchInfo, _responseTimeoutMS, TriggerMessageTimeout);
+
                     }
                     catch (OperationCanceledException)
                     {
@@ -273,12 +284,13 @@ namespace KafkaNet
             public int CorrelationId { get; private set; }
             public TaskCompletionSource<byte[]> ReceiveTask { get; private set; }
 
-            public void MarkRequestAsSent(Exception ex, TimeSpan timeout, Action<AsyncRequestItem> timeoutFunction)
+            /// <exception cref="Exception">Condition.</exception>
+            public void MarkRequestAsSent(ExceptionDispatchInfo exceptionDispatchInfo, TimeSpan timeout, Action<AsyncRequestItem> timeoutFunction)
             {
-                if (ex != null)
+                if (exceptionDispatchInfo != null)
                 {
-                    ReceiveTask.TrySetException(ex);
-                    throw ex;
+                    ReceiveTask.TrySetException(exceptionDispatchInfo.SourceException);
+                    exceptionDispatchInfo.Throw();
                 }
 
                 _cancellationTokenSource.CancelAfter(timeout);

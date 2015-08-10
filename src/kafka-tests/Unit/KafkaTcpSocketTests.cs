@@ -148,7 +148,7 @@ namespace kafka_tests.Unit
         [Test]
         public void ReadShouldCancelWhileAwaitingResponse()
         {
-            using (var server = new FakeTcpServer(_log,FakeServerPort))
+            using (var server = new FakeTcpServer(_log, FakeServerPort))
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
             {
                 var count = 0;
@@ -258,7 +258,7 @@ namespace kafka_tests.Unit
         [Test]
         public void ReadShouldBeAbleToReceiveMoreThanOnce()
         {
-            using (var server = new FakeTcpServer(_log,FakeServerPort))
+            using (var server = new FakeTcpServer(_log, FakeServerPort))
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
             {
                 const int firstMessage = 99;
@@ -327,7 +327,7 @@ namespace kafka_tests.Unit
         [Test]
         public void ReadShouldThrowServerDisconnectedExceptionWhenDisconnected()
         {
-            using (var server = new FakeTcpServer(_log,FakeServerPort))
+            using (var server = new FakeTcpServer(_log, FakeServerPort))
             {
                 var socket = new KafkaTcpSocket(_log, _fakeServerUrl);
 
@@ -466,9 +466,9 @@ namespace kafka_tests.Unit
                 var write = new List<int>();
                 var read = new List<int>();
                 var expected = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-                AutoResetEvent v = new AutoResetEvent(false);
+                AutoResetEvent allEventAreArrived = new AutoResetEvent(false);
 
-                using (var server = new FakeTcpServer(_log,FakeServerPort))
+                using (var server = new FakeTcpServer(_log, FakeServerPort))
                 using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
                 {
                     server.OnBytesReceived += data =>
@@ -476,12 +476,9 @@ namespace kafka_tests.Unit
                         write.AddRange(data.Batch(4).Select(x => x.ToArray().ToInt32()));
                         if (write.Count == 10)
                         {
-                            v.Set();
+                            allEventAreArrived.Set();
                         }
                     };
-
-
-
                     var tasks = Enumerable.Range(1, 10)
                         .SelectMany(i => new[]
                         {
@@ -491,7 +488,7 @@ namespace kafka_tests.Unit
                         }).ToArray();
 
                     Task.WaitAll(tasks);
-                    v.WaitOne(1000);
+                    Assert.IsTrue(allEventAreArrived.WaitOne(2000), "not Get all event on time");
 
                     Assert.That(write.OrderBy(x => x), Is.EqualTo(expected));
                     Assert.That(read.OrderBy(x => x), Is.EqualTo(expected));
@@ -504,10 +501,10 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-       
+
         public void WriteShouldHandleLargeVolumeSendAsynchronously()
         {
-            AutoResetEvent v = new AutoResetEvent(false);
+            AutoResetEvent allEventAreArrived = new AutoResetEvent(false);
             var write = new List<int>();
             int percent = 0;
             using (var server = new FakeTcpServer(_log, FakeServerPort))
@@ -525,13 +522,13 @@ namespace kafka_tests.Unit
                     }
                     if (write.Count == numberOfWrite)
                     {
-                        v.Set();
+                        allEventAreArrived.Set();
                     }
                 };
                 var tasks = Enumerable.Range(1, 10000).SelectMany(i => new[] { test.WriteAsync(i.ToBytes().ToPayload()), }).ToArray();
 
                 Task.WaitAll(tasks);
-                v.WaitOne(1000);
+                Assert.IsTrue(allEventAreArrived.WaitOne(2000), "not get all event on time");
                 Assert.That(write.OrderBy(x => x), Is.EqualTo(Enumerable.Range(1, numberOfWrite)));
             }
         }
