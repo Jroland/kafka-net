@@ -25,7 +25,7 @@ namespace kafka_tests.Integration
 
         [Test]
         public async Task SimpleGetMessages()
-        {            
+        {
             // Creating a broker router and a protocol gateway for the producer and consumer
             var brokerRouter = new BrokerRouter(_options);
             var protocolGateway = new ProtocolGateway(_kafkaUri);
@@ -65,7 +65,7 @@ namespace kafka_tests.Integration
             // Creating 5 messages
             List<Message> messages = CreateTestMessages(10, 1);
 
-            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));                       
+            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));
 
             // Now let's consume
             var result = (await consumer.GetMessages(5, offset)).ToList();
@@ -126,6 +126,24 @@ namespace kafka_tests.Integration
             Assert.AreEqual(0, result.Count, "Should not get any messages");
         }
 
+        [Test]
+        [ExpectedException(typeof(KafkaApplicationException))]
+        public async Task GetOffsetConsumerGroupDoesntExist()
+        {
+            // Creating a broker router and a protocol gateway for the producer and consumer
+            var protocolGateway = new ProtocolGateway(_kafkaUri);
+            var partitionId = 0;
+            var topic = "ManualConsumerTestTopic";
+            var consumerGroup = Guid.NewGuid().ToString();
+
+            ManualConsumer consumer = new ManualConsumer(partitionId, topic, protocolGateway, "TestClient");
+
+            var offset = await consumer.GetOffset(consumerGroup);
+
+            // Now let's consume            
+            Assert.AreEqual(0, offset, "Should not get any messages");
+        }
+
         private void CheckMessages(List<Message> expected, List<Message> actual)
         {
             Assert.AreEqual(expected.Count(), actual.Count(), "Didn't get all messages");
@@ -146,13 +164,13 @@ namespace kafka_tests.Integration
 
                 for (int j = 0; j < messageSize; j++)
                 {
-                    payload.Add(Convert.ToByte(i));    
+                    payload.Add(Convert.ToByte(i));
                 }
-                
+
                 messages.Add(new Message() { Value = payload.ToArray() });
             }
 
             return messages;
-        }                
+        }
     }
 }
