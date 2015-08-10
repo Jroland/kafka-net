@@ -5,6 +5,7 @@ using KafkaNet.Common;
 using kafka_tests.Fakes;
 using NUnit.Framework;
 using kafka_tests.Helpers;
+using KafkaNet;
 
 namespace kafka_tests.Unit
 {
@@ -13,7 +14,7 @@ namespace kafka_tests.Unit
     public class FakeTcpServerTests
     {
         private readonly Uri _fakeServerUrl;
-
+        private IKafkaLog Ilog=new NoDebugLog();
         public FakeTcpServerTests()
         {
             _fakeServerUrl = new Uri("http://localhost:8999");
@@ -22,7 +23,7 @@ namespace kafka_tests.Unit
         [Test]
         public void FakeShouldBeAbleToReconnect()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(Ilog,8999))
             {
                 byte[] received = null;
                 server.OnBytesReceived += data => received = data;
@@ -48,7 +49,7 @@ namespace kafka_tests.Unit
         [Test]
         public void ShouldDisposeEvenWhenTryingToSendWithoutExceptionThrown()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(Ilog, 8999))
             {
                 server.SendDataAsync("test");
                 Thread.Sleep(500);
@@ -58,7 +59,7 @@ namespace kafka_tests.Unit
         [Test]
         public void ShouldDisposeWithoutExecptionThrown()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(Ilog,8999))
             {
                 Thread.Sleep(500);
             }
@@ -68,7 +69,7 @@ namespace kafka_tests.Unit
         public void SendAsyncShouldWaitUntilClientIsConnected()
         {
             const int testData = 99;
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(Ilog,8999))
             using (var client = new TcpClient())
             {
                 server.SendDataAsync(testData.ToBytes());

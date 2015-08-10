@@ -61,7 +61,7 @@ namespace kafka_tests.Unit
         [Test]
         public void ShouldDisposeWithoutExceptionThrown()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(_log, 8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             {
                 var conn = new KafkaConnection(socket, log: _log);
@@ -89,7 +89,7 @@ namespace kafka_tests.Unit
         {
             var mockLog = _kernel.GetMock<IKafkaLog>();
 
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(_log,8999))
             using (var socket = new KafkaTcpSocket(mockLog.Object, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, log: mockLog.Object))
             {
@@ -122,7 +122,7 @@ namespace kafka_tests.Unit
 
             var mockLog = _kernel.GetMock<IKafkaLog>();
 
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(_log,8999))
             using (var socket = new KafkaTcpSocket(mockLog.Object, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, log: mockLog.Object))
             {
@@ -149,7 +149,7 @@ namespace kafka_tests.Unit
         [Test]
         public void SendAsyncShouldTimeoutWhenSendAsyncTakesTooLong()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(_log,8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(1), log: _log))
             {
@@ -181,7 +181,7 @@ namespace kafka_tests.Unit
                 Assert.That(taskResult.Status, Is.EqualTo(TaskStatus.WaitingForActivation));
 
                 Console.WriteLine("Starting server to establish connection...");
-                using (var server = new FakeTcpServer(8999))
+                using (var server = new FakeTcpServer(_log, 8999))
                 {
                     server.OnClientConnected += () => Console.WriteLine("Client connected...");
                     server.OnBytesReceived += (b) =>
@@ -201,7 +201,7 @@ namespace kafka_tests.Unit
         [Test]
         public void SendAsyncShouldTimeoutMultipleMessagesAtATime()
         {
-            using (var server = new FakeTcpServer(8999))
+            using (var server = new FakeTcpServer(_log,8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(100), log: _log))
             {
