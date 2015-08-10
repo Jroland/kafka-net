@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using NUnit.Framework;
 using kafka_tests.Helpers;
+using KafkaNet.Common;
 
 namespace kafka_tests.Integration
 {
@@ -63,7 +65,6 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        [Ignore("Not working, sometimes crashing server.  Needs review.")]
         public void EnsureGzipCanDecompressMessageFromKafka()
         {
             var router = new BrokerRouter(_options);
@@ -71,14 +72,21 @@ namespace kafka_tests.Integration
 
             var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationCompressionTopic).Result;
 
-            var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationCompressionTopic, router),
-                offsets.Select(x => new OffsetPosition(x.PartitionId, 0)).ToArray());
-
-            var results = consumer.Consume().Take(3).ToList();
-
-            for (int i = 0; i < 3; i++)
+            var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationCompressionTopic, router){PartitionWhitelist = new List<int>(){0}},
+                offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray());
+            int numberOfmessage = 3;
+            for (int i = 0; i < numberOfmessage; i++)
             {
-                Assert.That(results[i].Value, Is.EqualTo(i.ToString()));
+                producer.SendMessageAsync(IntegrationConfig.IntegrationCompressionTopic,new[]{ new Message(i.ToString( ))}, codec: MessageCodec.CodecGzip,
+              partition: 0);
+            }
+
+
+            var results = consumer.Consume(new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token).Take(numberOfmessage).ToList();
+
+            for (int i = 0; i < numberOfmessage; i++)
+            {
+                Assert.That(results[i].Value.ToUtf8String(), Is.EqualTo(i.ToString()));
             }
 
             using (producer)
