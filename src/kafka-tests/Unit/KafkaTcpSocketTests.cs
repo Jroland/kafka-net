@@ -466,6 +466,7 @@ namespace kafka_tests.Unit
                 var read = new List<int>();
                 var expected = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
                 AutoResetEvent v = new AutoResetEvent(false);
+                
                 using (var server = new FakeTcpServer(FakeServerPort))
                 using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
                 {
@@ -491,14 +492,9 @@ namespace kafka_tests.Unit
                     Task.WaitAll(tasks);
                     v.WaitOne(1000);
 
-                    for (int i = 0; i < 10; i++)
-                    {
-                        Assert.True(read[i] == expected[i]);
-                    }
-                    for (int i = 0; i < 10; i++)
-                    {
-                        Assert.True(write[i] == expected[i]);
-                    }
+                    Assert.That(write.OrderBy(x => x), Is.EqualTo(expected));
+                    Assert.That(read.OrderBy(x => x), Is.EqualTo(expected));
+         
 
 
 
