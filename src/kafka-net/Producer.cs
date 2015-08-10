@@ -179,13 +179,16 @@ namespace KafkaNet
                 {
                     try
                     {
-                        await _asyncCollection.OnHasDataAvailable(_stopToken.Token).ConfigureAwait(false);
-
+                        bool hasDate = await _asyncCollection.OnHasDataAvailable(_stopToken.Token).ConfigureAwait(false);
+                        if (!hasDate)
+                        {
+                            return; //TODO log that the operation was canceled, this only happens during a dispose
+                        }
                         batch = await _asyncCollection.TakeAsync(BatchSize, BatchDelayTime, _stopToken.Token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException ex)
                     {
-                        //TODO log that the operation was canceled, this only happens during a dispose
+                       //log not sopose to hepend
                     }
 
                     if (_asyncCollection.IsCompleted && _asyncCollection.Count > 0)

@@ -25,9 +25,9 @@ namespace KafkaNet.Common
             IsCompleted = true;
         }
 
-        public Task OnHasDataAvailable(CancellationToken token)
+        public Task<bool> OnHasDataAvailable(CancellationToken token)
         {
-            return _dataAvailableEvent.WaitAsync().WithCancellation(token);
+            return _dataAvailableEvent.WaitAsync().WithCancellationBool(token);
         }
 
         public void Add(T data)

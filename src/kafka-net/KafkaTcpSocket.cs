@@ -179,11 +179,15 @@ namespace KafkaNet
             //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
             while (_disposeToken.IsCancellationRequested == false && netStream != null)
             {
+
                 Task sendDataReady = Task.WhenAll(writeTask, _sendTaskQueue.OnHasDataAvailable(_disposeToken.Token));
+
                 Task readDataReady = Task.WhenAll(readTask, _readTaskQueue.OnHasDataAvailable(_disposeToken.Token));
 
                 Task.WaitAny(sendDataReady, readDataReady);
-
+           
+        
+                if (_disposeToken.IsCancellationRequested == true) return;
                 var exception = new[] { writeTask, readTask }
                     .Where(x => x.IsFaulted && x.Exception != null)
                     .SelectMany(x => x.Exception.InnerExceptions)
@@ -191,8 +195,21 @@ namespace KafkaNet
 
                 if (exception != null) throw exception;
 
-                if (sendDataReady.IsCompleted) writeTask = ProcessSentTasksAsync(netStream, _sendTaskQueue.Pop());
-                if (readDataReady.IsCompleted) readTask = ProcessReadTaskAsync(netStream, _readTaskQueue.Pop());
+                if (sendDataReady.IsCompleted )
+                {
+                    var hasWritedData = _sendTaskQueue.OnHasDataAvailable(_disposeToken.Token).Result;
+                    if(!hasWritedData) return;
+                    var write = _sendTaskQueue.Pop();
+                    writeTask = ProcessSentTasksAsync(netStream, write);
+                }
+                if (readDataReady.IsCompleted )
+                {
+                    var hasReadData = _readTaskQueue.OnHasDataAvailable(_disposeToken.Token).Result;
+                    if (!hasReadData) return;
+                    var read = _readTaskQueue.Pop();
+                    readTask = ProcessReadTaskAsync(netStream, read);
+
+                }
             }
         }
 
@@ -400,7 +417,7 @@ namespace KafkaNet
     {
         public TaskCompletionSource<KafkaDataPayload> Tcp { get; set; }
         public KafkaDataPayload Payload { get; set; }
-      
+
         private readonly CancellationTokenRegistration _cancellationTokenRegistration;
 
         public SocketPayloadSendTask(KafkaDataPayload payload, CancellationToken cancellationToken)

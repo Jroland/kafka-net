@@ -460,26 +460,49 @@ namespace kafka_tests.Unit
         [Test]
         public void WriteAndReadShouldBeAsynchronous()
         {
-            var write = new List<int>();
-            var read = new List<int>();
-            var expected = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-
-            using (var server = new FakeTcpServer(FakeServerPort))
-            using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
+            for (int j = 0; j < 1000; j++)
             {
-                server.OnBytesReceived += data => write.AddRange(data.Batch(4).Select(x => x.ToArray().ToInt32()));
-
-                var tasks = Enumerable.Range(1, 10)
-                    .SelectMany(i => new[]
+                var write = new List<int>();
+                var read = new List<int>();
+                var expected = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+                AutoResetEvent v = new AutoResetEvent(false);
+                using (var server = new FakeTcpServer(FakeServerPort))
+                using (var test = new KafkaTcpSocket(new DefaultTraceLog(), _fakeServerUrl))
+                {
+                    server.OnBytesReceived += data =>
                     {
-                        test.WriteAsync(i.ToBytes().ToPayload()),
-                        test.ReadAsync(4).ContinueWith(t => read.Add(t.Result.ToInt32())),
-                        server.SendDataAsync(i.ToBytes())
-                    }).ToArray();
+                        write.AddRange(data.Batch(4).Select(x => x.ToArray().ToInt32()));
+                        if (write.Count == 10)
+                        {
+                            v.Set();
+                        }
+                    };
+                
 
-                Task.WaitAll(tasks);
-                Assert.That(write.OrderBy(x => x), Is.EqualTo(expected));
-                Assert.That(read.OrderBy(x => x), Is.EqualTo(expected));
+
+                    var tasks = Enumerable.Range(1, 10)
+                        .SelectMany(i => new[]
+                        {
+                            test.WriteAsync(i.ToBytes().ToPayload()),
+                            test.ReadAsync(4).ContinueWith(t => read.Add(t.Result.ToInt32())),
+                            server.SendDataAsync(i.ToBytes())
+                        }).ToArray();
+
+                    Task.WaitAll(tasks);
+                    v.WaitOne(1000);
+
+                    for (int i = 0; i < 10; i++)
+                    {
+                        Assert.True(read[i] == expected[i]);
+                    }
+                    for (int i = 0; i < 10; i++)
+                    {
+                        Assert.True(write[i] == expected[i]);
+                    }
+
+
+
+                }
             }
         }
 
