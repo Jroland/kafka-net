@@ -49,7 +49,6 @@
     <Compile Include="Common\AsyncCollection.cs" />
     <Compile Include="Common\ConcurrentCircularBuffer.cs" />
     <Compile Include="Common\KafkaMessagePacker.cs" />
-    <Compile Include="Default\NoDebugLog.cs" />
     <Compile Include="Interfaces\IManualConsumer.cs" />
     <Compile Include="ManualConsumer.cs" />
     <Compile Include="ProtocolGateway.cs" />

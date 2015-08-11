@@ -54,7 +54,7 @@ namespace kafka_tests.Unit
             var aq = new AsyncCollection<bool>();
             int timeSpen = 100;
             Task<bool> waitUntilCancel = aq.OnHasDataAvailable(new CancellationTokenSource(timeSpen).Token);
-            await Task.WhenAny(waitUntilCancel, Task.Delay(timeSpen/2));
+            await Task.WhenAny(waitUntilCancel, Task.Delay(timeSpen / 2));
             Assert.IsFalse(waitUntilCancel.IsCompleted, "task Should Cancel only when time is up");
             Assert.IsFalse(await waitUntilCancel, "it Should return false when cancel");
         }
@@ -242,6 +242,8 @@ namespace kafka_tests.Unit
 
             Console.WriteLine("Waiting to unwind test...");
             await highVolumeAdding;
+            collection.Drain();
+
         }
 
 
@@ -270,6 +272,7 @@ namespace kafka_tests.Unit
 
             Console.WriteLine("Left in collection: {0}", collection.Count);
             Assert.That(dataTask.Result.Count, Is.EqualTo(expected));
+            collection.Drain();
         }
 
         [Test]
@@ -309,43 +312,72 @@ namespace kafka_tests.Unit
         [Test]
         public void AddRangeShouldBePerformant()
         {
-            var sw = Stopwatch.StartNew();
-            var collection = new AsyncCollection<int>();
-            collection.AddRange(Enumerable.Range(0, 1000000));
-            sw.Stop();
-            Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
-            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+
+            for (int i = 0; i < 100; i++)
+            {
+                AsyncCollection<int> collection = new AsyncCollection<int>();
+                collection.Drain();
+                var sw = Stopwatch.StartNew();
+
+                collection.AddRange(Enumerable.Range(0, 1000000));
+                sw.Stop();
+                Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
+                Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+                
+                collection.Drain();
+            }
         }
 
+        [TearDown]
+        public void Cleanup()
+        {
+            GC.Collect();
+        }
+
+        
         [Test]
         public async void TakeAsyncShouldBePerformant()
         {
-            const int dataSize = 1000000;
-            var collection = new AsyncCollection<int>();
-            collection.AddRange(Enumerable.Range(0, dataSize));
-            var sw = Stopwatch.StartNew();
-            var list = await collection.TakeAsync(dataSize, TimeSpan.FromSeconds(1), CancellationToken.None);
-            sw.Stop();
-            Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
-            Assert.That(list.Count, Is.EqualTo(dataSize));
-            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+
+            for (int i = 0; i < 100; i++)
+            {
+                const int dataSize = 1000000;
+                AsyncCollection<int> collection = new AsyncCollection<int>();
+                collection.Drain();
+                collection.AddRange(Enumerable.Range(0, dataSize));
+                var sw = Stopwatch.StartNew();
+                var list = await collection.TakeAsync(dataSize, TimeSpan.FromSeconds(1), CancellationToken.None);
+                sw.Stop();
+                Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
+                Assert.That(list.Count, Is.EqualTo(dataSize));
+                Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+                collection.Drain();
+                GC.Collect();
+            }
         }
 
         [Test]
-        public void AddAndRemoveShouldBePerformant()
+        public async Task AddAndRemoveShouldBePerformant()
         {
-            const int dataSize = 1000000;
-            var collection = new AsyncCollection<int>();
+            AsyncCollection<int> collection = new AsyncCollection<int>();
+            for (int i = 0; i < 100; i++)
+            {
+                const int dataSize = 1000000;
+      
+                collection.Drain();
+                List<int> receivedData = null;// new List<int>(dataSize);
+                var sw = Stopwatch.StartNew();
 
-            var sw = Stopwatch.StartNew();
-            var receivedData = new List<int>();
-            Parallel.Invoke(
-                () => collection.AddRange(Enumerable.Range(0, dataSize)),
-                () => receivedData = collection.TakeAsync(dataSize, TimeSpan.FromSeconds(5), CancellationToken.None).Result);
-            sw.Stop();
-            Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
-            Assert.That(receivedData.Count, Is.EqualTo(dataSize));
-            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+                var t = Task.Run(() => collection.AddRange(Enumerable.Range(0, dataSize)));
+                var t2 = Task.Run(() => receivedData = collection.TakeAsync(dataSize, TimeSpan.FromSeconds(5), CancellationToken.None).Result);
+                await Task.WhenAll(t, t2);
+                sw.Stop();
+                Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
+                Assert.That(receivedData.Count, Is.EqualTo(dataSize));
+                Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+                collection.Drain();
+                GC.Collect();
+            }
         }
         #endregion
 

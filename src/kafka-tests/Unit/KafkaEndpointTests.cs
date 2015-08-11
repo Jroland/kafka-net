@@ -8,7 +8,7 @@ namespace kafka_tests.Unit
     [TestFixture]
     public class KafkaEndpointTests
     {
-        private  IKafkaLog _log=new NoDebugLog();
+        private  IKafkaLog _log=new ConsoleLog(LogLevel.Warn);
         [Test]
         public void EnsureEndpointCanBeResulved()
         {

@@ -22,24 +22,29 @@ namespace kafka_tests.Integration
         [TestCase(1000, 1000)]
         public async Task SendAsyncShouldHandleHighVolumeOfMessages(int amount, int maxAsync)
         {
+
+
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
-            using (var producer = new Producer(router, maxAsync) { BatchSize = amount / 2 })
+            using (var producer = new Producer(router, maxAsync) {BatchSize = amount/2})
             {
                 var tasks = new Task<List<ProduceResponse>>[amount];
 
                 for (var i = 0; i < amount; i++)
                 {
-                    tasks[i] = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(Guid.NewGuid().ToString()) });
+                    tasks[i] = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic,
+                        new[] {new Message(Guid.NewGuid().ToString())});
                 }
-                var results = await Task.WhenAny(tasks.ToArray());
-           
+                var results = await Task.WhenAll(tasks.ToArray());
+
                 //Because of how responses are batched up and sent to servers, we will usually get multiple responses per requested message batch
                 //So this assertion will never pass
                 //Assert.That(results.Count, Is.EqualTo(amount));
 
-                Assert.That(results.Result.Any(x => x.Error != 0), Is.False, "Should not have received any results as failures.");
+                Assert.That(results.Any(x => x.Any(y => y.Error != 0)), Is.False,
+                    "Should not have received any results as failures.");
             }
-        }
+        
+    }
 
         [Test]
         public void ConsumerShouldConsumeInSameOrderAsProduced()

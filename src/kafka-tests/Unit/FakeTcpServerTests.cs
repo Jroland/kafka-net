@@ -14,7 +14,7 @@ namespace kafka_tests.Unit
     public class FakeTcpServerTests
     {
         private readonly Uri _fakeServerUrl;
-        private IKafkaLog Ilog=new NoDebugLog();
+        private IKafkaLog Ilog=new ConsoleLog(LogLevel.Warn);
         public FakeTcpServerTests()
         {
             _fakeServerUrl = new Uri("http://localhost:8999");
