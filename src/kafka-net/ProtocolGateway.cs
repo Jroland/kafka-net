@@ -16,6 +16,10 @@ namespace KafkaNet
             _brokerRouter = new BrokerRouter(kafkaOptions);
         }
 
+        public ProtocolGateway(BrokerRouter brokerRouter)
+        {
+            _brokerRouter = brokerRouter;
+        }
         public ProtocolGateway(KafkaOptions kafkaOptions)
         {
             _brokerRouter = new BrokerRouter(kafkaOptions);
