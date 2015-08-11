@@ -26,7 +26,7 @@ namespace KafkaNet
         private readonly KafkaMetadataProvider _kafkaMetadataProvider;
         private readonly ConcurrentDictionary<KafkaEndpoint, IKafkaConnection> _defaultConnectionIndex = new ConcurrentDictionary<KafkaEndpoint, IKafkaConnection>();
         private readonly ConcurrentDictionary<int, IKafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, IKafkaConnection>();
-        private readonly ConcurrentDictionary<string, Topic> _topicIndex = new ConcurrentDictionary<string, Topic>();
+        private readonly ConcurrentDictionary<string, Tuple<Topic, DateTime>> _topicIndex = new ConcurrentDictionary<string, Tuple<Topic, DateTime>>();
         private SemaphoreSlim _taskLocker = new SemaphoreSlim(1);
         public BrokerRouter(KafkaOptions kafkaOptions)
         {
@@ -125,36 +125,24 @@ namespace KafkaNet
         /// </remarks>
 
 
-        private TaskCompletionSource<int> _lastTask;
-        private string[] _lastTopicsRequest;
+
 
         public Task RefreshTopicMetadata(params string[] topics)
         {
-            return RefreshTopicMetadata(true, TimeSpan.FromMinutes(2), topics);
+            return RefreshTopicMetadata(_kafkaOptions.cacheExpiration, TimeSpan.FromMinutes(2), topics);
         }
 
-        private async Task RefreshTopicMetadata(bool forceRefresh, TimeSpan timeout, params string[] topics)
+        private async Task RefreshTopicMetadata(TimeSpan? cacheExpiration, TimeSpan timeout, params string[] topics)
         {
-            var  cacheLastTasK = _lastTask;
-            bool isRunningTheSameTask = RunningTheSameTask(topics, forceRefresh);
-            if (isRunningTheSameTask)
-            {
-                await cacheLastTasK.Task;
-                return;
-            }
-
             try
             {
                 await _taskLocker.WaitAsync(timeout);
-                int missingFromCache = SearchCacheForTopics(topics).Missing.Count;
-                if (!forceRefresh && missingFromCache == 0)
+                int missingFromCache = SearchCacheForTopics(topics, cacheExpiration).Missing.Count;
+                if ( missingFromCache == 0)
                 {
                     return;
                 }
 
-
-                _lastTask = new TaskCompletionSource<int>();
-                _lastTopicsRequest = topics;
                 _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
 
                 //get the connections to query against and get metadata
@@ -164,20 +152,16 @@ namespace KafkaNet
                 if (!TaskGetMetadata.IsCompleted)
                 {
                     var ex = new Exception("_kafkaMetadataProvider.Get not get in time");
-                    _lastTask.TrySetException(ex);
+
                     throw ex;
                 }
                 var metadataResponse = await TaskGetMetadata;
 
                 UpdateInternalMetadataCache(metadataResponse);//Can heppend simultaneously
-              //  _lastTopicsRequest = null;
-                _lastTask.TrySetResult(1);
+                //  _lastTopicsRequest = null;
+
             }
-            catch (Exception ex)
-            {
-                _lastTask.TrySetException(ex);
-                throw;
-            }
+
             finally
             {
                 _taskLocker.Release();
@@ -185,26 +169,15 @@ namespace KafkaNet
 
         }
 
-        private bool RunningTheSameTask(string[] topics, bool forceRefresh)
-        {
-            var cacheLastRequest = _lastTopicsRequest;
-            bool isRunning = _taskLocker.CurrentCount == 0;
 
-            bool sameTask = cacheLastRequest != null && topics.SequenceEqual(cacheLastRequest);
-            if (forceRefresh)
-            {
-                return isRunning && sameTask;
-            }
-            return (sameTask);
-        }
 
-        private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics)
+        private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics, TimeSpan? expiration = null)
         {
             var result = new TopicSearchResult();
 
             foreach (var topic in topics)
             {
-                var cachedTopic = GetCachedTopic(topic);
+                var cachedTopic = GetCachedTopic(topic, expiration);
 
                 if (cachedTopic == null)
                     result.Missing.Add(topic);
@@ -215,10 +188,19 @@ namespace KafkaNet
             return result;
         }
 
-        private Topic GetCachedTopic(string topic)
+        private Topic GetCachedTopic(string topic, TimeSpan? expiration = null)
         {
-            Topic cachedTopic;
-            return _topicIndex.TryGetValue(topic, out cachedTopic) ? cachedTopic : null;
+            Tuple<Topic, DateTime> cachedTopic;
+            if (_topicIndex.TryGetValue(topic, out cachedTopic))
+            {
+                bool notExistOrExpire = !expiration.HasValue ||(DateTime.Now - cachedTopic.Item2).TotalMilliseconds <expiration.Value.TotalMilliseconds;
+                if (notExistOrExpire)
+                {
+                    return cachedTopic.Item1;
+                }
+            }
+            return null;
+
         }
 
         private BrokerRoute GetCachedRoute(string topic, Partition partition)
@@ -272,7 +254,7 @@ namespace KafkaNet
 
             foreach (var topic in metadata.Topics)
             {
-                var localTopic = topic;
+                var localTopic = new Tuple<Topic, DateTime>(topic, DateTime.Now);
                 _topicIndex.AddOrUpdate(topic.Name, s => localTopic, (s, existing) => localTopic);
             }
         }
@@ -302,18 +284,15 @@ namespace KafkaNet
 
 
 
-        public async Task RefreshTopicMetadataThatNoExistOnCache(params string[] topics)
+        public async Task RefreshMissingTopicMetadata(params string[] topics)
         {
-            var topicSearchResult = SearchCacheForTopics(topics);
+            var topicSearchResult = SearchCacheForTopics(topics,null);
 
             //update metadata for all missing topics
             if (topicSearchResult.Missing.Count > 0)
             {
                 //double check for missing topics and query
-                await RefreshTopicMetadata(false, TimeSpan.FromMinutes(2), topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
-
-                var refreshedTopics = topicSearchResult.Missing.Select(GetCachedTopic).Where(x => x != null);
-                topicSearchResult.Topics.AddRange(refreshedTopics);
+                await RefreshTopicMetadata(null, TimeSpan.FromMinutes(2), topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
             }
 
         }

@@ -49,6 +49,6 @@ namespace KafkaNet
         [Obsolete]
         Task RefreshTopicMetadata(params string[] topics);
 
-        Task RefreshTopicMetadataThatNoExistOnCache(params string[] topics);
+        Task RefreshMissingTopicMetadata(params string[] topics);
     }
 }

@@ -50,7 +50,7 @@ namespace kafka_tests.Integration
             const int partitionId = 0;
             using (var router = new BrokerRouter(Options))
             {
-                await router.RefreshTopicMetadataThatNoExistOnCache(IntegrationConfig.IntegrationTopic);
+                await router.RefreshMissingTopicMetadata(IntegrationConfig.IntegrationTopic);
                 var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var commit = CreateOffsetCommitRequest(IntegrationConfig.IntegrationConsumer, partitionId, 10);
@@ -69,7 +69,7 @@ namespace kafka_tests.Integration
 
             using (var router = new BrokerRouter(Options))
             {
-                await router.RefreshTopicMetadataThatNoExistOnCache(IntegrationConfig.IntegrationTopic);
+                await router.RefreshMissingTopicMetadata(IntegrationConfig.IntegrationTopic);
                 var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var commit = CreateOffsetCommitRequest(IntegrationConfig.IntegrationConsumer, partitionId, offset);

@@ -83,7 +83,7 @@ namespace kafka_tests.Unit
 
             _mockKafkaConnection1.Setup(x => x.SendAsync(It.IsAny<IKafkaRequest<MetadataResponse>>()))
                       .Returns(() => Task.Run(() => new List<MetadataResponse> { CreateMetaResponse() }));
-            await router.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+            await router.RefreshMissingTopicMetadata(TestTopic);
             var topics = router.GetTopicMetadataFromLocalCache(TestTopic);
             _mockKafkaConnectionFactory.Verify(x => x.Create(It.Is<KafkaEndpoint>(e => e.Endpoint.Port == 2), It.IsAny<TimeSpan>(), It.IsAny<IKafkaLog>(), null), Times.Once());
         }
@@ -95,7 +95,7 @@ namespace kafka_tests.Unit
             var routerProxy = new BrokerRouterProxy(_kernel);
             routerProxy.BrokerConn0.MetadataResponseFunction = () => { throw new Exception("some error"); };
             var router = routerProxy.Create();
-            await router.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+            await router.RefreshMissingTopicMetadata(TestTopic);
             var result = router.GetTopicMetadataFromLocalCache(TestTopic);
             Assert.That(result, Is.Not.Null);
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(1));
@@ -113,7 +113,7 @@ namespace kafka_tests.Unit
 
             try
             {
-                await router.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+                await router.RefreshMissingTopicMetadata(TestTopic);
                 router.GetTopicMetadataFromLocalCache(TestTopic);
             }
             catch
@@ -129,7 +129,7 @@ namespace kafka_tests.Unit
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
-            await router.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+            await router.RefreshMissingTopicMetadata(TestTopic);
             var result1 = router.GetTopicMetadataFromLocalCache(TestTopic);
             var result2 = router.GetTopicMetadataFromLocalCache(TestTopic);
 
@@ -141,14 +141,14 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public async Task RefreshTopicMetadataShouldIgnoreCacheAndAlwayCauseMetadataRequest()
+        public async Task RefreshTopicMetadataShouldIgnoreCacheAndAlwayCauseMetadataRequestAfterExpertionDate()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
 
             await router.RefreshTopicMetadata(TestTopic);
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(1));
-
+            await Task.Delay(101);
             await router.RefreshTopicMetadata(TestTopic);
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(2));
         }
@@ -174,7 +174,7 @@ namespace kafka_tests.Unit
 
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
-            await router.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+            await router.RefreshMissingTopicMetadata(TestTopic);
             var p0 = router.SelectBrokerRouteFromLocalCache(TestTopic, 0);
             var p1 = router.SelectBrokerRouteFromLocalCache(TestTopic, 1);
 
@@ -188,7 +188,7 @@ namespace kafka_tests.Unit
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
-            await router.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+            await router.RefreshMissingTopicMetadata(TestTopic);
             router.SelectBrokerRouteFromLocalCache(TestTopic, 3);
         }
 
@@ -215,7 +215,7 @@ namespace kafka_tests.Unit
             var routerProxy = new BrokerRouterProxy(_kernel);
             routerProxy.BrokerConn0.MetadataResponseFunction = () => metadataResponse;
             var router = routerProxy.Create();
-            await router.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+            await router.RefreshMissingTopicMetadata(TestTopic);
             router.SelectBrokerRouteFromLocalCache(TestTopic, 1);
         }
         #endregion
@@ -242,7 +242,7 @@ namespace kafka_tests.Unit
 
             routerProxy.PartitionSelector = _mockPartitionSelector.Object;
             var router = routerProxy.Create();
-            await router.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+            await router.RefreshMissingTopicMetadata(TestTopic);
             var result = router.SelectBrokerRouteFromLocalCache(TestTopic, key);
 
             _mockPartitionSelector.Verify(f => f.Select(It.Is<Topic>(x => x.Name == TestTopic), key), Times.Once());
@@ -273,7 +273,7 @@ namespace kafka_tests.Unit
             var router = routerProxy.BrokerConn0;
             routerProxy.BrokerConn0.MetadataResponseFunction = () => metadataResponse;
             var routerProxy1 = routerProxy.Create();
-            await routerProxy1.RefreshTopicMetadataThatNoExistOnCache(TestTopic);
+            await routerProxy1.RefreshMissingTopicMetadata(TestTopic);
             routerProxy1.SelectBrokerRouteFromLocalCache(TestTopic);
         }
         #endregion

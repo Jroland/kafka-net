@@ -31,7 +31,7 @@ namespace KafkaNet
             {
                 try
                 {
-                    await _brokerRouter.RefreshTopicMetadataThatNoExistOnCache(topic);
+                    await _brokerRouter.RefreshMissingTopicMetadata(topic);
                     //find route it can chage after Metadata Refresh
                     var route = _brokerRouter.SelectBrokerRouteFromLocalCache(topic, partition);
                     var responses = await route.Connection.SendAsync(request);

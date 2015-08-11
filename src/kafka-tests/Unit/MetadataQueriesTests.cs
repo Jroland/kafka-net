@@ -58,7 +58,7 @@ namespace kafka_tests.Unit
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
-            await router.RefreshTopicMetadataThatNoExistOnCache(BrokerRouterProxy.TestTopic);
+            await router.RefreshMissingTopicMetadata(BrokerRouterProxy.TestTopic);
             var common = new MetadataQueries(router);
 
             var result = common.GetTopicFromCache(BrokerRouterProxy.TestTopic);

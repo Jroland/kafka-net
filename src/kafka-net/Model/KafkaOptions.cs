@@ -9,6 +9,9 @@ namespace KafkaNet.Model
     {
         private const int DefaultResponseTimeout = 60000;
 
+        
+        //min allow to refresh metaData request 
+        public TimeSpan cacheExpiration = TimeSpan.FromMilliseconds(100);
         /// <summary>
         /// List of Uri connections to kafka servers.  The are used to query for metadata from Kafka.  More than one is recommended.
         /// </summary>

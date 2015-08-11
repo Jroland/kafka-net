@@ -84,7 +84,7 @@ namespace KafkaNet
                 if (Interlocked.Increment(ref _ensureOneThread) == 1)
                 {
                     _options.Log.DebugFormat("Consumer: Refreshing partitions for topic: {0}", _options.Topic);
-                    _options.Router.RefreshTopicMetadataThatNoExistOnCache(_options.Topic).Wait();
+                    _options.Router.RefreshMissingTopicMetadata(_options.Topic).Wait();
                     var topic = _options.Router.GetTopicMetadataFromLocalCache(_options.Topic);
                     if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
                     _topic = topic.First();

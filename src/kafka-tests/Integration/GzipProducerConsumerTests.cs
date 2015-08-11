@@ -35,7 +35,7 @@ namespace kafka_tests.Integration
 
             using (var router = new BrokerRouter(_options))
             {
-                await router.RefreshTopicMetadataThatNoExistOnCache(IntegrationConfig.IntegrationCompressionTopic);
+                await router.RefreshMissingTopicMetadata(IntegrationConfig.IntegrationCompressionTopic);
                 var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationCompressionTopic, 0);
 
                 var request = new ProduceRequest

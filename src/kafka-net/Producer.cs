@@ -237,7 +237,7 @@ namespace KafkaNet
         {
             Interlocked.Add(ref _inFlightMessageCount, messages.Count);
             var topics = messages.GroupBy(batch => batch.Topic).Select(batch => batch.Key).ToArray();
-            await BrokerRouter.RefreshTopicMetadataThatNoExistOnCache(topics);
+            await BrokerRouter.RefreshMissingTopicMetadata(topics);
 
             //we must send a different produce request for each ack level and timeout combination.
             foreach (var ackLevelBatch in messages.GroupBy(batch => new { batch.Acks, batch.Timeout }))
