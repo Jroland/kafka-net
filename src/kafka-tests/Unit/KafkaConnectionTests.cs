@@ -89,7 +89,7 @@ namespace kafka_tests.Unit
         {
             var mockLog = _kernel.GetMock<IKafkaLog>();
 
-            using (var server = new FakeTcpServer(_log,8999))
+            using (var server = new FakeTcpServer(_log, 8999))
             using (var socket = new KafkaTcpSocket(mockLog.Object, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, log: mockLog.Object))
             {
@@ -105,7 +105,7 @@ namespace kafka_tests.Unit
 
                 //Wait a while for the client to notice the disconnect and log
                 TaskTest.WaitFor(() => disconnected);
-                
+
 
                 //should log an exception and keep going
                 mockLog.Verify(x => x.ErrorFormat(It.IsAny<string>(), It.IsAny<Exception>()));
@@ -122,7 +122,7 @@ namespace kafka_tests.Unit
 
             var mockLog = _kernel.GetMock<IKafkaLog>();
 
-            using (var server = new FakeTcpServer(_log,8999))
+            using (var server = new FakeTcpServer(_log, 8999))
             using (var socket = new KafkaTcpSocket(mockLog.Object, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, log: mockLog.Object))
             {
@@ -149,7 +149,7 @@ namespace kafka_tests.Unit
         [Test]
         public void SendAsyncShouldTimeoutWhenSendAsyncTakesTooLong()
         {
-            using (var server = new FakeTcpServer(_log,8999))
+            using (var server = new FakeTcpServer(_log, 8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(1), log: _log))
             {
@@ -197,11 +197,12 @@ namespace kafka_tests.Unit
                 }
             }
         }
-        
+
         [Test]
         public void SendAsyncShouldTimeoutMultipleMessagesAtATime()
         {
-            using (var server = new FakeTcpServer(_log,8999))
+
+            using (var server = new FakeTcpServer(_log, 8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(100), log: _log))
             {
@@ -217,11 +218,13 @@ namespace kafka_tests.Unit
 
                 Task.WhenAll(tasks);
 
-                TaskTest.WaitFor(() => tasks.Any(t => t.IsFaulted));
+                TaskTest.WaitFor(() => tasks.All(t => t.IsFaulted));
                 foreach (var task in tasks)
                 {
                     Assert.That(task.IsFaulted, Is.True, "Task should have faulted.");
-                    Assert.That(task.Exception.InnerException, Is.TypeOf<ResponseTimeoutException>(), "Task fault should be of type ResponseTimeoutException.");
+                    Assert.That(task.Exception.InnerException, Is.TypeOf<ResponseTimeoutException>(),
+                        "Task fault should be of type ResponseTimeoutException.");
+
                 }
             }
         }
