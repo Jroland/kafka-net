@@ -62,7 +62,7 @@ namespace kafka_tests
         {
             return new BrokerRouter(new KafkaNet.Model.KafkaOptions
             {
-                KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },
+                KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },cacheExpiration = TimeSpan.FromMilliseconds(100),
                 KafkaConnectionFactory = _mockKafkaConnectionFactory.Object,
                 PartitionSelector = PartitionSelector
             });
