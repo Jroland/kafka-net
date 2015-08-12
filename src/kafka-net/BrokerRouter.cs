@@ -124,11 +124,17 @@ namespace KafkaNet
         /// Only call this method to force a metadata update.  For all other queries use <see cref="GetTopicMetadataFromLocalCache"/> which uses cached values.
         /// </remarks>
 
+ 
         public Task RefreshTopicMetadata(params string[] topics)
         {
-            return RefreshTopicMetadata(_kafkaOptions.cacheExpiration, TimeSpan.FromMinutes(2), topics);
+            return RefreshTopicMetadata(_kafkaOptions.CacheExpiration, TimeSpan.FromMinutes(2), topics);
         }
-
+        /// <summary>
+        /// refresh metadata Request get to server for all topic that there Cache Expire.
+        /// CacheExpiration is max time for topic to be valid after this time the Cache Expire for topic,
+        /// and be refresh on next refresh metadata Request.
+        /// if cacheExpiration is null: refresh metadata Request get to server for all topic that dose not exists on Cache.
+        /// </summary>
         private async Task RefreshTopicMetadata(TimeSpan? cacheExpiration, TimeSpan timeout, params string[] topics)
         {
             try

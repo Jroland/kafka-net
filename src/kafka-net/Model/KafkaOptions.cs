@@ -8,10 +8,16 @@ namespace KafkaNet.Model
     public class KafkaOptions
     {
         private const int DefaultResponseTimeout = 60000;
+        private const int DefaultCacheExpirationTimeoutMS = 100;
 
-        
-        //min allow to refresh metaData request 
-        public TimeSpan cacheExpiration = TimeSpan.FromMilliseconds(100);
+        /// <summary>
+        /// refresh metadata Request get to server for all topic that there Cache Expire.
+        /// CacheExpiration is max time for topic to be valid after this time the Cache Expire for topic,
+        /// and be refresh on next refresh metadata Request.
+        /// </summary>
+
+        public TimeSpan CacheExpiration { get; set; }
+
         /// <summary>
         /// List of Uri connections to kafka servers.  The are used to query for metadata from Kafka.  More than one is recommended.
         /// </summary>
@@ -67,6 +73,7 @@ namespace KafkaNet.Model
             Log = new DefaultTraceLog();
             KafkaConnectionFactory = new DefaultKafkaConnectionFactory();
             ResponseTimeoutMs = TimeSpan.FromMilliseconds(DefaultResponseTimeout);
+            CacheExpiration = TimeSpan.FromMilliseconds(DefaultCacheExpirationTimeoutMS); ;
         }
     }
 }

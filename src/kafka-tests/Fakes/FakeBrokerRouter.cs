@@ -62,7 +62,7 @@ namespace kafka_tests
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },
                 KafkaConnectionFactory = _mockKafkaConnectionFactory,
                 PartitionSelector = PartitionSelector
-                ,cacheExpiration = _cacheExpiration
+                ,CacheExpiration = _cacheExpiration
             });
         }
 
