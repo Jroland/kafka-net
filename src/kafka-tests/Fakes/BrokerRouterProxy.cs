@@ -21,7 +21,7 @@ namespace kafka_tests
         private readonly FakeKafkaConnection _fakeConn0;
         private readonly FakeKafkaConnection _fakeConn1;
         private readonly Mock<IKafkaConnectionFactory> _mockKafkaConnectionFactory;
-
+        public readonly TimeSpan _cacheExpiration = TimeSpan.FromMilliseconds(1);
         public FakeKafkaConnection BrokerConn0 { get { return _fakeConn0; } }
         public FakeKafkaConnection BrokerConn1 { get { return _fakeConn1; } }
         public Mock<IKafkaConnectionFactory> KafkaConnectionMockKafkaConnectionFactory { get { return _mockKafkaConnectionFactory; } }
@@ -62,7 +62,8 @@ namespace kafka_tests
         {
             return new BrokerRouter(new KafkaNet.Model.KafkaOptions
             {
-                KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },cacheExpiration = TimeSpan.FromMilliseconds(100),
+                KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },
+                cacheExpiration = _cacheExpiration,
                 KafkaConnectionFactory = _mockKafkaConnectionFactory.Object,
                 PartitionSelector = PartitionSelector
             });

@@ -65,29 +65,41 @@ namespace kafka_tests.Unit
         [Test]
         public void ProducerShouldReportCorrectAmountOfAsyncRequests()
         {
-            var semaphore = new SemaphoreSlim(0);
-            var routerProxy = new FakeBrokerRouter();
-            //block the second call returning from send message async
-            routerProxy.BrokerConn0.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
-
-            var router = routerProxy.Create();
-            using (var producer = new Producer(router, maximumAsyncRequests: 1) { BatchSize = 1 })
+         var log  = new ConsoleLog();
+            for (int i = 0; i  < 100; i++)
             {
-                var messages = new[] { new Message("1") };
+             
 
-                Assert.That(producer.AsyncCount, Is.EqualTo(0));
+                var semaphore = new SemaphoreSlim(0);
+                var routerProxy = new FakeBrokerRouter();
+                //block the second call returning from send message async
+                routerProxy.BrokerConn0.ProduceResponseFunction = () =>
+                {
+                    semaphore.Wait();
+                    return new ProduceResponse();
+                };
 
-                var sendTask = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+                var router = routerProxy.Create();
+                using (var producer = new Producer(router, maximumAsyncRequests: 1) {BatchSize = 1})
+                {
+                    var messages = new[] {new Message("1")};
 
-                TaskTest.WaitFor(() => producer.AsyncCount > 0);
-                Assert.That(producer.AsyncCount, Is.EqualTo(1), "One async operation should be sending.");
+                    Assert.That(producer.AsyncCount, Is.EqualTo(0));
 
-                semaphore.Release();
-                sendTask.Wait(TimeSpan.FromMilliseconds(500));
+                    var sendTask = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
 
-                Assert.That(sendTask.IsCompleted, Is.True, "Send task should be marked as completed.");
-                Assert.That(producer.AsyncCount, Is.EqualTo(0), "Async should now show zero count.");
+                    TaskTest.WaitFor(() => producer.AsyncCount > 0);
+                    Assert.That(producer.AsyncCount, Is.EqualTo(1), "One async operation should be sending.");
+
+                    semaphore.Release();
+                    sendTask.Wait(TimeSpan.FromMilliseconds(500));
+                    Task.Delay(2).Wait();
+                    Assert.That(sendTask.IsCompleted, Is.True, "Send task should be marked as completed.");
+                    Assert.That(producer.AsyncCount, Is.EqualTo(0), "Async should now show zero count.");
+                }
+            log.DebugFormat(i.ToString());
             }
+           
         }
 
         [Test]

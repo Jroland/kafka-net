@@ -148,7 +148,7 @@ namespace kafka_tests.Unit
             TimeSpan cacheExpiration=TimeSpan.FromMilliseconds(100);
             await router.RefreshTopicMetadata(TestTopic);
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(1));
-            await Task.Delay(cacheExpiration);
+            await Task.Delay(routerProxy._cacheExpiration);
             await Task.Delay(1);//After cache is expair
             await router.RefreshTopicMetadata(TestTopic);
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(2));

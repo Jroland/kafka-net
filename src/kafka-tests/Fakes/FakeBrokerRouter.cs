@@ -19,7 +19,7 @@ namespace kafka_tests
         private readonly FakeKafkaConnection _fakeConn0;
         private readonly FakeKafkaConnection _fakeConn1;
         private readonly IKafkaConnectionFactory _mockKafkaConnectionFactory;
-
+       public  readonly TimeSpan _cacheExpiration=TimeSpan.FromMilliseconds(1);
         public FakeKafkaConnection BrokerConn0 { get { return _fakeConn0; } }
         public FakeKafkaConnection BrokerConn1 { get { return _fakeConn1; } }
         public IKafkaConnectionFactory KafkaConnectionMockKafkaConnectionFactory { get { return _mockKafkaConnectionFactory; } }
@@ -31,6 +31,7 @@ namespace kafka_tests
         public FakeBrokerRouter()
         {
             //setup mock IKafkaConnection
+          
             _fakeConn0 = new FakeKafkaConnection(new Uri("http://localhost:1"));
             _fakeConn0.ProduceResponseFunction = () => new ProduceResponse { Offset = _offset0++, PartitionId = 0, Topic = TestTopic };
             _fakeConn0.MetadataResponseFunction = () => MetadataResponse();
@@ -42,7 +43,7 @@ namespace kafka_tests
             _fakeConn1.MetadataResponseFunction = () => MetadataResponse();
             _fakeConn1.OffsetResponseFunction = () => new OffsetResponse { Offsets = new List<long> { 0, 100 }, PartitionId = 1, Topic = TestTopic };
             _fakeConn1.FetchResponseFunction = () => { Thread.Sleep(500); return null; };
-
+       
             _mockKafkaConnectionFactory = Substitute.For<IKafkaConnectionFactory>();
             _mockKafkaConnectionFactory.Create(Arg.Is<KafkaEndpoint>(e => e.Endpoint.Port == 1), Arg.Any<TimeSpan>(), Arg.Any<IKafkaLog>()).Returns(_fakeConn0);
             _mockKafkaConnectionFactory.Create(Arg.Is<KafkaEndpoint>(e => e.Endpoint.Port == 2), Arg.Any<TimeSpan>(), Arg.Any<IKafkaLog>()).Returns(_fakeConn1);
@@ -61,6 +62,7 @@ namespace kafka_tests
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },
                 KafkaConnectionFactory = _mockKafkaConnectionFactory,
                 PartitionSelector = PartitionSelector
+                ,cacheExpiration = _cacheExpiration
             });
         }
 
