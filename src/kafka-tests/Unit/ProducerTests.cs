@@ -73,7 +73,7 @@ namespace kafka_tests.Unit
                 var semaphore = new SemaphoreSlim(0);
                 var routerProxy = new FakeBrokerRouter();
                 //block the second call returning from send message async
-                routerProxy.BrokerConn0.ProduceResponseFunction = () =>
+                routerProxy.BrokerConn0.ProduceResponseFunction = async () =>
                 {
                     semaphore.Wait();
                     return new ProduceResponse();
@@ -109,7 +109,7 @@ namespace kafka_tests.Unit
             var semaphore = new SemaphoreSlim(0);
             var routerProxy = new FakeBrokerRouter();
             //block the second call returning from send message async
-            routerProxy.BrokerConn0.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
+            routerProxy.BrokerConn0.ProduceResponseFunction = async () => { semaphore.Wait(); return new ProduceResponse(); };
 
             var router = routerProxy.Create();
             using (var producer = new Producer(router, maximumAsyncRequests: 1) { BatchSize = 1 })
@@ -315,8 +315,8 @@ namespace kafka_tests.Unit
             //with max buffer set below the batch size, this should cause the producer to block until batch delay time.
             var routerProxy = new FakeBrokerRouter();
             var semaphore = new SemaphoreSlim(0);
-            routerProxy.BrokerConn0.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
-            routerProxy.BrokerConn1.ProduceResponseFunction = () => { semaphore.Wait(); return new ProduceResponse(); };
+            routerProxy.BrokerConn0.ProduceResponseFunction = async () => { semaphore.Wait(); return new ProduceResponse(); };
+            routerProxy.BrokerConn1.ProduceResponseFunction = async () => { semaphore.Wait(); return new ProduceResponse(); };
 
             var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 5, maximumAsyncRequests: 1) { BatchSize =1 , BatchDelayTime = TimeSpan.FromMilliseconds(500) };
             using (producer)

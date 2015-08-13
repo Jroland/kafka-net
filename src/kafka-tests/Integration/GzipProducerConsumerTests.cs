@@ -24,43 +24,57 @@ namespace kafka_tests.Integration
             return new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), endpoint), _options.ResponseTimeoutMs, _options.Log);
         }
 
+
+
+
+
         [Test]
         public async Task EnsureGzipCompressedMessageCanSend()
         {
-            //ensure topic exists
-            using (var conn = GetKafkaConnection())
-            {
-                conn.SendAsync(new MetadataRequest { Topics = new List<string>(new[] { IntegrationConfig.IntegrationCompressionTopic }) }).Wait(TimeSpan.FromSeconds(10));
-            }
 
-            using (var router = new BrokerRouter(_options))
+            for (int i = 0; i < 100; i++)
             {
-                await router.RefreshMissingTopicMetadata(IntegrationConfig.IntegrationCompressionTopic);
-                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationCompressionTopic, 0);
 
-                var request = new ProduceRequest
+
+                //ensure topic exists
+                using (var conn = GetKafkaConnection())
                 {
-                    Acks = 1,
-                    TimeoutMS = 1000,
-                    Payload = new List<Payload>
-                                {
-                                    new Payload
-                                        {
-                                            Codec = MessageCodec.CodecGzip,
-                                            Topic = IntegrationConfig.IntegrationCompressionTopic,
-                                            Partition = 0,
-                                            Messages = new List<Message>
-                                                    {
-                                                        new Message("0", "1"),
-                                                        new Message("1", "1"),
-                                                        new Message("2", "1")
-                                                    }
-                                        }
-                                }
-                };
+                    conn.SendAsync(new MetadataRequest
+                    {
+                        Topics = new List<string>(new[] {IntegrationConfig.IntegrationCompressionTopic})
+                    })
+                        .Wait(TimeSpan.FromSeconds(10));
+                }
 
-                var response = conn.Connection.SendAsync(request).Result;
-                Assert.That(response.First().Error, Is.EqualTo(0));
+                using (var router = new BrokerRouter(_options))
+                {
+                    await router.RefreshMissingTopicMetadata(IntegrationConfig.IntegrationCompressionTopic);
+                    var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationCompressionTopic, 0);
+
+                    var request = new ProduceRequest
+                    {
+                        Acks = 1,
+                        TimeoutMS = 1000,
+                        Payload = new List<Payload>
+                        {
+                            new Payload
+                            {
+                                Codec = MessageCodec.CodecGzip,
+                                Topic = IntegrationConfig.IntegrationCompressionTopic,
+                                Partition = 0,
+                                Messages = new List<Message>
+                                {
+                                    new Message("0", "1"),
+                                    new Message("1", "1"),
+                                    new Message("2", "1")
+                                }
+                            }
+                        }
+                    };
+
+                    var response = conn.Connection.SendAsync(request).Result;
+                    Assert.That(response.First().Error, Is.EqualTo(0));
+                }
             }
         }
 

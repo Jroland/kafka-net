@@ -201,7 +201,7 @@ namespace kafka_tests.Unit
             metadataResponse.Topics.Clear();
 
             var routerProxy = new BrokerRouterProxy(_kernel);
-            routerProxy.BrokerConn0.MetadataResponseFunction = () => metadataResponse;
+            routerProxy.BrokerConn0.MetadataResponseFunction = async () => metadataResponse;
 
             routerProxy.Create().SelectBrokerRouteFromLocalCache(TestTopic, 1);
         }
@@ -214,7 +214,7 @@ namespace kafka_tests.Unit
             metadataResponse.Brokers.Clear();
 
             var routerProxy = new BrokerRouterProxy(_kernel);
-            routerProxy.BrokerConn0.MetadataResponseFunction = () => metadataResponse;
+            routerProxy.BrokerConn0.MetadataResponseFunction = async () => metadataResponse;
             var router = routerProxy.Create();
             await router.RefreshMissingTopicMetadata(TestTopic);
             router.SelectBrokerRouteFromLocalCache(TestTopic, 1);
@@ -258,7 +258,7 @@ namespace kafka_tests.Unit
 
 
             var routerProxy = new BrokerRouterProxy(_kernel);
-            routerProxy.BrokerConn0.MetadataResponseFunction = () => metadataResponse;
+            routerProxy.BrokerConn0.MetadataResponseFunction = async () => metadataResponse;
 
             routerProxy.Create().SelectBrokerRouteFromLocalCache(TestTopic);
         }
@@ -272,7 +272,7 @@ namespace kafka_tests.Unit
 
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.BrokerConn0;
-            routerProxy.BrokerConn0.MetadataResponseFunction = () => metadataResponse;
+            routerProxy.BrokerConn0.MetadataResponseFunction = async () => metadataResponse;
             var routerProxy1 = routerProxy.Create();
             await routerProxy1.RefreshMissingTopicMetadata(TestTopic);
             routerProxy1.SelectBrokerRouteFromLocalCache(TestTopic);

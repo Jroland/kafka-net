@@ -22,7 +22,7 @@ namespace kafka_tests.Unit
         public void CancellationShouldInterruptConsumption()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction =async () => { return new FetchResponse(); };
 
             var router = routerProxy.Create();
 
@@ -49,7 +49,7 @@ namespace kafka_tests.Unit
         public void ConsumerWhitelistShouldOnlyConsumeSpecifiedPartition()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = async () => { return new FetchResponse(); };
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int> { 0 };
@@ -93,7 +93,7 @@ namespace kafka_tests.Unit
         public void ConsumerShouldCreateTaskForEachBroker()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = async () => { return new FetchResponse(); };
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int>();
@@ -111,7 +111,7 @@ namespace kafka_tests.Unit
         public void ConsumerShouldReturnOffset()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = async () => { return new FetchResponse(); };
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int>();
@@ -137,7 +137,7 @@ namespace kafka_tests.Unit
         public void EnsureConsumerDisposesAllTasks()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = async () => { return new FetchResponse(); };
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int>();

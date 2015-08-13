@@ -25,14 +25,14 @@ namespace kafka_tests.Integration
 
 
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
-            using (var producer = new Producer(router, maxAsync) {BatchSize = amount/2})
+            using (var producer = new Producer(router, maxAsync) { BatchSize = amount / 2 })
             {
                 var tasks = new Task<List<ProduceResponse>>[amount];
 
                 for (var i = 0; i < amount; i++)
                 {
                     tasks[i] = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic,
-                        new[] {new Message(Guid.NewGuid().ToString())});
+                        new[] { new Message(Guid.NewGuid().ToString()) });
                 }
                 var results = await Task.WhenAll(tasks.ToArray());
 
@@ -43,8 +43,8 @@ namespace kafka_tests.Integration
                 Assert.That(results.Any(x => x.Any(y => y.Error != 0)), Is.False,
                     "Should not have received any results as failures.");
             }
-        
-    }
+
+        }
 
         [Test]
         public void ConsumerShouldConsumeInSameOrderAsProduced()

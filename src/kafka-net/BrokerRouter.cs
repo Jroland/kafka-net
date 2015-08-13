@@ -124,8 +124,8 @@ namespace KafkaNet
         /// Only call this method to force a metadata update.  For all other queries use <see cref="GetTopicMetadataFromLocalCache"/> which uses cached values.
         /// </remarks>
 
- 
-        public Task RefreshTopicMetadata(params string[] topics)
+
+        public Task<bool> RefreshTopicMetadata(params string[] topics)
         {
             return RefreshTopicMetadata(_kafkaOptions.CacheExpiration, TimeSpan.FromMinutes(2), topics);
         }
@@ -135,7 +135,7 @@ namespace KafkaNet
         /// and be refresh on next refresh metadata Request.
         /// if cacheExpiration is null: refresh metadata Request get to server for all topic that dose not exists on Cache.
         /// </summary>
-        private async Task RefreshTopicMetadata(TimeSpan? cacheExpiration, TimeSpan timeout, params string[] topics)
+        private async Task<bool> RefreshTopicMetadata(TimeSpan? cacheExpiration, TimeSpan timeout, params string[] topics)
         {
             try
             {
@@ -143,7 +143,7 @@ namespace KafkaNet
                 int missingFromCache = SearchCacheForTopics(topics, cacheExpiration).Missing.Count;
                 if (missingFromCache == 0)
                 {
-                    return;
+                    return false;
                 }
 
                 _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
@@ -165,6 +165,7 @@ namespace KafkaNet
             {
                 _taskLocker.Release();
             }
+            return true;
         }
 
         private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics, TimeSpan? expiration = null)
@@ -286,6 +287,12 @@ namespace KafkaNet
                 //double check for missing topics and query
                 await RefreshTopicMetadata(null, TimeSpan.FromMinutes(2), topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
             }
+        }
+
+
+        public DateTime GetTopicMetadataRefreshTime(string topic)
+        {
+            return _topicIndex[topic].Item2;
         }
     }
 

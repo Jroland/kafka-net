@@ -33,16 +33,16 @@ namespace kafka_tests
             //setup mock IKafkaConnection
           
             _fakeConn0 = new FakeKafkaConnection(new Uri("http://localhost:1"));
-            _fakeConn0.ProduceResponseFunction = () => new ProduceResponse { Offset = _offset0++, PartitionId = 0, Topic = TestTopic };
-            _fakeConn0.MetadataResponseFunction = () => MetadataResponse();
-            _fakeConn0.OffsetResponseFunction = () => new OffsetResponse { Offsets = new List<long> { 0, 99 }, PartitionId = 0, Topic = TestTopic };
-            _fakeConn0.FetchResponseFunction = () => { Thread.Sleep(500); return null; };
+            _fakeConn0.ProduceResponseFunction = async () => new ProduceResponse { Offset = _offset0++, PartitionId = 0, Topic = TestTopic };
+            _fakeConn0.MetadataResponseFunction = async () => MetadataResponse();
+            _fakeConn0.OffsetResponseFunction = async () => new OffsetResponse { Offsets = new List<long> { 0, 99 }, PartitionId = 0, Topic = TestTopic };
+            _fakeConn0.FetchResponseFunction = async () => { Thread.Sleep(500); return null; };
 
             _fakeConn1 = new FakeKafkaConnection(new Uri("http://localhost:2"));
-            _fakeConn1.ProduceResponseFunction = () => new ProduceResponse { Offset = _offset1++, PartitionId = 1, Topic = TestTopic };
-            _fakeConn1.MetadataResponseFunction = () => MetadataResponse();
-            _fakeConn1.OffsetResponseFunction = () => new OffsetResponse { Offsets = new List<long> { 0, 100 }, PartitionId = 1, Topic = TestTopic };
-            _fakeConn1.FetchResponseFunction = () => { Thread.Sleep(500); return null; };
+            _fakeConn1.ProduceResponseFunction = async () => new ProduceResponse { Offset = _offset1++, PartitionId = 1, Topic = TestTopic };
+            _fakeConn1.MetadataResponseFunction = async () => MetadataResponse();
+            _fakeConn1.OffsetResponseFunction = async () => new OffsetResponse { Offsets = new List<long> { 0, 100 }, PartitionId = 1, Topic = TestTopic };
+            _fakeConn1.FetchResponseFunction = async () => { Thread.Sleep(500); return null; };
        
             _mockKafkaConnectionFactory = Substitute.For<IKafkaConnectionFactory>();
             _mockKafkaConnectionFactory.Create(Arg.Is<KafkaEndpoint>(e => e.Endpoint.Port == 1), Arg.Any<TimeSpan>(), Arg.Any<IKafkaLog>()).Returns(_fakeConn0);

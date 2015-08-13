@@ -47,8 +47,10 @@ namespace KafkaNet
         /// This method will initiate a call to the kafka servers and retrieve metadata for all given topics, updating the broke cache in the process.
         /// </remarks>
 
-        Task RefreshTopicMetadata(params string[] topics);
+        Task<bool> RefreshTopicMetadata(params string[] topics);
 
         Task RefreshMissingTopicMetadata(params string[] topics);
+
+        DateTime GetTopicMetadataRefreshTime(string topic);
     }
 }
