@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
 using KafkaNet.Common;
 using kafka_tests.Fakes;
 using NUnit.Framework;
@@ -21,7 +22,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void FakeShouldBeAbleToReconnect()
+        public async Task FakeShouldBeAbleToReconnect()
         {
             using (var server = new FakeTcpServer(Ilog,8999))
             {
@@ -30,17 +31,17 @@ namespace kafka_tests.Unit
 
                 var t1 = new TcpClient();
                 t1.Connect(_fakeServerUrl.Host, _fakeServerUrl.Port);
-                TaskTest.WaitFor(() => server.ConnectionEventcount == 1);
+                await TaskTest.WaitFor(() => server.ConnectionEventcount == 1);
 
                 server.DropConnection();
-                TaskTest.WaitFor(() => server.DisconnectionEventCount == 1);
+                await TaskTest.WaitFor(() => server.DisconnectionEventCount == 1);
 
                 var t2 = new TcpClient();
                 t2.Connect(_fakeServerUrl.Host, _fakeServerUrl.Port);
-                TaskTest.WaitFor(() => server.ConnectionEventcount == 2);
+                await TaskTest.WaitFor(() => server.ConnectionEventcount == 2);
 
                 t2.GetStream().Write(99.ToBytes(), 0, 4);
-                TaskTest.WaitFor(() => received != null);
+             await    TaskTest.WaitFor(() => received != null);
 
                 Assert.That(received.ToInt32(), Is.EqualTo(99));
             }

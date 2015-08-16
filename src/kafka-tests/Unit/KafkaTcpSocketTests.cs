@@ -46,27 +46,27 @@ namespace kafka_tests.Unit
         #region Connection Tests...
 
         [Test]
-        public void ConnectionShouldStartDedicatedThreadOnConstruction()
+        public async Task ConnectionShouldStartDedicatedThreadOnConstruction()
         {
             var count = 0;
 
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
             {
                 test.OnReconnectionAttempt += x => Interlocked.Increment(ref count);
-                TaskTest.WaitFor(() => count > 0);
+                await TaskTest.WaitFor(() => count > 0);
                 Assert.That(count, Is.GreaterThan(0));
             }
         }
 
         [Test]
-        public void ConnectionShouldAttemptMultipleTimesWhenConnectionFails()
+        public async Task ConnectionShouldAttemptMultipleTimesWhenConnectionFails()
         {
             var count = 0;
             using (var test = new KafkaTcpSocket(_log, _badServerUrl))
             {
                 test.WriteAsync(1.ToBytes().ToPayload()); //will force a connection
                 test.OnReconnectionAttempt += x => Interlocked.Increment(ref count);
-                TaskTest.WaitFor(() => count > 1, 10000);
+                await TaskTest.WaitFor(() => count > 1, 10000);
                 Assert.That(count, Is.GreaterThan(1));
             }
         }
@@ -76,7 +76,7 @@ namespace kafka_tests.Unit
         #region Dispose Tests...
 
         [Test]
-        public void KafkaTcpSocketShouldDisposeEvenWhilePollingToReconnect()
+        public async Task KafkaTcpSocketShouldDisposeEvenWhilePollingToReconnect()
         {
             int connectionAttempt = 0;
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
@@ -85,11 +85,12 @@ namespace kafka_tests.Unit
 
                 var taskResult = test.ReadAsync(4);
 
-                TaskTest.WaitFor(() => connectionAttempt > 1);
+                await TaskTest.WaitFor(() => connectionAttempt > 1);
 
-                using (test) { }
+                test.Dispose();
+                await Task.WhenAny(taskResult, Task.Delay(1000)).ConfigureAwait(false);
 
-                taskResult.ContinueWith(t => taskResult = t).Wait(TimeSpan.FromSeconds(1));
+
 
                 Assert.That(taskResult.IsFaulted, Is.True);
                 Assert.That(taskResult.Exception.InnerException, Is.TypeOf<ObjectDisposedException>());
@@ -97,7 +98,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void KafkaTcpSocketShouldDisposeEvenWhileAwaitingReadAndThrowException()
+        public async Task KafkaTcpSocketShouldDisposeEvenWhileAwaitingReadAndThrowException()
         {
             using (var server = new FakeTcpServer(_log, FakeServerPort))
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
@@ -108,7 +109,7 @@ namespace kafka_tests.Unit
 
                 var taskResult = test.ReadAsync(4);
 
-                TaskTest.WaitFor(() => readSize > 0);
+                await TaskTest.WaitFor(() => readSize > 0);
 
                 using (test) { }
 
@@ -174,7 +175,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void ReadShouldCancelWhileAwaitingReconnection()
+        public async Task ReadShouldCancelWhileAwaitingReconnection()
         {
             int connectionAttempt = 0;
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
@@ -184,7 +185,7 @@ namespace kafka_tests.Unit
 
                 var taskResult = test.ReadAsync(4, token.Token);
 
-                TaskTest.WaitFor(() => connectionAttempt > 1);
+                await TaskTest.WaitFor(() => connectionAttempt > 1);
 
                 token.Cancel();
 
@@ -195,7 +196,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void SocketShouldReconnectEvenAfterCancelledRead()
+        public async Task SocketShouldReconnectEvenAfterCancelledRead()
         {
             int connectionAttempt = 0;
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
@@ -205,20 +206,20 @@ namespace kafka_tests.Unit
 
                 var taskResult = test.ReadAsync(4, token.Token);
 
-                TaskTest.WaitFor(() => connectionAttempt > 1);
+                await TaskTest.WaitFor(() => connectionAttempt > 1);
 
                 var attemptsMadeSoFar = connectionAttempt;
 
                 token.Cancel();
 
-                TaskTest.WaitFor(() => connectionAttempt > attemptsMadeSoFar);
+                await TaskTest.WaitFor(() => connectionAttempt > attemptsMadeSoFar);
 
                 Assert.That(connectionAttempt, Is.GreaterThan(attemptsMadeSoFar));
             }
         }
 
         [Test]
-        public void ReadShouldBlockUntilAllBytesRequestedAreReceived()
+        public async Task ReadShouldBlockUntilAllBytesRequestedAreReceived()
         {
             using (var server = new FakeTcpServer(_log, FakeServerPort))
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
@@ -240,7 +241,7 @@ namespace kafka_tests.Unit
                 Assert.That(sendInitialBytes, Is.True, "First 3 bytes should have been sent.");
 
                 Console.WriteLine("Ensuring task blocks...");
-                TaskTest.WaitFor(() => bytesReceived > 0);
+                await TaskTest.WaitFor(() => bytesReceived > 0);
                 Assert.That(resultTask.IsCompleted, Is.False, "Task should still be running, blocking.");
                 Assert.That(sendCompleted, Is.EqualTo(0), "Should still block even though bytes have been received.");
                 Assert.That(bytesReceived, Is.EqualTo(3), "Three bytes should have been received and we are waiting on the last byte.");
@@ -250,7 +251,7 @@ namespace kafka_tests.Unit
                 Assert.That(sendLastByte, Is.True, "Last byte should have sent.");
 
                 Console.WriteLine("Ensuring task unblocks...");
-                TaskTest.WaitFor(() => resultTask.IsCompleted);
+                await TaskTest.WaitFor(() => resultTask.IsCompleted);
                 Assert.That(bytesReceived, Is.EqualTo(4), "Should have received 4 bytes.");
                 Assert.That(resultTask.IsCompleted, Is.True, "Task should have completed.");
                 Assert.That(sendCompleted, Is.EqualTo(1), "Task ContinueWith should have executed.");
@@ -328,7 +329,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void ReadShouldThrowServerDisconnectedExceptionWhenDisconnected()
+        public async Task ReadShouldThrowServerDisconnectedExceptionWhenDisconnected()
         {
             using (var server = new FakeTcpServer(_log, FakeServerPort))
             {
@@ -337,11 +338,11 @@ namespace kafka_tests.Unit
                 var resultTask = socket.ReadAsync(4);
 
                 //wait till connected
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
+                await TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
 
                 server.DropConnection();
 
-                TaskTest.WaitFor(() => server.DisconnectionEventCount > 0);
+                await TaskTest.WaitFor(() => server.DisconnectionEventCount > 0);
 
                 resultTask.ContinueWith(t => resultTask = t).Wait(TimeSpan.FromSeconds(1));
 
@@ -351,7 +352,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void ReadShouldReconnectAfterLosingConnection()
+        public async Task ReadShouldReconnectAfterLosingConnection()
         {
             using (var server = new FakeTcpServer(_log, FakeServerPort))
             {
@@ -364,20 +365,21 @@ namespace kafka_tests.Unit
                 var resultTask = ReadFromSocketWithRetry(socket, 4);
 
                 //wait till connected
-                TaskTest.WaitFor(() => connects > 0);
+                await TaskTest.WaitFor(() => connects > 0);
 
                 //drop connection
                 server.DropConnection();
-                TaskTest.WaitFor(() => disconnects > 0);
+                await TaskTest.WaitFor(() => disconnects > 0);
                 Assert.That(disconnects, Is.EqualTo(1), "Server should have disconnected the client.");
 
                 //wait for reconnection
-                TaskTest.WaitFor(() => connects > 1);
+                await TaskTest.WaitFor(() => connects > 1);
                 Assert.That(connects, Is.EqualTo(2), "Socket should have reconnected.");
 
                 //send data and get result
                 server.SendDataAsync(99.ToBytes());
-                Assert.That(resultTask.Result.ToInt32(), Is.EqualTo(99), "Socket should have received the 4 bytes.");
+                var result = await resultTask;
+                Assert.That(result.ToInt32(), Is.EqualTo(99), "Socket should have received the 4 bytes.");
             }
         }
 
@@ -428,7 +430,7 @@ namespace kafka_tests.Unit
         #region Write Tests...
 
         [Test]
-        public void WriteAsyncShouldSendData()
+        public async Task WriteAsyncShouldSendData()
         {
             using (var server = new FakeTcpServer(_log, FakeServerPort))
             using (var test = new KafkaTcpSocket(new ConsoleLog(LogLevel.Warn), _fakeServerUrl))
@@ -439,13 +441,13 @@ namespace kafka_tests.Unit
                 server.OnBytesReceived += data => result = data.ToInt32();
 
                 test.WriteAsync(testData.ToBytes().ToPayload()).Wait(TimeSpan.FromSeconds(1));
-                TaskTest.WaitFor(() => result > 0);
+                await TaskTest.WaitFor(() => result > 0);
                 Assert.That(result, Is.EqualTo(testData));
             }
         }
 
         [Test]
-        public void WriteAsyncShouldAllowMoreThanOneWrite()
+        public async Task WriteAsyncShouldAllowMoreThanOneWrite()
         {
             using (var server = new FakeTcpServer(_log, FakeServerPort))
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
@@ -456,7 +458,7 @@ namespace kafka_tests.Unit
                 server.OnBytesReceived += results.AddRange;
 
                 Task.WaitAll(test.WriteAsync(testData.ToBytes().ToPayload()), test.WriteAsync(testData.ToBytes().ToPayload()));
-                TaskTest.WaitFor(() => results.Count >= 8);
+                await TaskTest.WaitFor(() => results.Count >= 8);
                 Assert.That(results.Count, Is.EqualTo(8));
             }
         }
@@ -464,32 +466,32 @@ namespace kafka_tests.Unit
         [Test]
         public void WriteAndReadShouldBeAsynchronous()
         {
-            for (int j = 0; j < 1000; j++)
+            //     for (int j = 0; j < 1000; j++)
+            //     {
+            var expected = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+            var write = new ConcurrentBag<int>();
+            var read = new ConcurrentBag<int>();
+
+            AutoResetEvent allEventAreArrived = new AutoResetEvent(false);
+            AutoResetEvent allrReadEventAreArrived = new AutoResetEvent(false);
+            using (var server = new FakeTcpServer(_log, FakeServerPort))
+            using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
             {
-                var expected = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-                var write = new ConcurrentBag<int>();
-                var read = new ConcurrentBag<int>();
-
-                AutoResetEvent allEventAreArrived = new AutoResetEvent(false);
-                AutoResetEvent allrReadEventAreArrived = new AutoResetEvent(false);
-                using (var server = new FakeTcpServer(_log, FakeServerPort))
-                using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
+                server.OnBytesReceived += data =>
                 {
-                    server.OnBytesReceived += data =>
+                    var d = data.Batch(4).Select(x => x.ToArray().ToInt32());
+                    foreach (var item in d)
                     {
-                        var d = data.Batch(4).Select(x => x.ToArray().ToInt32());
-                        foreach (var item in d)
-                        {
-                            write.Add(item);
-                        }
+                        write.Add(item);
+                    }
 
-                        if (expected.Count == write.Count)
-                        {
-                            allEventAreArrived.Set();
-                        }
-                    };
-                    var tasks = Enumerable.Range(1, 10)
-                        .SelectMany(i => new[]
+                    if (expected.Count == write.Count)
+                    {
+                        allEventAreArrived.Set();
+                    }
+                };
+                var tasks = Enumerable.Range(1, 10)
+                    .SelectMany(i => new[]
                         {
                             test.WriteAsync(i.ToBytes().ToPayload()),
                             test.ReadAsync(4).ContinueWith(t =>
@@ -503,24 +505,24 @@ namespace kafka_tests.Unit
                             server.SendDataAsync(i.ToBytes())
                         }).ToArray();
 
-                    Task.WaitAll(tasks);
-                    Assert.IsTrue(allEventAreArrived.WaitOne(3000), "not Get all write event in time");
-                    Assert.IsTrue(allrReadEventAreArrived.WaitOne(3000), "not Get all  read event in time");
-                    var w = write.OrderBy(x => x);
-                    var r = read.OrderBy(x => x);
+                Task.WaitAll(tasks);
+                Assert.IsTrue(allEventAreArrived.WaitOne(3000), "not Get all write event in time");
+                Assert.IsTrue(allrReadEventAreArrived.WaitOne(3000), "not Get all  read event in time");
+                var w = write.OrderBy(x => x);
+                var r = read.OrderBy(x => x);
 
-                    for (int i = 0; i < expected.Count; i++)
-                    {
-                        //  _log.InfoFormat("write was {0}  expected {1}", w.ElementAt(i), expected[i]);
-                        Assert.That(w.ElementAt(i), Is.EqualTo(expected[i]));
-                    }
-                    for (int i = 0; i < expected.Count; i++)
-                    {
-                        //     _log.InfoFormat("read was {0}  expected {1}", r.ElementAt(i), expected[i]);
-                        Assert.That(r.ElementAt(i), Is.EqualTo(expected[i]));
-                    }
+                for (int i = 0; i < expected.Count; i++)
+                {
+                    //  _log.InfoFormat("write was {0}  expected {1}", w.ElementAt(i), expected[i]);
+                    Assert.That(w.ElementAt(i), Is.EqualTo(expected[i]));
+                }
+                for (int i = 0; i < expected.Count; i++)
+                {
+                    //     _log.InfoFormat("read was {0}  expected {1}", r.ElementAt(i), expected[i]);
+                    Assert.That(r.ElementAt(i), Is.EqualTo(expected[i]));
                 }
             }
+            //   }
         }
 
         [Test]
@@ -560,7 +562,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void WriteShouldCancelWhileSendingData()
+        public async Task WriteShouldCancelWhileSendingData()
         {
             var writeAttempts = 0;
             using (var server = new FakeTcpServer(_log, FakeServerPort))
@@ -571,19 +573,19 @@ namespace kafka_tests.Unit
 
                 test.WriteAsync(new KafkaDataPayload { Buffer = 1.ToBytes() }, token.Token);
 
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
-                TaskTest.WaitFor(() => writeAttempts > 0);
+                await TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
+                await TaskTest.WaitFor(() => writeAttempts > 0);
 
                 Assert.That(writeAttempts, Is.EqualTo(1), "Socket should have attempted to write.");
 
                 //create a buffer write that will take a long time
-                var taskResult = test.WriteAsync(
-                    new KafkaDataPayload { Buffer = Enumerable.Range(0, 1000000).Select(b => (byte)b).ToArray() },
-                    token.Token);
-
+                var data = Enumerable.Range(0, 100000000).Select(b => (byte)b).ToArray();
                 token.Cancel();
+                var taskResult = test.WriteAsync(
+                        new KafkaDataPayload { Buffer = data },
+                        token.Token);
+                await Task.WhenAny(taskResult, Task.Delay(TimeSpan.FromSeconds(5))).ConfigureAwait(false);
 
-                taskResult.SafeWait(TimeSpan.FromMilliseconds(5000));
 
                 Assert.That(taskResult.IsCanceled, Is.True, "Task should have cancelled.");
             }
@@ -611,7 +613,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void SocketShouldReconnectEvenAfterCancelledWrite()
+        public async Task SocketShouldReconnectEvenAfterCancelledWrite()
         {
             int connectionAttempt = 0;
             using (var test = new KafkaTcpSocket(_log, _fakeServerUrl))
@@ -627,7 +629,7 @@ namespace kafka_tests.Unit
 
                 token.Cancel();
 
-                TaskTest.WaitFor(() => connectionAttempt > attemptsMadeSoFar);
+                await TaskTest.WaitFor(() => connectionAttempt > attemptsMadeSoFar);
 
                 Assert.That(connectionAttempt, Is.GreaterThan(attemptsMadeSoFar));
             }

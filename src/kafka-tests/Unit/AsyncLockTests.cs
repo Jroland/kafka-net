@@ -52,7 +52,7 @@ namespace kafka_tests.Unit
                     }
                 }
             }
-            catch 
+            catch
             {
             }
 
@@ -115,7 +115,7 @@ namespace kafka_tests.Unit
 
 
         [Test]
-        public void AsyncLockShouldUnlockEvenFromDifferentThreads()
+        public async Task AsyncLockShouldUnlockEvenFromDifferentThreads()
         {
             var block = new SemaphoreSlim(0, 2);
             var count = 0;
@@ -133,7 +133,7 @@ namespace kafka_tests.Unit
                 }
             });
 
-            TaskTest.WaitFor(() => count > 0);
+            await TaskTest.WaitFor(() => count > 0);
 
             Task.Factory.StartNew(async () =>
             {
@@ -148,7 +148,7 @@ namespace kafka_tests.Unit
             Assert.That(count, Is.EqualTo(1), "Only one task should have gotten past lock.");
 
             block.Release();
-            TaskTest.WaitFor(() => count > 1);
+            await TaskTest.WaitFor(() => count > 1);
             Assert.That(count, Is.EqualTo(2), "Second call should get past lock.");
         }
 

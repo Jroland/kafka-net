@@ -63,47 +63,47 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void ProducerShouldReportCorrectAmountOfAsyncRequests()
+        public async Task ProducerShouldReportCorrectAmountOfAsyncRequests()
         {
-         var log  = new ConsoleLog();
-            for (int i = 0; i  < 100; i++)
+            //     var log = new ConsoleLog();
+            //    for (int i = 0; i < 100; i++)
+            //    {
+
+
+            var semaphore = new SemaphoreSlim(0);
+            var routerProxy = new FakeBrokerRouter();
+            //block the second call returning from send message async
+            routerProxy.BrokerConn0.ProduceResponseFunction = async () =>
             {
-             
+                semaphore.Wait();
+                return new ProduceResponse();
+            };
 
-                var semaphore = new SemaphoreSlim(0);
-                var routerProxy = new FakeBrokerRouter();
-                //block the second call returning from send message async
-                routerProxy.BrokerConn0.ProduceResponseFunction = async () =>
-                {
-                    semaphore.Wait();
-                    return new ProduceResponse();
-                };
+            var router = routerProxy.Create();
+            using (var producer = new Producer(router, maximumAsyncRequests: 1) { BatchSize = 1 })
+            {
+                var messages = new[] { new Message("1") };
 
-                var router = routerProxy.Create();
-                using (var producer = new Producer(router, maximumAsyncRequests: 1) {BatchSize = 1})
-                {
-                    var messages = new[] {new Message("1")};
+                Assert.That(producer.AsyncCount, Is.EqualTo(0));
 
-                    Assert.That(producer.AsyncCount, Is.EqualTo(0));
+                var sendTask = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
 
-                    var sendTask = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+                await TaskTest.WaitFor(() => producer.AsyncCount > 0);
+                Assert.That(producer.AsyncCount, Is.EqualTo(1), "One async operation should be sending.");
 
-                    TaskTest.WaitFor(() => producer.AsyncCount > 0);
-                    Assert.That(producer.AsyncCount, Is.EqualTo(1), "One async operation should be sending.");
-
-                    semaphore.Release();
-                    sendTask.Wait(TimeSpan.FromMilliseconds(500));
-                    Task.Delay(2).Wait();
-                    Assert.That(sendTask.IsCompleted, Is.True, "Send task should be marked as completed.");
-                    Assert.That(producer.AsyncCount, Is.EqualTo(0), "Async should now show zero count.");
-                }
-            log.DebugFormat(i.ToString());
+                semaphore.Release();
+                sendTask.Wait(TimeSpan.FromMilliseconds(500));
+                await Task.Delay(2);
+                Assert.That(sendTask.IsCompleted, Is.True, "Send task should be marked as completed.");
+                Assert.That(producer.AsyncCount, Is.EqualTo(0), "Async should now show zero count.");
+                //     }
+                //     log.DebugFormat(i.ToString());
             }
-           
+
         }
 
         [Test]
-        public void SendAsyncShouldBlockWhenMaximumAsyncQueueReached()
+        public async Task SendAsyncShouldBlockWhenMaximumAsyncQueueReached()
         {
             int count = 0;
             var semaphore = new SemaphoreSlim(0);
@@ -127,12 +127,12 @@ namespace kafka_tests.Unit
                     await t;
                 });
 
-                TaskTest.WaitFor(() => producer.AsyncCount > 0);
-                TaskTest.WaitFor(() => count > 0);
+                await TaskTest.WaitFor(() => producer.AsyncCount > 0);
+                await TaskTest.WaitFor(() => count > 0);
                 Assert.That(count, Is.EqualTo(1), "Only one SendMessageAsync should continue.");
 
                 semaphore.Release();
-                TaskTest.WaitFor(() => count > 1);
+                await TaskTest.WaitFor(() => count > 1);
                 Assert.That(count, Is.EqualTo(2), "The second SendMessageAsync should continue after semaphore is released.");
             }
         }
@@ -278,7 +278,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void ProducerShouldBlockWhenFullBufferReached()
+        public async Task ProducerShouldBlockWhenFullBufferReached()
         {
             int count = 0;
             //with max buffer set below the batch size, this should cause the producer to block until batch delay time.
@@ -295,7 +295,7 @@ namespace kafka_tests.Unit
                     }
                 });
 
-                TaskTest.WaitFor(() => count > 0);
+                await TaskTest.WaitFor(() => count > 0);
                 Assert.That(producer.BufferCount, Is.EqualTo(1));
 
                 Console.WriteLine("Waiting for the rest...");
@@ -318,7 +318,7 @@ namespace kafka_tests.Unit
             routerProxy.BrokerConn0.ProduceResponseFunction = async () => { semaphore.Wait(); return new ProduceResponse(); };
             routerProxy.BrokerConn1.ProduceResponseFunction = async () => { semaphore.Wait(); return new ProduceResponse(); };
 
-            var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 5, maximumAsyncRequests: 1) { BatchSize =1 , BatchDelayTime = TimeSpan.FromMilliseconds(500) };
+            var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 5, maximumAsyncRequests: 1) { BatchSize = 1, BatchDelayTime = TimeSpan.FromMilliseconds(500) };
             using (producer)
             {
                 var sendTasks = Enumerable.Range(0, 5)

@@ -85,7 +85,7 @@ namespace kafka_tests.Unit
 
         #region Read Tests...
         [Test]
-        public void ReadShouldLogDisconnectAndRecover()
+        public async Task ReadShouldLogDisconnectAndRecover()
         {
             var mockLog = _kernel.GetMock<IKafkaLog>();
 
@@ -96,21 +96,21 @@ namespace kafka_tests.Unit
                 var disconnected = false;
                 socket.OnServerDisconnected += () => disconnected = true;
 
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
+                await TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
 
                 server.DropConnection();
-                TaskTest.WaitFor(() => server.DisconnectionEventCount > 0);
+                await TaskTest.WaitFor(() => server.DisconnectionEventCount > 0);
                 Assert.That(server.DisconnectionEventCount, Is.EqualTo(1));
 
                 //Wait a while for the client to notice the disconnect and log
-                TaskTest.WaitFor(() => disconnected);
+                await TaskTest.WaitFor(() => disconnected);
 
 
                 //should log an exception and keep going
                 mockLog.Verify(x => x.ErrorFormat(It.IsAny<string>(), It.IsAny<Exception>()));
 
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 1);
+                await TaskTest.WaitFor(() => server.ConnectionEventcount > 1);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(2));
             }
         }
@@ -147,13 +147,13 @@ namespace kafka_tests.Unit
         #region Send Tests...
 
         [Test]
-        public void SendAsyncShouldTimeoutWhenSendAsyncTakesTooLong()
+        public async Task SendAsyncShouldTimeoutWhenSendAsyncTakesTooLong()
         {
             using (var server = new FakeTcpServer(_log, 8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(1), log: _log))
             {
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
+                await TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
 
                 var taskResult = conn.SendAsync(new MetadataRequest());
@@ -199,7 +199,7 @@ namespace kafka_tests.Unit
         }
 
         [Test]
-        public void SendAsyncShouldTimeoutMultipleMessagesAtATime()
+        public async Task  SendAsyncShouldTimeoutMultipleMessagesAtATime()
         {
 
             using (var server = new FakeTcpServer(_log, 8999))
@@ -218,7 +218,7 @@ namespace kafka_tests.Unit
 
                 Task.WhenAll(tasks);
 
-                TaskTest.WaitFor(() => tasks.All(t => t.IsFaulted));
+            await    TaskTest.WaitFor(() => tasks.All(t => t.IsFaulted));
                 foreach (var task in tasks)
                 {
                     Assert.That(task.IsFaulted, Is.True, "Task should have faulted.");

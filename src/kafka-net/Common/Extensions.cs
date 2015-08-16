@@ -164,6 +164,14 @@ namespace KafkaNet.Common
             return true;
         }
 
+
+        public static Task CreateTask(this CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs);
+            return tcs.Task;
+        }
+
         /// <summary>
         /// Returns true if <see cref="WaitHandle"/> before timeout expires./>
         /// </summary>
