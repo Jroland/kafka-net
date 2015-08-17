@@ -197,11 +197,11 @@ namespace KafkaNet
                         batch.AddRange(_asyncCollection.Drain());
                     }
 
-                    //we want to fire the batch without blocking and then move on to fire another one
+
                     var sendTask = ProduceAndSendBatchAsync(batch, _stopToken.Token);
                     try
                     {
-                        await sendTask;
+                        await sendTask;//if not await the order is not going to be guaranteed
                     }
                     catch (Exception ex)
                     {
