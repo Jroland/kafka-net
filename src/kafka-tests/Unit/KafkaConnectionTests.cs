@@ -88,8 +88,8 @@ namespace kafka_tests.Unit
 
         #region Read Tests...
 
-        //TODO FIx has moc error
-        [Test, Repeat(1)]
+        //TODO fix has moc error
+        [Test, Repeat(1)]///  [Test, Repeat(100)]
         public async Task ReadShouldLogDisconnectAndRecover()
         {
             var mockLog = _kernel.GetMock<IKafkaLog>();

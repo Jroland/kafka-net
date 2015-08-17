@@ -25,13 +25,13 @@ namespace KafkaNet
         private const int DefaultResponseTimeoutMs = 60000;
 
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
-        private readonly TimeSpan _responseTimeoutMS;
+        private readonly TimeSpan _responseTimeoutMs;
         private readonly IKafkaLog _log;
         private readonly IKafkaTcpSocket _client;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
 
-        private int _disposeCount = 0;
-        private Task _connectionReadPollingTask = null;
+        private int _disposeCount;
+        private Task _connectionReadPollingTask;
         private int _ensureOneActiveReader;
         private int _correlationIdSeed;
 
@@ -45,7 +45,7 @@ namespace KafkaNet
         {
             _client = client;
             _log = log ?? new DefaultTraceLog();
-            _responseTimeoutMS = responseTimeoutMs ?? TimeSpan.FromMilliseconds(DefaultResponseTimeoutMs);
+            _responseTimeoutMs = responseTimeoutMs ?? TimeSpan.FromMilliseconds(DefaultResponseTimeoutMs);
 
             StartReadStreamPoller();
         }
@@ -117,7 +117,7 @@ namespace KafkaNet
                         {
                             exceptionDispatchInfo = ExceptionDispatchInfo.Capture(ex);
                         }
-                        asyncRequest.MarkRequestAsSent(exceptionDispatchInfo, _responseTimeoutMS, TriggerMessageTimeout);
+                        asyncRequest.MarkRequestAsSent(exceptionDispatchInfo, _responseTimeoutMs, TriggerMessageTimeout);
 
                     }
                     catch (OperationCanceledException)
@@ -250,7 +250,7 @@ namespace KafkaNet
             {
                 asyncRequestItem.ReceiveTask.TrySetException(new ResponseTimeoutException(
                     string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.",
-                        _responseTimeoutMS)));
+                        _responseTimeoutMs)));
             }
         }
 

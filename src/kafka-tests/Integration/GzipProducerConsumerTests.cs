@@ -24,7 +24,7 @@ namespace kafka_tests.Integration
             return new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), endpoint), _options.ResponseTimeoutMs, _options.Log);
         }
 
-        [Test, Repeat(100)]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task EnsureGzipCompressedMessageCanSend()
         {
             IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start EnsureGzipCompressedMessageCanSend"));

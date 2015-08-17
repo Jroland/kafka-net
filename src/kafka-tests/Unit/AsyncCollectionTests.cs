@@ -90,15 +90,15 @@ namespace kafka_tests.Unit
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [Ignore("Currently remove max buffer feature.")]
-        public void CollectionShouldBlockOnMaxBuffer()
+        public async Task CollectionShouldBlockOnMaxBuffer()
         {
             var collection = new AsyncCollection<int>();
             var task = Task.Factory.StartNew(() => collection.AddRange(Enumerable.Range(0, 10)));
-            TaskTest.WaitFor(() => collection.Count >= 9);
+            await TaskTest.WaitFor(() => collection.Count >= 9);
             Assert.That(collection.Count, Is.EqualTo(9), "Buffer should block at 9 items.");
             Assert.That(task.IsCompleted, Is.False, "Task should be blocking on last item.");
             var item = collection.Pop();
-            TaskTest.WaitFor(() => task.IsCompleted);
+            await TaskTest.WaitFor(() => task.IsCompleted);
             Assert.That(task.IsCompleted, Is.True, "Task should complete after room is made in buffer.");
             Assert.That(collection.Count, Is.EqualTo(9), "There should now be 9 items in the buffer.");
         }
@@ -118,7 +118,7 @@ namespace kafka_tests.Unit
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
-        public async void TakeAsyncShouldOnlyWaitTimeoutAndReturnWhatItHas()
+        public async Task TakeAsyncShouldOnlyWaitTimeoutAndReturnWhatItHas()
         {
             const int size = 20;
             var aq = new AsyncCollection<bool>();
@@ -150,7 +150,7 @@ namespace kafka_tests.Unit
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
-        public async void TakeAsyncShouldBeAbleToCancel()
+        public async Task TakeAsyncShouldBeAbleToCancel()
         {
             var cancelSource = new CancellationTokenSource();
             var collection = new AsyncCollection<int>();
@@ -268,7 +268,7 @@ namespace kafka_tests.Unit
 
             Console.WriteLine("Left in collection: {0}", collection.Count);
             Assert.That(dataTask.Result.Count, Is.EqualTo(expected));
-            collection.Drain();
+
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
@@ -308,19 +308,13 @@ namespace kafka_tests.Unit
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void AddRangeShouldBePerformant()
         {
-            for (int i = 0; i < 100; i++)
-            {
-                AsyncCollection<int> collection = new AsyncCollection<int>();
-                collection.Drain();
-                var sw = Stopwatch.StartNew();
 
-                collection.AddRange(Enumerable.Range(0, 1000000));
-                sw.Stop();
-                Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
-                Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
-
-                collection.Drain();
-            }
+            AsyncCollection<int> collection = new AsyncCollection<int>();
+            var sw = Stopwatch.StartNew();
+            collection.AddRange(Enumerable.Range(0, 1000000));
+            sw.Stop();
+            Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
         }
 
         [TearDown]
@@ -334,7 +328,7 @@ namespace kafka_tests.Unit
         {
             const int dataSize = 1000000;
             AsyncCollection<int> collection = new AsyncCollection<int>();
-            collection.Drain();
+
             collection.AddRange(Enumerable.Range(0, dataSize));
             var sw = Stopwatch.StartNew();
             var list = await collection.TakeAsync(dataSize, TimeSpan.FromSeconds(1), CancellationToken.None);
@@ -342,8 +336,6 @@ namespace kafka_tests.Unit
             Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
             Assert.That(list.Count, Is.EqualTo(dataSize));
             Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
-            collection.Drain();
-            GC.Collect();
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
@@ -352,8 +344,6 @@ namespace kafka_tests.Unit
             AsyncCollection<int> collection = new AsyncCollection<int>();
 
             const int dataSize = 1000000;
-
-            collection.Drain();
             List<int> receivedData = null;// new List<int>(dataSize);
             var sw = Stopwatch.StartNew();
 
@@ -364,8 +354,6 @@ namespace kafka_tests.Unit
             Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
             Assert.That(receivedData.Count, Is.EqualTo(dataSize));
             Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
-            collection.Drain();
-            GC.Collect();
         }
 
         #endregion Thread Contention Tests...

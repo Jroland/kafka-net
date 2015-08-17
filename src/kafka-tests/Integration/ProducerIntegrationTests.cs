@@ -21,7 +21,7 @@ namespace kafka_tests.Integration
             {
                 var sendTask = producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(Guid.NewGuid().ToString()) }, acks: 0);
 
-                sendTask.Wait(TimeSpan.FromHours(10));
+                sendTask.Wait(TimeSpan.FromMinutes(2));
 
                 Assert.That(sendTask.Status, Is.EqualTo(TaskStatus.RanToCompletion));
             }

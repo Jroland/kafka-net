@@ -29,6 +29,7 @@ namespace KafkaNet
         private readonly ConcurrentDictionary<string, Tuple<Topic, DateTime>> _topicIndex = new ConcurrentDictionary<string, Tuple<Topic, DateTime>>();
         private SemaphoreSlim _taskLocker = new SemaphoreSlim(1);
 
+
         public BrokerRouter(KafkaOptions kafkaOptions)
         {
             _kafkaOptions = kafkaOptions;
@@ -60,7 +61,7 @@ namespace KafkaNet
         {
             var cachedTopic = GetTopicMetadataFromLocalCache(topic);
             var topicMetadata = cachedTopic.First();
-            if (topicMetadata ==null)
+            if (topicMetadata == null)
             {
                 throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topic));
             }
@@ -78,7 +79,6 @@ namespace KafkaNet
         /// <param name="key">The key used by the IPartitionSelector to collate to a consistent partition. Null value means key will be ignored in selection process.</param>
         /// <returns>A broker route for the given topic.</returns>
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
-        /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
         public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, byte[] key = null)
         {
             //get topic either from cache or server.
@@ -104,7 +104,7 @@ namespace KafkaNet
         /// <exception cref="InvalidTopicMetadataException">Condition.</exception>
         public List<Topic> GetTopicMetadataFromLocalCache(params string[] topics)
         {
-            var topicSearchResult = SearchCacheForTopics(topics);
+            var topicSearchResult = SearchCacheForTopics(topics,null);
 
             //update metadata for all missing topics
             if (topicSearchResult.Missing.Count > 0)
@@ -127,7 +127,7 @@ namespace KafkaNet
 
         public Task<bool> RefreshTopicMetadata(params string[] topics)
         {
-            return RefreshTopicMetadata(_kafkaOptions.CacheExpiration, TimeSpan.FromMinutes(2), topics);
+            return RefreshTopicMetadata(_kafkaOptions.CacheExpiration, _kafkaOptions.RefreshMetadataTimeout, topics);
         }
         /// <summary>
         /// refresh metadata Request get to server for all topic that there Cache Expire.
@@ -168,7 +168,7 @@ namespace KafkaNet
             return true;
         }
 
-        private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics, TimeSpan? expiration = null)
+        private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics, TimeSpan? expiration )
         {
             var result = new TopicSearchResult();
 
@@ -285,7 +285,7 @@ namespace KafkaNet
             if (topicSearchResult.Missing.Count > 0)
             {
                 //double check for missing topics and query
-                await RefreshTopicMetadata(null, TimeSpan.FromMinutes(2), topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
+                await RefreshTopicMetadata(null, _kafkaOptions.RefreshMetadataTimeout, topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
             }
         }
 

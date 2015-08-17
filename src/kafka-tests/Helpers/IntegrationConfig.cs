@@ -17,6 +17,11 @@ namespace kafka_tests.Helpers
         {
             return String.Format("**************************{0}**************************", message); 
         }
+        public static string Highlight(string message,params object[] args)
+        {
+            return String.Format("**************************{0}**************************", string.Format(message, args));
+        }
+
 
         public static Uri IntegrationUri
         {
