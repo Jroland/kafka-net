@@ -58,8 +58,8 @@ namespace KafkaNet
             _readTaskQueue = new AsyncCollection<SocketPayloadReadTask>();
 
             //dedicate a long running task to the read/write operations
-            _socketTask = Task.Run(async () => { await DedicatedSocketTask().ConfigureAwait(false); });
-            //_socketTask = Task.Factory.StartNew(DedicatedSocketTask, CancellationToken.None,TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            _socketTask = Task.Run(async () => {await DedicatedSocketTask(); });
+
             _disposeTask = _disposeToken.Token.CreateTask();
             _disposeRegistration = _disposeToken.Token.Register(() =>
             {
@@ -149,7 +149,7 @@ namespace KafkaNet
                         setDisposeExceptonToPenndingTask();
                         return;
                     }
-                    var netStream =await netStreamTask; //all reday done
+                    var netStream = await netStreamTask; //all reday done
                     await ProcessNetworkstreamTasks(netStream).ConfigureAwait(false);
                 }
                 catch (Exception ex)
@@ -444,7 +444,7 @@ namespace KafkaNet
             _cancellationTokenRegistration = cancellationToken.Register(
                 () =>
                 {
-                    Tcp.TrySetCanceled(); 
+                    Tcp.TrySetCanceled();
                 }
                 );
         }
