@@ -3,26 +3,27 @@ using KafkaNet.Model;
 using KafkaNet.Protocol;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace kafka_tests.Fakes
 {
     public class FakeKafkaConnection : IKafkaConnection
     {
-        public Func<ProduceResponse> ProduceResponseFunction;
-        public Func<MetadataResponse> MetadataResponseFunction;
-        public Func<OffsetResponse> OffsetResponseFunction;
-        public Func<FetchResponse> FetchResponseFunction;
+        public Func<Task<ProduceResponse>> ProduceResponseFunction;
+        public Func<Task<MetadataResponse>> MetadataResponseFunction;
+        public Func<Task<OffsetResponse>> OffsetResponseFunction;
+        public Func<Task<FetchResponse>> FetchResponseFunction;
 
         public FakeKafkaConnection(Uri address)
         {
             Endpoint = new DefaultKafkaConnectionFactory().Resolve(address, new DefaultTraceLog());
         }
 
-        public int MetadataRequestCallCount { get; set; }
-        public int ProduceRequestCallCount { get; set; }
-        public int OffsetRequestCallCount { get; set; }
-        public int FetchRequestCallCount { get; set; }
+        public long MetadataRequestCallCount; // { get; set; }
+        public long ProduceRequestCallCount; //{ get; set; }
+        public long OffsetRequestCallCount; //{ get; set; }
+        public long FetchRequestCallCount; // { get; set; }
 
         public KafkaEndpoint Endpoint { get; private set; }
 
@@ -36,42 +37,43 @@ namespace kafka_tests.Fakes
             throw new NotImplementedException();
         }
 
-        public Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
+        /// <exception cref="Exception">A delegate callback throws an exception.</exception>
+        /// <exception cref="NullReferenceException">The address of <paramref name="location" /> is a null pointer. </exception>
+        public async Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
         {
-            //start a thread to handle the request and return
-            var task = new Task<List<T>>(() =>
+            T result;
+
+            if (typeof(T) == typeof(ProduceResponse))
             {
-                if (typeof(T) == typeof(ProduceResponse))
-                {
-                    ProduceRequestCallCount++;
-                    return new List<T> { (T)(object)ProduceResponseFunction() };
-                }
-                else if (typeof(T) == typeof(MetadataResponse))
-                {
-                    MetadataRequestCallCount++;
-                    return new List<T> { (T)(object)MetadataResponseFunction() };
-                }
-                else if (typeof(T) == typeof(OffsetResponse))
-                {
-                    OffsetRequestCallCount++;
-                    return new List<T> { (T)(object)OffsetResponseFunction() };
-                }
-                else if (typeof(T) == typeof(FetchResponse))
-                {
-                    FetchRequestCallCount++;
-                    return new List<T> { (T)(object)FetchResponseFunction() };
-                }
-
-                return null;
-            });
-
-            task.Start();
-            return task;
+                Interlocked.Increment(ref ProduceRequestCallCount);
+                result = (T)((object)await ProduceResponseFunction());
+            }
+            else if (typeof(T) == typeof(MetadataResponse))
+            {
+                Interlocked.Increment(ref MetadataRequestCallCount);
+                result = (T)(object)await MetadataResponseFunction();
+            }
+            else if (typeof(T) == typeof(OffsetResponse))
+            {
+                Interlocked.Increment(ref OffsetRequestCallCount);
+                result = (T)(object)await OffsetResponseFunction();
+            }
+            else if (typeof(T) == typeof(FetchResponse))
+            {
+                Interlocked.Increment(ref FetchRequestCallCount);
+                result = (T)(object)await FetchResponseFunction();
+            }
+            else
+            {
+                throw new Exception("no found implementation");
+            }
+            var resultlist = new List<T>();
+            resultlist.Add(result);
+            return resultlist;
         }
 
         public void Dispose()
         {
-
         }
     }
 }

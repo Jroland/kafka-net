@@ -54,7 +54,6 @@
     <Compile Include="ProtocolGateway.cs" />
     <Compile Include="Protocol\IBaseResponse.cs" />
     <Compile Include="Statistics\StatisticsTracker.cs" />
-    <Compile Include="Default\ConsoleLog.cs" />
     <Compile Include="Default\DefaultKafkaConnectionFactory.cs" />
     <Compile Include="Interfaces\IMetadataQueries.cs" />
     <Compile Include="Interfaces\IKafkaTcpSocket.cs" />

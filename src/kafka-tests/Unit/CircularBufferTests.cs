@@ -1,6 +1,7 @@
-﻿using System.Linq;
+﻿using kafka_tests.Helpers;
 using KafkaNet.Common;
 using NUnit.Framework;
+using System.Linq;
 
 namespace kafka_tests.Unit
 {
@@ -8,7 +9,7 @@ namespace kafka_tests.Unit
     [Category("Unit")]
     public class CircularBufferTests
     {
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void BufferShouldOnlyStoreMaxAmount()
         {
             var buffer = new ConcurrentCircularBuffer<int>(2);
@@ -21,7 +22,7 @@ namespace kafka_tests.Unit
             Assert.That(buffer.Count, Is.EqualTo(2));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void BufferShouldCountUntilMaxHitThenAlswaysShowMax()
         {
             var buffer = new ConcurrentCircularBuffer<int>(2);
@@ -35,7 +36,7 @@ namespace kafka_tests.Unit
             Assert.That(buffer.Count, Is.EqualTo(2));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void BufferMaxSizeShouldReportMax()
         {
             var buffer = new ConcurrentCircularBuffer<int>(2);
@@ -45,7 +46,7 @@ namespace kafka_tests.Unit
             Assert.That(buffer.MaxSize, Is.EqualTo(2));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnumerationShouldReturnOnlyRecordsWithData()
         {
             var buffer = new ConcurrentCircularBuffer<int>(2);
@@ -59,7 +60,7 @@ namespace kafka_tests.Unit
             Assert.That(buffer.ToList().Count, Is.EqualTo(2));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnqueueShouldAddToFirstSlot()
         {
             var buffer = new ConcurrentCircularBuffer<int>(2);

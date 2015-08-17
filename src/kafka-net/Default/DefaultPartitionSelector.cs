@@ -1,9 +1,8 @@
-﻿using System;
+﻿using KafkaNet.Common;
+using KafkaNet.Protocol;
+using System;
 using System.Collections.Concurrent;
 using System.Linq;
-using KafkaNet.Common;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {

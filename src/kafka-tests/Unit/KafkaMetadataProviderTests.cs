@@ -1,10 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
-using KafkaNet.Model;
 using KafkaNet.Protocol;
-using NUnit.Framework;
 using NSubstitute;
+using NUnit.Framework;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Unit
 {
@@ -13,18 +13,17 @@ namespace kafka_tests.Unit
     {
         private IKafkaLog _log;
 
-
         [SetUp]
         public void Setup()
         {
             _log = Substitute.For<IKafkaLog>();
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(ErrorResponseCode.LeaderNotAvailable)]
         [TestCase(ErrorResponseCode.OffsetsLoadInProgressCode)]
         [TestCase(ErrorResponseCode.ConsumerCoordinatorNotAvailableCode)]
-        public void ShouldRetryWhenReceiveAnRetryErrorCode(ErrorResponseCode errorCode)
+        public async Task ShouldRetryWhenReceiveAnRetryErrorCode(ErrorResponseCode errorCode)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -33,7 +32,7 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
 
             Received.InOrder(() =>
@@ -44,37 +43,37 @@ namespace kafka_tests.Unit
             });
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(ErrorResponseCode.LeaderNotAvailable)]
-        public void ShouldBackoffRequestOnMultipleFailures(ErrorResponseCode errorCode)
+        public async Task ShouldBackoffRequestOnMultipleFailures(ErrorResponseCode errorCode)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>())
-                .Returns(   x => CreateMetadataResponse(errorCode),
+                .Returns(x => CreateMetadataResponse(errorCode),
                             x => CreateMetadataResponse(errorCode),
                             x => CreateMetadataResponse(errorCode),
                             x => CreateMetadataResponse(ErrorResponseCode.NoError));
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
 
             Received.InOrder(() =>
             {
-                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
+                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Wait();
                 _log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", 100);
-                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
+                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Wait();
                 _log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", 400);
-                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
+                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Wait();
                 _log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", 900);
-                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
+                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Wait();
             });
         }
 
-        [Test]
-        public void ShouldRetryWhenReceiveBrokerIdNegativeOne()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task ShouldRetryWhenReceiveBrokerIdNegativeOne()
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -83,7 +82,7 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
 
             Received.InOrder(() =>
@@ -94,7 +93,7 @@ namespace kafka_tests.Unit
             });
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ShouldReturnWhenNoErrorReceived()
         {
             var conn = Substitute.For<IKafkaConnection>();
@@ -110,14 +109,12 @@ namespace kafka_tests.Unit
             conn.Received(1).SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
         }
 
-
-
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(ErrorResponseCode.Unknown)]
         [TestCase(ErrorResponseCode.RequestTimedOut)]
         [TestCase(ErrorResponseCode.InvalidMessage)]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
-        public void ShouldThrowExceptionWhenNotARetriableErrorCode(ErrorResponseCode errorCode)
+        public async Task ShouldThrowExceptionWhenNotARetriableErrorCode(ErrorResponseCode errorCode)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -125,15 +122,15 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(null)]
         [TestCase("")]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
-        public void ShouldThrowExceptionWhenHostIsMissing(string host)
+        public async Task ShouldThrowExceptionWhenHostIsMissing(string host)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -141,15 +138,15 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(0)]
         [TestCase(-1)]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
-        public void ShouldThrowExceptionWhenPortIsMissing(int port)
+        public async Task ShouldThrowExceptionWhenPortIsMissing(int port)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -157,7 +154,7 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
         }
 
@@ -180,24 +177,26 @@ namespace kafka_tests.Unit
             return tcs.Task;
         }
 
-        private Task<List<MetadataResponse>> CreateMetadataResponse(ErrorResponseCode errorCode)
+        private async Task<List<MetadataResponse>> CreateMetadataResponse(ErrorResponseCode errorCode)
         {
-            var tcs = new TaskCompletionSource<List<MetadataResponse>>();
-            tcs.SetResult(new List<MetadataResponse>{
-                new MetadataResponse
+
+            return new List<MetadataResponse>
             {
-                Brokers = new List<Broker>(),
-                Topics = new List<Topic>
+                new MetadataResponse
                 {
-                    new Topic
+                    Brokers = new List<Broker>(),
+                    Topics = new List<Topic>
                     {
-                        ErrorCode = (short) errorCode,
-                        Name = "Test",
-                        Partitions = new List<Partition>()
+                        new Topic
+                        {
+                            ErrorCode = (short) errorCode,
+                            Name = "Test",
+                            Partitions = new List<Partition>()
+                        }
                     }
                 }
-            }});
-            return tcs.Task;
+            };
+
         }
     }
 }

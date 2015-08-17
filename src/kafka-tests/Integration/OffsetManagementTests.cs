@@ -1,11 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using NUnit.Framework;
-using kafka_tests.Helpers;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Integration
 {
@@ -18,22 +19,21 @@ namespace kafka_tests.Integration
         [SetUp]
         public void Setup()
         {
-
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [Ignore("Not supported currently in 8.1.2?")]
         public void OffsetFetchRequestOfNonExistingGroupShouldReturnNoError()
         {
             //From documentation: https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+ProtocolTests#AGuideToTheKafkaProtocol-OffsetFetchRequest
-            //Note that if there is no offset associated with a topic-partition under that consumer group the broker does not set an error code 
+            //Note that if there is no offset associated with a topic-partition under that consumer group the broker does not set an error code
             //(since it is not really an error), but returns empty metadata and sets the offset field to -1.
             const int partitionId = 0;
             using (var router = new BrokerRouter(Options))
             {
                 var request = CreateOffsetFetchRequest(Guid.NewGuid().ToString(), partitionId);
 
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var response = conn.Connection.SendAsync(request).Result.FirstOrDefault();
 
@@ -43,13 +43,14 @@ namespace kafka_tests.Integration
             }
         }
 
-        [Test]
-        public void OffsetCommitShouldStoreAndReturnSuccess()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task OffsetCommitShouldStoreAndReturnSuccess()
         {
             const int partitionId = 0;
             using (var router = new BrokerRouter(Options))
             {
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
+                await router.RefreshMissingTopicMetadata(IntegrationConfig.IntegrationTopic);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var commit = CreateOffsetCommitRequest(IntegrationConfig.IntegrationConsumer, partitionId, 10);
                 var response = conn.Connection.SendAsync(commit).Result.FirstOrDefault();
@@ -59,20 +60,20 @@ namespace kafka_tests.Integration
             }
         }
 
-        [Test]
-        public void OffsetCommitShouldStoreOffsetValue()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task OffsetCommitShouldStoreOffsetValue()
         {
             const int partitionId = 0;
             const long offset = 99;
 
             using (var router = new BrokerRouter(Options))
             {
-
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
+                await router.RefreshMissingTopicMetadata(IntegrationConfig.IntegrationTopic);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var commit = CreateOffsetCommitRequest(IntegrationConfig.IntegrationConsumer, partitionId, offset);
                 var commitResponse = conn.Connection.SendAsync(commit).Result.FirstOrDefault();
-                
+
                 Assert.That(commitResponse, Is.Not.Null);
                 Assert.That(commitResponse.Error, Is.EqualTo((int)ErrorResponseCode.NoError));
 
@@ -85,7 +86,7 @@ namespace kafka_tests.Integration
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [Ignore("The response does not seem to return metadata information.  Not supported yet in kafka?")]
         public void OffsetCommitShouldStoreMetadata()
         {
@@ -95,7 +96,7 @@ namespace kafka_tests.Integration
 
             using (var router = new BrokerRouter(Options))
             {
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic, partitionId);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic, partitionId);
 
                 var commit = CreateOffsetCommitRequest(IntegrationConfig.IntegrationConsumer, partitionId, offset, metadata);
                 var commitResponse = conn.Connection.SendAsync(commit).Result.FirstOrDefault();
@@ -113,15 +114,15 @@ namespace kafka_tests.Integration
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [Ignore("Not supported currently in 8.1.1?")]
         public void ConsumerMetadataRequestShouldReturnWithoutError()
         {
             using (var router = new BrokerRouter(Options))
             {
-                var conn = router.SelectBrokerRoute(IntegrationConfig.IntegrationTopic);
+                var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationTopic);
 
-                var request = new ConsumerMetadataRequest {ConsumerGroup = IntegrationConfig.IntegrationConsumer};
+                var request = new ConsumerMetadataRequest { ConsumerGroup = IntegrationConfig.IntegrationConsumer };
 
                 var response = conn.Connection.SendAsync(request).Result.FirstOrDefault();
 
