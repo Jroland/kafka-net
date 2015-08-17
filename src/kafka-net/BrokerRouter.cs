@@ -104,9 +104,9 @@ namespace KafkaNet
         /// <exception cref="InvalidTopicMetadataException">Condition.</exception>
         public List<Topic> GetTopicMetadataFromLocalCache(params string[] topics)
         {
-            var topicSearchResult = SearchCacheForTopics(topics,null);
+            var topicSearchResult = SearchCacheForTopics(topics, null);
 
-           
+
             if (topicSearchResult.Missing.Count > 0)
             {
                 throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topicSearchResult.Missing));
@@ -168,7 +168,7 @@ namespace KafkaNet
             return true;
         }
 
-        private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics, TimeSpan? expiration )
+        private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics, TimeSpan? expiration)
         {
             var result = new TopicSearchResult();
 
@@ -190,8 +190,9 @@ namespace KafkaNet
             Tuple<Topic, DateTime> cachedTopic;
             if (_topicIndex.TryGetValue(topic, out cachedTopic))
             {
-                bool notExistOrExpire = !expiration.HasValue || (DateTime.Now - cachedTopic.Item2).TotalMilliseconds < expiration.Value.TotalMilliseconds;
-                if (notExistOrExpire)
+                bool hasExpirationPolicy = expiration.HasValue;
+                bool isNotExpired = expiration.HasValue && (DateTime.Now - cachedTopic.Item2).TotalMilliseconds < expiration.Value.TotalMilliseconds;
+                if (!hasExpirationPolicy || isNotExpired)
                 {
                     return cachedTopic.Item1;
                 }
