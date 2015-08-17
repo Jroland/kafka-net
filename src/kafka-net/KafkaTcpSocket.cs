@@ -197,7 +197,7 @@ namespace KafkaNet
                 await Task.WhenAny(sendDataReady, readDataReady, _disposeTask).ConfigureAwait(false);
                 if (_disposeToken.IsCancellationRequested) return;
 
-                var exception = FindExceptionInLastReadOrWriteTasks(lastWriteTask, readDataReady);
+                var exception = FindExceptionInLastReadOrWriteTasks(lastWriteTask, lastReadTask);
                 if (exception != null) throw exception;
 
                 if (sendDataReady.IsCompleted)
