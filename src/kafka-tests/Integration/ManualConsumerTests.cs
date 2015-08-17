@@ -17,6 +17,7 @@ namespace kafka_tests.Integration
         private readonly KafkaOptions _options;
         private readonly Uri _kafkaUri;
         private const int DefaultMaxMessageSetSize = 4096*8;
+        private string _topic = "ManualConsumerTestTopic";
 
         public ManualConsumerTests()
         {
@@ -25,7 +26,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public async Task SimpleGetMessages()
+        public async Task FetchMessagesSimpleTest()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
             var brokerRouter = new BrokerRouter(_options);
@@ -50,23 +51,22 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public async Task GetMessagesSecondFromCache()
+        public async Task FetchMessagesCacheContainsAllRequestTest()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
             var brokerRouter = new BrokerRouter(_options);
             var protocolGateway = new ProtocolGateway(_kafkaUri);
-            var partitionId = 1;
-            var topic = "ManualConsumerTestTopic";
+            var partitionId = 1;            
 
             Producer producer = new Producer(brokerRouter);
-            ManualConsumer consumer = new ManualConsumer(partitionId, topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
+            ManualConsumer consumer = new ManualConsumer(partitionId, _topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
 
             var offset = await consumer.FetchLastOffset();
 
             // Creating 5 messages
             List<Message> messages = CreateTestMessages(10, 1);
 
-            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));
+            await producer.SendMessageAsync(_topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));
 
             // Now let's consume
             var result = (await consumer.FetchMessages(5, offset)).ToList();
@@ -80,23 +80,51 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public async Task GetMessagesMakeTwoFetchRequests()
+        public async Task FetchMessagesCacheContainsNoneOfRequestTest()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
             var brokerRouter = new BrokerRouter(_options);
             var protocolGateway = new ProtocolGateway(_kafkaUri);
             var partitionId = 1;
-            var topic = "ManualConsumerTestTopic";
 
             Producer producer = new Producer(brokerRouter);
-            ManualConsumer consumer = new ManualConsumer(partitionId, topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
+            ManualConsumer consumer = new ManualConsumer(partitionId, _topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
 
             var offset = await consumer.FetchLastOffset();
 
             // Creating 5 messages
             List<Message> messages = CreateTestMessages(10, 4096);
 
-            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));
+            await producer.SendMessageAsync(_topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));
+
+            // Now let's consume
+            var result = (await consumer.FetchMessages(7, offset)).ToList();
+
+            CheckMessages(messages.Take(7).ToList(), result);
+
+            // Now let's consume again
+            result = (await consumer.FetchMessages(2, offset + 8)).ToList();
+
+            CheckMessages(messages.Skip(8).ToList(), result);
+        }
+
+        [Test]
+        public async Task FetchMessagesCacheContainsPartOfRequestTest()
+        {
+            // Creating a broker router and a protocol gateway for the producer and consumer
+            var brokerRouter = new BrokerRouter(_options);
+            var protocolGateway = new ProtocolGateway(_kafkaUri);
+            var partitionId = 1;
+
+            Producer producer = new Producer(brokerRouter);
+            ManualConsumer consumer = new ManualConsumer(partitionId, _topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
+
+            var offset = await consumer.FetchLastOffset();
+
+            // Creating 5 messages
+            List<Message> messages = CreateTestMessages(10, 4096);
+
+            await producer.SendMessageAsync(_topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));
 
             // Now let's consume
             var result = (await consumer.FetchMessages(5, offset)).ToList();
@@ -110,14 +138,13 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        public async Task GetMessagesNoNewMessagesInQueue()
+        public async Task FetchMessagesNoNewMessagesInQueue()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
             var protocolGateway = new ProtocolGateway(_kafkaUri);
             var partitionId = 1;
-            var topic = "ManualConsumerTestTopic";
 
-            ManualConsumer consumer = new ManualConsumer(partitionId, topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
+            ManualConsumer consumer = new ManualConsumer(partitionId, _topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
 
             var offset = await consumer.FetchLastOffset();
 
@@ -128,16 +155,67 @@ namespace kafka_tests.Integration
         }
 
         [Test]
+        [ExpectedException(typeof(ArgumentOutOfRangeException))]
+        public async Task FetchMessagesInvalidOffsetTest()
+        {
+            // Creating a broker router and a protocol gateway for the producer and consumer
+            var protocolGateway = new ProtocolGateway(_kafkaUri);
+            var partitionId = 1;
+
+            ManualConsumer consumer = new ManualConsumer(partitionId, _topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
+
+            var offset = -1;
+
+            // Now let's consume
+            var result = (await consumer.FetchMessages(5, offset)).ToList();
+        }
+
+        [Test]
+        public async Task FetchMessagesTopicDoesntExist()
+        {
+            // Creating a broker router and a protocol gateway for the producer and consumer
+            var protocolGateway = new ProtocolGateway(_kafkaUri);
+            var partitionId = 1;
+            var topic = _topic + Guid.NewGuid();
+
+            ManualConsumer consumer = new ManualConsumer(partitionId, topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize * 2);
+
+            var offset = await consumer.FetchLastOffset();
+
+            // Now let's consume
+            var result = (await consumer.FetchMessages(5, offset)).ToList();
+
+            Assert.AreEqual(0, result.Count);
+        }
+
+        [Test]
+        [Ignore]
+        public async Task FetchMessagesPartitionDoesntExist()
+        {
+            // Creating a broker router and a protocol gateway for the producer and consumer
+            var brokerRouter = new BrokerRouter(_options);
+            var protocolGateway = new ProtocolGateway(_kafkaUri);
+            var partitionId = 100;
+            var topic = _topic + Guid.NewGuid();
+
+            ManualConsumer consumer = new ManualConsumer(partitionId, topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize * 2);
+
+            var offset = 0;
+
+            // Now let's consume
+            var result = (await consumer.FetchMessages(5, offset)).ToList();
+        }
+
+        [Test]
         [ExpectedException(typeof(KafkaApplicationException))]
-        public async Task GetOffsetConsumerGroupDoesntExist()
+        public async Task FetchOffsetConsumerGroupDoesntExist()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
             var protocolGateway = new ProtocolGateway(_kafkaUri);
             var partitionId = 0;
-            var topic = "ManualConsumerTestTopic";
             var consumerGroup = Guid.NewGuid().ToString();
 
-            ManualConsumer consumer = new ManualConsumer(partitionId, topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
+            ManualConsumer consumer = new ManualConsumer(partitionId, _topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
 
             var offset = await consumer.FetchOffset(consumerGroup);
 
@@ -165,7 +243,7 @@ namespace kafka_tests.Integration
 
                 for (int j = 0; j < messageSize; j++)
                 {
-                    payload.Add(Convert.ToByte(i));
+                    payload.Add(Convert.ToByte(1));
                 }
 
                 messages.Add(new Message() { Value = payload.ToArray() });

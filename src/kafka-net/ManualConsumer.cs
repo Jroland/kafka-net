@@ -15,14 +15,13 @@ namespace KafkaNet
         private readonly string _topic;
         private readonly int _partitionId;
         private readonly ProtocolGateway _gateway;
-        private int _maxSizeOfMessageSet;
+        private readonly int _maxSizeOfMessageSet;
         private readonly string _clientId;
         private List<Message> _lastMessages;
 
         private const int MaxWaitTimeForKafka = 0;
         private const int UseBrokerTimestamp = -1;
         private const int NoOffsetFound = -1;
-        private const double MessageSizeMultiplier = 1.5;
 
         public ManualConsumer(int partitionId, string topic, ProtocolGateway gateway, string clientId, int maxSizeOfMessageSet)
         {
@@ -75,7 +74,6 @@ namespace KafkaNet
 
             OffsetFetchRequest offsetFetchrequest = CreateOffsetFetchRequest(consumerGroup);
 
-            // TODO: Should also bring timeout?
             var response = await _gateway.SendProtocolRequest(offsetFetchrequest, _topic, _partitionId);
             return response.Offset;
         }
@@ -128,7 +126,7 @@ namespace KafkaNet
                 MaxWaitTime = MaxWaitTimeForKafka,
                 MinBytes = 0,
                 Fetches = new List<Fetch>() { fetch },
-                ClientId = _clientId
+                ClientId = _clientId                
             };
 
             return request;
