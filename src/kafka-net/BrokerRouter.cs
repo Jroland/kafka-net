@@ -106,7 +106,7 @@ namespace KafkaNet
         {
             var topicSearchResult = SearchCacheForTopics(topics,null);
 
-            //update metadata for all missing topics
+           
             if (topicSearchResult.Missing.Count > 0)
             {
                 throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topicSearchResult.Missing));
