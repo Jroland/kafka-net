@@ -100,7 +100,6 @@ namespace kafka_tests.Unit
 
         private IKafkaLog _log = new DefaultTraceLog();
 
-        //  [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task SendAsyncShouldBlockWhenMaximumAsyncQueueReached()
         {
@@ -109,7 +108,7 @@ namespace kafka_tests.Unit
             var semaphore = new SemaphoreSlim(0);
             var routerProxy = new FakeBrokerRouter();
             //block the second call returning from send message async
-            routerProxy.BrokerConn0.ProduceResponseFunction = async () => { semaphore.Wait(); return new ProduceResponse(); };
+            routerProxy.BrokerConn0.ProduceResponseFunction = async () => { await semaphore.WaitAsync(); return new ProduceResponse(); };
 
             var router = routerProxy.Create();
             using (var producer = new Producer(router, maximumAsyncRequests: 1) { BatchSize = 1 })
@@ -118,12 +117,14 @@ namespace kafka_tests.Unit
 
                 Task.Run(async () =>
                 {
-                    Interlocked.Increment(ref count);
+
                     var t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+                    Interlocked.Increment(ref count);
                     await t;
 
-                    Interlocked.Increment(ref count);
                     t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
+
+                    Interlocked.Increment(ref count);
                     await t;
                 });
 
@@ -278,12 +279,18 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test, Repeat(1000)]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        //someTime failed
         public async Task ProducerShouldBlockWhenFullBufferReached()
         {
             int count = 0;
             //with max buffer set below the batch size, this should cause the producer to block until batch delay time.
             var routerProxy = new FakeBrokerRouter();
+            routerProxy.BrokerConn0.ProduceResponseFunction = async () =>
+            {
+                await Task.Delay(200);
+                return new ProduceResponse();
+            };
             using (var producer = new Producer(routerProxy.Create(), maximumMessageBuffer: 1) { BatchSize = 10, BatchDelayTime = TimeSpan.FromMilliseconds(500) })
             {
                 var senderTask = Task.Factory.StartNew(async () =>

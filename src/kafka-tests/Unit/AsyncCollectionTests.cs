@@ -338,6 +338,7 @@ namespace kafka_tests.Unit
             Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
         }
 
+
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task AddAndRemoveShouldBePerformant()
         {
