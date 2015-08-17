@@ -16,6 +16,7 @@ namespace kafka_tests.Integration
     [Category("Integration")]
     public class ProducerConsumerTests
     {
+
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(10, 1000)]
         [TestCase(100, 1000)]
@@ -49,12 +50,12 @@ namespace kafka_tests.Integration
             var expected = new List<string> { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19" };
             var testId = Guid.NewGuid().ToString();
 
-            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
+            using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri) { Log = IntegrationConfig.NoDebugLog }))
             using (var producer = new Producer(router))
             {
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
 
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router),
+                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router){MaxWaitTimeForMinimumBytes = TimeSpan.Zero},
                     offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
                     for (int i = 0; i < 20; i++)
@@ -129,25 +130,25 @@ namespace kafka_tests.Integration
             router.Dispose();
         }
 
-        [Test, Repeat(1)]
-        [TestCase(1000, 200)]
-        [TestCase(30000, 900)]
-        [TestCase(50000, 1500)]
-        [TestCase(200000, 9300)]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        [TestCase(1000, 70)]
+        [TestCase(30000, 600)]
+        [TestCase(50000, 950)]
+        [TestCase(200000, 7300)]
         public async Task ConsumerShouldConsumeInSameOrderAsAsyncProduced_dataLoad(int numberOfMessage, int timeoutInMs)
         {
             int partition = 0;
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
 
-            Debug.WriteLine(String.Format("******************create BrokerRouter ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
-            var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri));
+              IntegrationConfig.NoDebugLog.InfoFormat("******************create BrokerRouter ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds);
+            var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri) { Log = IntegrationConfig.NoDebugLog });
             stopwatch.Restart();
             var producer = new Producer(router) { BatchDelayTime = TimeSpan.FromMilliseconds(10), BatchSize = numberOfMessage / 10 };
-            Debug.WriteLine(String.Format("******************create producer ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+               IntegrationConfig.NoDebugLog.InfoFormat("******************create producer ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds);
             stopwatch.Restart();
             List<OffsetResponse> offsets = await producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic);
-            Debug.WriteLine(String.Format("******************request Offset,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+              IntegrationConfig.NoDebugLog.InfoFormat("******************request Offset,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds);
             stopwatch.Restart();
             List<Task> sendList = new List<Task>(numberOfMessage);
             for (int i = 0; i < numberOfMessage; i++)
@@ -160,7 +161,7 @@ namespace kafka_tests.Integration
             await Task.WhenAny(doneSend, Task.Delay(maxTimeToRun));
             Assert.IsTrue(doneSend.IsCompleted, "not done to send in time");
 
-            Debug.WriteLine(String.Format("******************done send ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+             IntegrationConfig.NoDebugLog.InfoFormat("******************done send ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds);
             stopwatch.Restart();
 
             ConsumerOptions consumerOptions = new ConsumerOptions(IntegrationConfig.IntegrationTopic, router);
@@ -169,14 +170,14 @@ namespace kafka_tests.Integration
             Consumer consumer = new Consumer(consumerOptions, offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray());
 
             int expected = 0;
-            Debug.WriteLine(String.Format("******************start Consume ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat("******************start Consume ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds);
 
             IEnumerable<Message> messages = null;
             var doneConsume = Task.Run((() =>
              {
                  stopwatch.Restart();
                  messages = consumer.Consume().Take(numberOfMessage).ToArray();
-                 Debug.WriteLine(String.Format("******************done Consume ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+                   IntegrationConfig.NoDebugLog.InfoFormat("******************done Consume ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds);
                  stopwatch.Restart();
              }));
 
@@ -193,14 +194,14 @@ namespace kafka_tests.Integration
             }
             stopwatch.Restart();
             producer.Dispose();
-            Debug.WriteLine(String.Format("******************start producer Dispose ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat("******************start producer Dispose ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds);
 
             consumer.Dispose();
-            Debug.WriteLine(String.Format("******************start consumer Dispose ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat("******************start consumer Dispose ,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds);
             stopwatch.Restart();
 
             router.Dispose();
-            Debug.WriteLine(String.Format("******************start router Dispose,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat("******************start router Dispose,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds);
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
@@ -215,7 +216,7 @@ namespace kafka_tests.Integration
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result
                     .Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray();
 
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router), offsets))
+                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router){MaxWaitTimeForMinimumBytes = TimeSpan.Zero}, offsets))
                 {
                     for (int i = 0; i < 20; i++)
                     {
@@ -255,7 +256,7 @@ namespace kafka_tests.Integration
                 var startOffsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result
                     .Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray();
 
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router), startOffsets))
+                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router) { MaxWaitTimeForMinimumBytes = TimeSpan.Zero }, startOffsets))
                 {
                     for (int i = 0; i < 20; i++)
                     {
@@ -333,7 +334,7 @@ namespace kafka_tests.Integration
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
 
                 //create consumer with buffer size of 1 (should block upstream)
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router) { ConsumerBufferSize = 1 },
+                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router) { ConsumerBufferSize = 1, MaxWaitTimeForMinimumBytes = TimeSpan.Zero },
                       offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
                     for (int i = 0; i < 20; i++)
@@ -364,7 +365,7 @@ namespace kafka_tests.Integration
                 var offsets = await producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).ConfigureAwait(false);
 
                 using (var consumerRouter = new BrokerRouter(options))
-                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, consumerRouter),
+                using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, consumerRouter){MaxWaitTimeForMinimumBytes = TimeSpan.Zero},
                      offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
                     Console.WriteLine("Sending {0} test messages", expectedCount);

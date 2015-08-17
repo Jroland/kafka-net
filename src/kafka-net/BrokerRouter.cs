@@ -53,17 +53,17 @@ namespace KafkaNet
         /// <remarks>
         /// This function does not use any selector criteria.  If the given partitionId does not exist an exception will be thrown.
         /// </remarks>
-        /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
-        /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
+        /// /// <exception cref="InvalidTopicMetadataException">the Metadata is not exist in Cache.</exception>
+
         public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, int partitionId)
         {
             var cachedTopic = GetTopicMetadataFromLocalCache(topic);
-
-            if (cachedTopic.Count <= 0)
-                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
-
             var topicMetadata = cachedTopic.First();
+            if (topicMetadata ==null)
+            {
+                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topic));
+            }
 
             var partition = topicMetadata.Partitions.FirstOrDefault(x => x.PartitionId == partitionId);
             if (partition == null) throw new InvalidPartitionException(string.Format("The topic:{0} does not have a partitionId:{1} defined.", topic, partitionId));

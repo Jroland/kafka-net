@@ -48,6 +48,10 @@ namespace KafkaNet.Model
         /// one partition has at least 1 byte of data or the specified timeout occurs. By setting higher values in combination with the timeout the consumer can tune for throughput 
         /// and trade a little additional latency for reading only large chunks of data (e.g. setting MaxWaitTime to 100 ms and setting MinBytes to 64k would allow the server to wait 
         /// up to 100ms to try to accumulate 64k of data before responding).
+        /// 
+        /// long poling!!
+        /// Watch out If you are pulling (or sending) from the same leader different partitions it going to block each other Because operations are performed serially
+        /// this property can tall kafka  Leave the connection open until MaxWaitTimeForMinimumBytes.
         /// </summary>
         public int MinimumBytes { get; set; }
 

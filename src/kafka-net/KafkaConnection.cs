@@ -92,7 +92,7 @@ namespace KafkaNet
         /// <param name="request">The IKafkaRequest to send to the kafka servers.</param>
         /// <returns></returns>
 
-     
+
         public async Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
         {
             //assign unique correlationId
@@ -274,7 +274,7 @@ namespace KafkaNet
         class AsyncRequestItem : IDisposable
         {
             private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-            private static IKafkaLog s_log = new DefaultTraceLog();
+
             public AsyncRequestItem(int correlationId)
             {
                 CorrelationId = correlationId;
@@ -300,15 +300,7 @@ namespace KafkaNet
 
             public void Dispose()
             {
-                try
-                {
-                    _cancellationTokenSource.Cancel();
-                }
-                catch (Exception ex)
-                {
-                    s_log.ErrorFormat("error will disposing AsyncRequestItem: {0}", ex);
-                }
-
+                _cancellationTokenSource.Cancel();
                 _cancellationTokenSource.Dispose();
 
             }

@@ -16,7 +16,7 @@ namespace kafka_tests.Integration
     [Category("Integration")]
     public class GzipProducerConsumerTests
     {
-        private readonly KafkaOptions _options = new KafkaOptions(IntegrationConfig.IntegrationUri);
+        private readonly KafkaOptions _options = new KafkaOptions(IntegrationConfig.IntegrationUri) { Log = IntegrationConfig.NoDebugLog };
 
         private KafkaConnection GetKafkaConnection()
         {
@@ -24,9 +24,10 @@ namespace kafka_tests.Integration
             return new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), endpoint), _options.ResponseTimeoutMs, _options.Log);
         }
 
-        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        [Test, Repeat(100)]
         public async Task EnsureGzipCompressedMessageCanSend()
         {
+            IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start EnsureGzipCompressedMessageCanSend"));
             using (var conn = GetKafkaConnection())
             {
                 conn.SendAsync(new MetadataRequest
@@ -38,7 +39,9 @@ namespace kafka_tests.Integration
 
             using (var router = new BrokerRouter(_options))
             {
+                IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start RefreshMissingTopicMetadata"));
                 await router.RefreshMissingTopicMetadata(IntegrationConfig.IntegrationCompressionTopic);
+                IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("end RefreshMissingTopicMetadata"));
                 var conn = router.SelectBrokerRouteFromLocalCache(IntegrationConfig.IntegrationCompressionTopic, 0);
 
                 var request = new ProduceRequest
@@ -61,10 +64,13 @@ namespace kafka_tests.Integration
                             }
                         }
                 };
-
+                IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start SendAsync"));
                 var response = conn.Connection.SendAsync(request).Result;
+                IntegrationConfig.NoDebugLog.InfoFormat("end SendAsync");
                 Assert.That(response.First().Error, Is.EqualTo(0));
+                IntegrationConfig.NoDebugLog.InfoFormat("start dispose");
             }
+            IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("end EnsureGzipCompressedMessageCanSend"));
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]

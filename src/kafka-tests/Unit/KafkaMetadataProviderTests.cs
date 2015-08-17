@@ -23,7 +23,7 @@ namespace kafka_tests.Unit
         [TestCase(ErrorResponseCode.LeaderNotAvailable)]
         [TestCase(ErrorResponseCode.OffsetsLoadInProgressCode)]
         [TestCase(ErrorResponseCode.ConsumerCoordinatorNotAvailableCode)]
-        public void ShouldRetryWhenReceiveAnRetryErrorCode(ErrorResponseCode errorCode)
+        public async Task ShouldRetryWhenReceiveAnRetryErrorCode(ErrorResponseCode errorCode)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -32,7 +32,7 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
 
             Received.InOrder(() =>
@@ -45,7 +45,7 @@ namespace kafka_tests.Unit
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(ErrorResponseCode.LeaderNotAvailable)]
-        public void ShouldBackoffRequestOnMultipleFailures(ErrorResponseCode errorCode)
+        public async Task ShouldBackoffRequestOnMultipleFailures(ErrorResponseCode errorCode)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -57,23 +57,23 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
 
             Received.InOrder(() =>
             {
-                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
+                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Wait();
                 _log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", 100);
-                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
+                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Wait();
                 _log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", 400);
-                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
+                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Wait();
                 _log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", 900);
-                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
+                conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Wait();
             });
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
-        public void ShouldRetryWhenReceiveBrokerIdNegativeOne()
+        public async Task ShouldRetryWhenReceiveBrokerIdNegativeOne()
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -82,7 +82,7 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                var response = provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
 
             Received.InOrder(() =>
@@ -177,24 +177,26 @@ namespace kafka_tests.Unit
             return tcs.Task;
         }
 
-        private Task<List<MetadataResponse>> CreateMetadataResponse(ErrorResponseCode errorCode)
+        private async Task<List<MetadataResponse>> CreateMetadataResponse(ErrorResponseCode errorCode)
         {
-            var tcs = new TaskCompletionSource<List<MetadataResponse>>();
-            tcs.SetResult(new List<MetadataResponse>{
-                new MetadataResponse
+
+            return new List<MetadataResponse>
             {
-                Brokers = new List<Broker>(),
-                Topics = new List<Topic>
+                new MetadataResponse
                 {
-                    new Topic
+                    Brokers = new List<Broker>(),
+                    Topics = new List<Topic>
                     {
-                        ErrorCode = (short) errorCode,
-                        Name = "Test",
-                        Partitions = new List<Partition>()
+                        new Topic
+                        {
+                            ErrorCode = (short) errorCode,
+                            Name = "Test",
+                            Partitions = new List<Partition>()
+                        }
                     }
                 }
-            }});
-            return tcs.Task;
+            };
+
         }
     }
 }
