@@ -170,8 +170,9 @@ namespace KafkaNet
 
         private async Task BatchSendAsync()
         {
-            var outstandingSendTasks = new System.Collections.Concurrent.ConcurrentDictionary<Task, Task>();
-            while (_asyncCollection.IsCompleted == false || _asyncCollection.Count > 0)
+
+
+            while (IsNotDisposedOrHasMessagesToProcess())
             {
                 List<TopicMessage> batch = null;
 
@@ -198,8 +199,6 @@ namespace KafkaNet
 
                     //we want to fire the batch without blocking and then move on to fire another one
                     var sendTask = ProduceAndSendBatchAsync(batch, _stopToken.Token);
-
-                    outstandingSendTasks.TryAdd(sendTask, sendTask);
                     try
                     {
                         await sendTask;
@@ -208,11 +207,6 @@ namespace KafkaNet
                     {
                         batch.ForEach(x => x.Tcs.TrySetException(ex));
                     }
-                    outstandingSendTasks.TryRemove(sendTask, out sendTask);
-
-                 
-
-
                 }
                 catch (Exception ex)
                 {
@@ -221,13 +215,15 @@ namespace KafkaNet
                         batch.ForEach(x => x.Tcs.TrySetException(ex));
                     }
                 }
+
+
             }
 
-            var referenceToOutstanding = outstandingSendTasks.Values.ToList();
-            if (referenceToOutstanding.Count > 0)
-            {
-                await Task.WhenAll(referenceToOutstanding).ConfigureAwait(false);
-            }
+        }
+
+        private bool IsNotDisposedOrHasMessagesToProcess()
+        {
+            return _asyncCollection.IsCompleted == false || _asyncCollection.Count > 0;
         }
 
         private async Task ProduceAndSendBatchAsync(List<TopicMessage> messages, CancellationToken cancellationToken)
