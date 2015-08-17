@@ -1,19 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using kafka_tests.Helpers;
 using KafkaNet.Protocol;
-using kafka_tests.Helpers;
 using NUnit.Framework;
+using System.Linq;
 
 namespace kafka_tests.Unit
 {
     [TestFixture]
     [Category("Unit")]
     public class ProtocolTests
-    { 
-        [Test]
+    {
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void MetadataResponseShouldDecode()
         {
             var request = new MetadataRequest();

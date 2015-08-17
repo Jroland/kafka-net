@@ -1,12 +1,12 @@
-﻿using System;
+﻿using kafka_tests.Fakes;
+using kafka_tests.Helpers;
+using KafkaNet;
+using KafkaNet.Common;
+using NUnit.Framework;
+using System;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Common;
-using kafka_tests.Fakes;
-using NUnit.Framework;
-using kafka_tests.Helpers;
-using KafkaNet;
 
 namespace kafka_tests.Unit
 {
@@ -15,16 +15,17 @@ namespace kafka_tests.Unit
     public class FakeTcpServerTests
     {
         private readonly Uri _fakeServerUrl;
-        private IKafkaLog Ilog=new ConsoleLog(LogLevel.Warn);
+        private IKafkaLog Ilog = new DefaultTraceLog(LogLevel.Warn);
+
         public FakeTcpServerTests()
         {
             _fakeServerUrl = new Uri("http://localhost:8999");
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task FakeShouldBeAbleToReconnect()
         {
-            using (var server = new FakeTcpServer(Ilog,8999))
+            using (var server = new FakeTcpServer(Ilog, 8999))
             {
                 byte[] received = null;
                 server.OnBytesReceived += data => received = data;
@@ -41,13 +42,13 @@ namespace kafka_tests.Unit
                 await TaskTest.WaitFor(() => server.ConnectionEventcount == 2);
 
                 t2.GetStream().Write(99.ToBytes(), 0, 4);
-             await    TaskTest.WaitFor(() => received != null);
+                await TaskTest.WaitFor(() => received != null);
 
                 Assert.That(received.ToInt32(), Is.EqualTo(99));
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ShouldDisposeEvenWhenTryingToSendWithoutExceptionThrown()
         {
             using (var server = new FakeTcpServer(Ilog, 8999))
@@ -57,20 +58,20 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ShouldDisposeWithoutExecptionThrown()
         {
-            using (var server = new FakeTcpServer(Ilog,8999))
+            using (var server = new FakeTcpServer(Ilog, 8999))
             {
                 Thread.Sleep(500);
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void SendAsyncShouldWaitUntilClientIsConnected()
         {
             const int testData = 99;
-            using (var server = new FakeTcpServer(Ilog,8999))
+            using (var server = new FakeTcpServer(Ilog, 8999))
             using (var client = new TcpClient())
             {
                 server.SendDataAsync(testData.ToBytes());
@@ -79,7 +80,7 @@ namespace kafka_tests.Unit
 
                 var buffer = new byte[4];
                 client.GetStream().ReadAsync(buffer, 0, 4).Wait(TimeSpan.FromSeconds(5));
-                
+
                 Assert.That(buffer.ToInt32(), Is.EqualTo(testData));
             }
         }

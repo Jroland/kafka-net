@@ -1,13 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
-using kafka_tests.Helpers;
 using NUnit.Framework;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Integration
 {
@@ -15,7 +13,7 @@ namespace kafka_tests.Integration
     [Category("Integration")]
     public class ProducerIntegrationTests
     {
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ProducerShouldNotExpectResponseWhenAckIsZero()
         {
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
@@ -29,7 +27,7 @@ namespace kafka_tests.Integration
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void SendAsyncShouldGetOneResultForMessage()
         {
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
@@ -41,20 +39,20 @@ namespace kafka_tests.Integration
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void SendAsyncShouldGetAResultForEachPartitionSentTo()
         {
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
             using (var producer = new Producer(router))
             {
-                var messages=new[] { new Message("1"), new Message("2"), new Message("3")};
-                var result = await producer.SendMessageAsync(IntegrationConfig.IntegrationTopic,messages);
+                var messages = new[] { new Message("1"), new Message("2"), new Message("3") };
+                var result = await producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, messages);
 
                 Assert.That(result.Count, Is.EqualTo(messages.Count()));
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void SendAsyncShouldGetOneResultForEachPartitionThroughBatching()
         {
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))

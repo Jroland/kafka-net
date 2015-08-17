@@ -1,5 +1,4 @@
-﻿using System.Net;
-using System.Runtime.Remoting.Messaging;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Common;
 using KafkaNet.Model;
@@ -9,6 +8,7 @@ using Ninject.MockingKernel.Moq;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace kafka_tests.Unit
@@ -41,7 +41,7 @@ namespace kafka_tests.Unit
                 });
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void BrokerRouterCanConstruct()
         {
             var result = new BrokerRouter(new KafkaOptions
@@ -53,7 +53,7 @@ namespace kafka_tests.Unit
             Assert.That(result, Is.Not.Null);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(ServerUnreachableException))]
         public void BrokerRouterConstructorThrowsServerUnreachableException()
         {
@@ -63,7 +63,7 @@ namespace kafka_tests.Unit
             });
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void BrokerRouterConstructorShouldIgnoreUnresolvableUriWhenAtLeastOneIsGood()
         {
             var result = new BrokerRouter(new KafkaOptions
@@ -72,7 +72,7 @@ namespace kafka_tests.Unit
             });
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task BrokerRouterUsesFactoryToAddNewBrokers()
         {
             var router = new BrokerRouter(new KafkaOptions
@@ -89,7 +89,8 @@ namespace kafka_tests.Unit
         }
 
         #region MetadataRequest Tests...
-        [Test]
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task BrokerRouteShouldCycleThroughEachBrokerUntilOneIsFound()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
@@ -102,7 +103,7 @@ namespace kafka_tests.Unit
             Assert.That(routerProxy.BrokerConn1.MetadataRequestCallCount, Is.EqualTo(1));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(ServerUnreachableException))]
         public async Task BrokerRouteShouldThrowIfCycleCouldNotConnectToAnyServer()
         {
@@ -124,7 +125,7 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task BrokerRouteShouldReturnTopicFromCache()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
@@ -140,12 +141,12 @@ namespace kafka_tests.Unit
             Assert.That(result2[0].Name, Is.EqualTo(TestTopic));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task RefreshTopicMetadataShouldIgnoreCacheAndAlwayCauseMetadataRequestAfterExpertionDate()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
-            TimeSpan cacheExpiration=TimeSpan.FromMilliseconds(100);
+            TimeSpan cacheExpiration = TimeSpan.FromMilliseconds(100);
             await router.RefreshTopicMetadata(TestTopic);
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(1));
             await Task.Delay(routerProxy._cacheExpiration);
@@ -154,25 +155,26 @@ namespace kafka_tests.Unit
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(2));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task SimultaneouslyRefreshTopicMetadataShouldGetDataFromCacheOnSameRequest()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
-            
+
             List<Task> x = new List<Task>();
             x.Add(router.RefreshTopicMetadata(TestTopic));//do not debug
             x.Add(router.RefreshTopicMetadata(TestTopic));//do not debug
             await Task.WhenAll(x.ToArray());
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(1));
         }
-        #endregion
+
+        #endregion MetadataRequest Tests...
 
         #region SelectBrokerRouteAsync Exact Tests...
-        [Test]
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task SelectExactPartitionShouldReturnRequestedPartition()
         {
-
             var routerProxy = new BrokerRouterProxy(_kernel);
             var router = routerProxy.Create();
             await router.RefreshMissingTopicMetadata(TestTopic);
@@ -183,7 +185,7 @@ namespace kafka_tests.Unit
             Assert.That(p1.PartitionId, Is.EqualTo(1));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(InvalidPartitionException))]
         public async Task SelectExactPartitionShouldThrowWhenPartitionDoesNotExist()
         {
@@ -193,7 +195,7 @@ namespace kafka_tests.Unit
             router.SelectBrokerRouteFromLocalCache(TestTopic, 3);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
         public void SelectExactPartitionShouldThrowWhenTopicsCollectionIsEmpty()
         {
@@ -206,7 +208,7 @@ namespace kafka_tests.Unit
             routerProxy.Create().SelectBrokerRouteFromLocalCache(TestTopic, 1);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(LeaderNotFoundException))]
         public async Task SelectExactPartitionShouldThrowWhenBrokerCollectionIsEmpty()
         {
@@ -219,11 +221,12 @@ namespace kafka_tests.Unit
             await router.RefreshMissingTopicMetadata(TestTopic);
             router.SelectBrokerRouteFromLocalCache(TestTopic, 1);
         }
-        #endregion
+
+        #endregion SelectBrokerRouteAsync Exact Tests...
 
         #region SelectBrokerRouteAsync Select Tests...
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(null)]
         [TestCase("withkey")]
         public async Task SelectPartitionShouldUsePartitionSelector(string testCase)
@@ -249,13 +252,12 @@ namespace kafka_tests.Unit
             _mockPartitionSelector.Verify(f => f.Select(It.Is<Topic>(x => x.Name == TestTopic), key), Times.Once());
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
         public void SelectPartitionShouldThrowWhenTopicsCollectionIsEmpty()
         {
             var metadataResponse = CreateMetaResponse();
             metadataResponse.Topics.Clear();
-
 
             var routerProxy = new BrokerRouterProxy(_kernel);
             routerProxy.BrokerConn0.MetadataResponseFunction = async () => metadataResponse;
@@ -263,7 +265,7 @@ namespace kafka_tests.Unit
             routerProxy.Create().SelectBrokerRouteFromLocalCache(TestTopic);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(LeaderNotFoundException))]
         public async Task SelectPartitionShouldThrowWhenBrokerCollectionIsEmpty()
         {
@@ -277,9 +279,11 @@ namespace kafka_tests.Unit
             await routerProxy1.RefreshMissingTopicMetadata(TestTopic);
             routerProxy1.SelectBrokerRouteFromLocalCache(TestTopic);
         }
-        #endregion
+
+        #endregion SelectBrokerRouteAsync Select Tests...
 
         #region Private Methods...
+
         private MetadataResponse CreateMetaResponse()
         {
             return new MetadataResponse
@@ -325,11 +329,11 @@ namespace kafka_tests.Unit
                                                     Replicas = new List<int> {1},
                                                 }
                                         }
-
                                 }
                         }
                 };
         }
-        #endregion
+
+        #endregion Private Methods...
     }
 }

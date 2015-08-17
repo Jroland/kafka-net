@@ -179,8 +179,8 @@ namespace KafkaNet
                 {
                     try
                     {
-                     _asyncCollection.OnHasDataAvailable(_stopToken.Token).ConfigureAwait(false);
-                      
+                        await _asyncCollection.OnHasDataAvailable(_stopToken.Token).ConfigureAwait(false);
+
                         batch = await _asyncCollection.TakeAsync(BatchSize, BatchDelayTime, _stopToken.Token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException ex)
@@ -210,7 +210,7 @@ namespace KafkaNet
                     }
                     outstandingSendTasks.TryRemove(sendTask, out sendTask);
 
-
+                 
 
 
                 }

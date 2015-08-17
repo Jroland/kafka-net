@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net;
+﻿using kafka_tests.Fakes;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using Moq;
 using Ninject.MockingKernel.Moq;
-using kafka_tests.Fakes;
+using System;
+using System.Collections.Generic;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -44,7 +44,7 @@ namespace kafka_tests
 
             _fakeConn1 = new FakeKafkaConnection(new Uri("http://localhost:2"));
             _fakeConn1.ProduceResponseFunction = async () => new ProduceResponse { Offset = _offset1++, PartitionId = 1, Topic = TestTopic };
-            _fakeConn1.MetadataResponseFunction =  () => MetadataResponse();
+            _fakeConn1.MetadataResponseFunction = () => MetadataResponse();
             _fakeConn1.OffsetResponseFunction = async () => new OffsetResponse { Offsets = new List<long> { 0, 100 }, PartitionId = 1, Topic = TestTopic };
             _fakeConn1.FetchResponseFunction = async () => { Thread.Sleep(500); return null; };
 
@@ -70,7 +70,7 @@ namespace kafka_tests
             });
         }
 
-        public static async Task< MetadataResponse> DefaultMetadataResponse()
+        public static async Task<MetadataResponse> DefaultMetadataResponse()
         {
             return new MetadataResponse
                 {
@@ -115,7 +115,6 @@ namespace kafka_tests
                                                     Replicas = new List<int> {1},
                                                 }
                                         }
-
                                 }
                         }
                 };

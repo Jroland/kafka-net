@@ -1,19 +1,22 @@
-﻿using System;
+﻿using KafkaNet;
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet;
 
 namespace kafka_tests.Fakes
 {
     public class FakeTcpServer : IDisposable
     {
         public event Action<byte[]> OnBytesReceived;
+
         public event Action OnClientConnected;
+
         public event Action OnClientDisconnected;
+
         private IKafkaLog _log;
 
         private TcpClient _client;
@@ -28,7 +31,7 @@ namespace kafka_tests.Fakes
         public int DisconnectionEventCount = 0;
         public Task HasClientConnected { get { return _clientConnectedTrigger.Task; } }
 
-        public FakeTcpServer(IKafkaLog log ,int port)
+        public FakeTcpServer(IKafkaLog log, int port)
         {
             _log = log;
             _listener = new TcpListener(IPAddress.Any, port);
@@ -120,7 +123,7 @@ namespace kafka_tests.Fakes
                 }
                 finally
                 {
-                  _log.ErrorFormat("FakeTcpServer: Client Disconnected.");
+                    _log.ErrorFormat("FakeTcpServer: Client Disconnected.");
                     _semaphoreSlim.Wait(); //remove the one client
                     if (OnClientDisconnected != null) OnClientDisconnected();
                 }
@@ -142,6 +145,4 @@ namespace kafka_tests.Fakes
             }
         }
     }
-
-
 }

@@ -274,7 +274,7 @@ namespace KafkaNet
         class AsyncRequestItem : IDisposable
         {
             private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
-            private static IKafkaLog s_log = new ConsoleLog();
+            private static IKafkaLog s_log = new DefaultTraceLog();
             public AsyncRequestItem(int correlationId)
             {
                 CorrelationId = correlationId;

@@ -70,14 +70,10 @@ namespace kafka_tests.Fakes
             var resultlist = new List<T>();
             resultlist.Add(result);
             return resultlist;
-
-
-
         }
 
         public void Dispose()
         {
-
         }
     }
 }

@@ -1,12 +1,10 @@
-﻿using KafkaNet;
+﻿using kafka_tests.Helpers;
+using KafkaNet;
 using KafkaNet.Protocol;
 using Moq;
 using Ninject.MockingKernel.Moq;
 using NUnit.Framework;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace kafka_tests.Unit
@@ -24,7 +22,8 @@ namespace kafka_tests.Unit
         }
 
         #region GetTopicOffset Tests...
-        [Test]
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void GetTopicOffsetShouldQueryEachBroker()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
@@ -36,7 +35,7 @@ namespace kafka_tests.Unit
             Assert.That(routerProxy.BrokerConn1.OffsetRequestCallCount, Is.EqualTo(1));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void GetTopicOffsetShouldThrowAnyException()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
@@ -50,10 +49,12 @@ namespace kafka_tests.Unit
                 Assert.That(t.Exception.Flatten().ToString(), Is.StringContaining("test 99"));
             }).Wait();
         }
-        #endregion
+
+        #endregion GetTopicOffset Tests...
 
         #region GetTopic Tests...
-        [Test]
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task GetTopicShouldReturnTopic()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
@@ -65,7 +66,7 @@ namespace kafka_tests.Unit
             Assert.That(result.Name, Is.EqualTo(BrokerRouterProxy.TestTopic));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
         public void EmptyTopicMetadataShouldThrowException()
         {
@@ -76,9 +77,9 @@ namespace kafka_tests.Unit
             common.GetTopicFromCache("MissingTopic");
         }
 
-        #endregion
+        #endregion GetTopic Tests...
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureCommonQueriesDisposesRouter()
         {
             var router = _kernel.GetMock<IBrokerRouter>();

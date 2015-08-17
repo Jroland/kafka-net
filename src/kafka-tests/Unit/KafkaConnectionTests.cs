@@ -1,16 +1,15 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using kafka_tests.Fakes;
+using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Common;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
-using kafka_tests.Fakes;
 using Moq;
-using NUnit.Framework;
 using Ninject.MockingKernel.Moq;
-using kafka_tests.Helpers;
-using System.Threading;
+using NUnit.Framework;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Unit
 {
@@ -34,18 +33,19 @@ namespace kafka_tests.Unit
         }
 
         #region Construct...
-        [Test]
-        public void ShouldStartReadPollingOnConstruction()
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task ShouldStartReadPollingOnConstruction()
         {
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, log: _log))
             {
-                TaskTest.WaitFor(() => conn.ReadPolling);
+                await TaskTest.WaitFor(() => conn.ReadPolling);
                 Assert.That(conn.ReadPolling, Is.True);
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ShouldReportServerUriOnConstruction()
         {
             var expectedUrl = _kafkaEndpoint;
@@ -55,23 +55,25 @@ namespace kafka_tests.Unit
                 Assert.That(conn.Endpoint, Is.EqualTo(expectedUrl));
             }
         }
-        #endregion
+
+        #endregion Construct...
 
         #region Dispose Tests...
-        [Test]
-        public void ShouldDisposeWithoutExceptionThrown()
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task ShouldDisposeWithoutExceptionThrown()
         {
             using (var server = new FakeTcpServer(_log, 8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             {
                 var conn = new KafkaConnection(socket, log: _log);
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
+                await TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 using (conn) { }
             }
         }
 
-        [Test]
-        public void ShouldDisposeWithoutExceptionEvenWhileCallingSendAsync()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task ShouldDisposeWithoutExceptionEvenWhileCallingSendAsync()
         {
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, log: _log))
@@ -81,10 +83,13 @@ namespace kafka_tests.Unit
                 Assert.That(task.IsCompleted, Is.False, "The send task should still be pending.");
             }
         }
-        #endregion
+
+        #endregion Dispose Tests...
 
         #region Read Tests...
-        [Test]
+
+        //TODO FIx has moc error
+        [Test, Repeat(1)]
         public async Task ReadShouldLogDisconnectAndRecover()
         {
             var mockLog = _kernel.GetMock<IKafkaLog>();
@@ -106,7 +111,6 @@ namespace kafka_tests.Unit
                 //Wait a while for the client to notice the disconnect and log
                 await TaskTest.WaitFor(() => disconnected);
 
-
                 //should log an exception and keep going
                 mockLog.Verify(x => x.ErrorFormat(It.IsAny<string>(), It.IsAny<Exception>()));
 
@@ -115,8 +119,8 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
-        public void ReadShouldIgnoreMessageWithUnknownCorrelationId()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task ReadShouldIgnoreMessageWithUnknownCorrelationId()
         {
             const int correlationId = 99;
 
@@ -133,20 +137,21 @@ namespace kafka_tests.Unit
                 server.SendDataAsync(CreateCorrelationMessage(correlationId)).Wait(TimeSpan.FromSeconds(5));
 
                 //wait for connection
-                TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
+                await TaskTest.WaitFor(() => server.ConnectionEventcount > 0);
                 Assert.That(server.ConnectionEventcount, Is.EqualTo(1));
 
-                TaskTest.WaitFor(() => receivedData);
+                await TaskTest.WaitFor(() => receivedData);
 
                 //should log a warning and keep going
                 mockLog.Verify(x => x.WarnFormat(It.IsAny<string>(), It.Is<int>(o => o == correlationId)));
             }
         }
-        #endregion
+
+        #endregion Read Tests...
 
         #region Send Tests...
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task SendAsyncShouldTimeoutWhenSendAsyncTakesTooLong()
         {
             using (var server = new FakeTcpServer(_log, 8999))
@@ -165,7 +170,7 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void SendAsyncShouldNotAllowResponseToTimeoutWhileAwaitingKafkaToEstableConnection()
         {
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
@@ -198,10 +203,9 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
-        public async Task  SendAsyncShouldTimeoutMultipleMessagesAtATime()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task SendAsyncShouldTimeoutMultipleMessagesAtATime()
         {
-
             using (var server = new FakeTcpServer(_log, 8999))
             using (var socket = new KafkaTcpSocket(_log, _kafkaEndpoint))
             using (var conn = new KafkaConnection(socket, TimeSpan.FromMilliseconds(100), log: _log))
@@ -218,17 +222,17 @@ namespace kafka_tests.Unit
 
                 Task.WhenAll(tasks);
 
-            await    TaskTest.WaitFor(() => tasks.All(t => t.IsFaulted));
+                await TaskTest.WaitFor(() => tasks.All(t => t.IsFaulted));
                 foreach (var task in tasks)
                 {
                     Assert.That(task.IsFaulted, Is.True, "Task should have faulted.");
                     Assert.That(task.Exception.InnerException, Is.TypeOf<ResponseTimeoutException>(),
                         "Task fault should be of type ResponseTimeoutException.");
-
                 }
             }
         }
-        #endregion
+
+        #endregion Send Tests...
 
         private static byte[] CreateCorrelationMessage(int id)
         {

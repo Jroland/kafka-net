@@ -1,15 +1,17 @@
-﻿using System;
-using System.Net;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using NUnit.Framework;
+using System;
+using System.Net;
 
 namespace kafka_tests.Unit
 {
     [TestFixture]
     public class KafkaEndpointTests
     {
-        private  IKafkaLog _log=new ConsoleLog(LogLevel.Warn);
-        [Test]
+        private IKafkaLog _log = new DefaultTraceLog(LogLevel.Warn);
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureEndpointCanBeResulved()
         {
             var expected = IPAddress.Parse("127.0.0.1");
@@ -18,7 +20,7 @@ namespace kafka_tests.Unit
             Assert.That(endpoint.Endpoint.Port, Is.EqualTo(8888));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureTwoEndpointNotOfTheSameReferenceButSameIPAreEqual()
         {
             var endpoint1 = new DefaultKafkaConnectionFactory().Resolve(new Uri("http://localhost:8888"), _log);
@@ -28,7 +30,7 @@ namespace kafka_tests.Unit
             Assert.That(endpoint1, Is.EqualTo(endpoint2));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureTwoEndointWithSameIPButDifferentPortsAreNotEqual()
         {
             var endpoint1 = new DefaultKafkaConnectionFactory().Resolve(new Uri("http://localhost:8888"), _log);

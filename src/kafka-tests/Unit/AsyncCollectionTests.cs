@@ -1,26 +1,26 @@
-﻿using System;
+﻿using kafka_tests.Helpers;
+using KafkaNet.Common;
+using NUnit.Framework;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Common;
-using kafka_tests.Helpers;
-using NUnit.Framework;
 
 namespace kafka_tests.Unit
 {
     [TestFixture]
     public class AsyncCollectionTests
     {
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void AsyncCollectionConstructs()
         {
             var collection = new AsyncCollection<string>();
             Assert.That(collection, Is.Not.Null);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void OnDataAvailableShouldTriggerWhenDataAdded()
         {
             var aq = new AsyncCollection<bool>();
@@ -32,7 +32,7 @@ namespace kafka_tests.Unit
             Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.True, "Task should indicate data available.");
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void OnDataAvailableShouldBlockWhenDataRemoved()
         {
             var aq = new AsyncCollection<bool>();
@@ -46,9 +46,7 @@ namespace kafka_tests.Unit
             Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
         }
 
-
-        [Test]
-
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task OnDataAvailableShouldCancel()//change class Behavers from trowing OperationCanceledException to returning false
         {//do not debug with brack point it harm this test
             var aq = new AsyncCollection<bool>();
@@ -57,10 +55,10 @@ namespace kafka_tests.Unit
             await Task.WhenAny(waitUntilCancel, Task.Delay(timeSpen / 2));
             Assert.IsFalse(waitUntilCancel.IsCompleted, "task Should Cancel only when time is up");
             //ToDO FIX
-         //   Assert.IsFalse(await waitUntilCancel, "it Should return false when cancel");
+            //   Assert.IsFalse(await waitUntilCancel, "it Should return false when cancel");
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void DrainShouldBlockWhenDataRemoved()
         {
             var aq = new AsyncCollection<bool>();
@@ -74,7 +72,7 @@ namespace kafka_tests.Unit
             Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void CollectionShouldReportCorrectBufferCount()
         {
             var collection = new AsyncCollection<int>();
@@ -90,7 +88,7 @@ namespace kafka_tests.Unit
             Assert.That(collection.Count, Is.EqualTo(0));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [Ignore("Currently remove max buffer feature.")]
         public void CollectionShouldBlockOnMaxBuffer()
         {
@@ -106,7 +104,8 @@ namespace kafka_tests.Unit
         }
 
         #region Take Tests...
-        [Test]
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void TryTakeShouldReturnFalseOnEmpty()
         {
             var aq = new AsyncCollection<bool>();
@@ -118,7 +117,7 @@ namespace kafka_tests.Unit
             Assert.That(aq.OnHasDataAvailable(CancellationToken.None).IsCompleted, Is.False, "Task should indicate no data available.");
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void TakeAsyncShouldOnlyWaitTimeoutAndReturnWhatItHas()
         {
             const int size = 20;
@@ -139,7 +138,7 @@ namespace kafka_tests.Unit
             Assert.That(result.Count, Is.LessThan(size));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void TakeAsyncShouldReturnEmptyListIfNothingFound()
         {
             var aq = new AsyncCollection<bool>();
@@ -150,7 +149,7 @@ namespace kafka_tests.Unit
             Assert.That(result.Count, Is.EqualTo(0));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void TakeAsyncShouldBeAbleToCancel()
         {
             var cancelSource = new CancellationTokenSource();
@@ -165,8 +164,7 @@ namespace kafka_tests.Unit
             Assert.That(sw.ElapsedMilliseconds, Is.LessThan(300));
         }
 
-
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void TakeAsyncShouldRemoveItemsFromCollection()
         {
             const int expectedCount = 10;
@@ -180,8 +178,7 @@ namespace kafka_tests.Unit
             Assert.That(collection.Count, Is.EqualTo(0));
         }
 
-
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void TakeAsyncShouldWaitXForBatchSizeToCollect()
         {
             const int expectedDelay = 100;
@@ -197,7 +194,7 @@ namespace kafka_tests.Unit
             Assert.That(data.Count, Is.EqualTo(expectedCount));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void TakeAsyncShouldReturnAsSoonAsBatchSizeArrived()
         {
             var collection = new AsyncCollection<int>();
@@ -209,12 +206,13 @@ namespace kafka_tests.Unit
             await dataTask;
 
             Assert.That(collection.Count, Is.EqualTo(0));
-
         }
-        #endregion
+
+        #endregion Take Tests...
 
         #region Thread Contention Tests...
-        [Test]
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void TakeAsyncShouldReturnEvenWhileMoreDataArrives()
         {
             var exit = false;
@@ -222,7 +220,6 @@ namespace kafka_tests.Unit
 
             var sw = Stopwatch.StartNew();
             var dataTask = collection.TakeAsync(10, TimeSpan.FromMilliseconds(5000), CancellationToken.None);
-
 
             var highVolumeAdding = Task.Run(() =>
             {
@@ -244,11 +241,9 @@ namespace kafka_tests.Unit
             Console.WriteLine("Waiting to unwind test...");
             await highVolumeAdding;
             collection.Drain();
-
         }
 
-
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void TakeAsyncShouldPlayNiceWithTPL()
         {
             const int expected = 200;
@@ -276,7 +271,7 @@ namespace kafka_tests.Unit
             collection.Drain();
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void TakeAsyncShouldBeThreadSafe()
         {
             const int expected = 10;
@@ -310,10 +305,9 @@ namespace kafka_tests.Unit
             Assert.That(take3.Result.Count, Is.EqualTo(expected));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void AddRangeShouldBePerformant()
         {
-
             for (int i = 0; i < 100; i++)
             {
                 AsyncCollection<int> collection = new AsyncCollection<int>();
@@ -324,7 +318,7 @@ namespace kafka_tests.Unit
                 sw.Stop();
                 Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
                 Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
-                
+
                 collection.Drain();
             }
         }
@@ -335,57 +329,50 @@ namespace kafka_tests.Unit
             GC.Collect();
         }
 
-        
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void TakeAsyncShouldBePerformant()
         {
-
-            for (int i = 0; i < 100; i++)
-            {
-                const int dataSize = 1000000;
-                AsyncCollection<int> collection = new AsyncCollection<int>();
-                collection.Drain();
-                collection.AddRange(Enumerable.Range(0, dataSize));
-                var sw = Stopwatch.StartNew();
-                var list = await collection.TakeAsync(dataSize, TimeSpan.FromSeconds(1), CancellationToken.None);
-                sw.Stop();
-                Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
-                Assert.That(list.Count, Is.EqualTo(dataSize));
-                Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
-                collection.Drain();
-                GC.Collect();
-            }
+            const int dataSize = 1000000;
+            AsyncCollection<int> collection = new AsyncCollection<int>();
+            collection.Drain();
+            collection.AddRange(Enumerable.Range(0, dataSize));
+            var sw = Stopwatch.StartNew();
+            var list = await collection.TakeAsync(dataSize, TimeSpan.FromSeconds(1), CancellationToken.None);
+            sw.Stop();
+            Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
+            Assert.That(list.Count, Is.EqualTo(dataSize));
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+            collection.Drain();
+            GC.Collect();
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task AddAndRemoveShouldBePerformant()
         {
             AsyncCollection<int> collection = new AsyncCollection<int>();
-            for (int i = 0; i < 100; i++)
-            {
-                const int dataSize = 1000000;
-      
-                collection.Drain();
-                List<int> receivedData = null;// new List<int>(dataSize);
-                var sw = Stopwatch.StartNew();
 
-                var t = Task.Run(() => collection.AddRange(Enumerable.Range(0, dataSize)));
-                var t2 = Task.Run(() => receivedData = collection.TakeAsync(dataSize, TimeSpan.FromSeconds(5), CancellationToken.None).Result);
-                await Task.WhenAll(t, t2);
-                sw.Stop();
-                Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
-                Assert.That(receivedData.Count, Is.EqualTo(dataSize));
-                Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
-                collection.Drain();
-                GC.Collect();
-            }
+            const int dataSize = 1000000;
+
+            collection.Drain();
+            List<int> receivedData = null;// new List<int>(dataSize);
+            var sw = Stopwatch.StartNew();
+
+            var t = Task.Run(() => collection.AddRange(Enumerable.Range(0, dataSize)));
+            var t2 = Task.Run(() => receivedData = collection.TakeAsync(dataSize, TimeSpan.FromSeconds(5), CancellationToken.None).Result);
+            await Task.WhenAll(t, t2);
+            sw.Stop();
+            Console.WriteLine("Performance: {0}", sw.ElapsedMilliseconds);
+            Assert.That(receivedData.Count, Is.EqualTo(dataSize));
+            Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
+            collection.Drain();
+            GC.Collect();
         }
-        #endregion
 
+        #endregion Thread Contention Tests...
 
         #region CompletedTests Tests...
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(ObjectDisposedException))]
         public void CompletedCollectionShouldPreventMoreItemsAdded()
         {
@@ -395,7 +382,7 @@ namespace kafka_tests.Unit
             collection.Add(1);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void CompletedCollectionShouldShowCompletedTrue()
         {
             var collection = new AsyncCollection<int>();
@@ -404,6 +391,7 @@ namespace kafka_tests.Unit
             collection.CompleteAdding();
             Assert.That(collection.IsCompleted, Is.True);
         }
-        #endregion
+
+        #endregion CompletedTests Tests...
     }
 }

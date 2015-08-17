@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Configuration;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace kafka_tests.Helpers
 {
@@ -12,6 +8,8 @@ namespace kafka_tests.Helpers
         public static string IntegrationCompressionTopic = "IntegrationCompressionTopic";
         public static string IntegrationTopic = "IntegrationTopic";
         public static string IntegrationConsumer = "IntegrationConsumer";
+        public const int NumberOfRepeat = 1;
+
         public static Uri IntegrationUri
         {
             get

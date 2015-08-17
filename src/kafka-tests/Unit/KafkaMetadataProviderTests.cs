@@ -1,11 +1,10 @@
-﻿using System;
+﻿using kafka_tests.Helpers;
+using KafkaNet;
+using KafkaNet.Protocol;
+using NSubstitute;
+using NUnit.Framework;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using KafkaNet;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
-using NUnit.Framework;
-using NSubstitute;
 
 namespace kafka_tests.Unit
 {
@@ -14,14 +13,13 @@ namespace kafka_tests.Unit
     {
         private IKafkaLog _log;
 
-
         [SetUp]
         public void Setup()
         {
             _log = Substitute.For<IKafkaLog>();
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(ErrorResponseCode.LeaderNotAvailable)]
         [TestCase(ErrorResponseCode.OffsetsLoadInProgressCode)]
         [TestCase(ErrorResponseCode.ConsumerCoordinatorNotAvailableCode)]
@@ -45,7 +43,7 @@ namespace kafka_tests.Unit
             });
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(ErrorResponseCode.LeaderNotAvailable)]
         public void ShouldBackoffRequestOnMultipleFailures(ErrorResponseCode errorCode)
         {
@@ -74,7 +72,7 @@ namespace kafka_tests.Unit
             });
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ShouldRetryWhenReceiveBrokerIdNegativeOne()
         {
             var conn = Substitute.For<IKafkaConnection>();
@@ -95,7 +93,7 @@ namespace kafka_tests.Unit
             });
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ShouldReturnWhenNoErrorReceived()
         {
             var conn = Substitute.For<IKafkaConnection>();
@@ -111,14 +109,12 @@ namespace kafka_tests.Unit
             conn.Received(1).SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>());
         }
 
-
-
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(ErrorResponseCode.Unknown)]
         [TestCase(ErrorResponseCode.RequestTimedOut)]
         [TestCase(ErrorResponseCode.InvalidMessage)]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
-        public  async Task ShouldThrowExceptionWhenNotARetriableErrorCode(ErrorResponseCode errorCode)
+        public async Task ShouldThrowExceptionWhenNotARetriableErrorCode(ErrorResponseCode errorCode)
         {
             var conn = Substitute.For<IKafkaConnection>();
 
@@ -130,7 +126,7 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(null)]
         [TestCase("")]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
@@ -142,11 +138,11 @@ namespace kafka_tests.Unit
 
             using (var provider = new KafkaMetadataProvider(_log))
             {
-                    var response = await provider.Get(new[] { conn }, new[] { "Test" });
+                var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(0)]
         [TestCase(-1)]
         [ExpectedException(typeof(InvalidTopicMetadataException))]
@@ -156,9 +152,8 @@ namespace kafka_tests.Unit
 
             conn.SendAsync(Arg.Any<IKafkaRequest<MetadataResponse>>()).Returns(x => CreateMetadataResponse(1, "123", port));
 
-            using (var provider =  new KafkaMetadataProvider(_log))
+            using (var provider = new KafkaMetadataProvider(_log))
             {
-
                 var response = await provider.Get(new[] { conn }, new[] { "Test" });
             }
         }

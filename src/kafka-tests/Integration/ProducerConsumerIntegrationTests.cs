@@ -1,14 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Common;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using NUnit.Framework;
-using kafka_tests.Helpers;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Integration
 {
@@ -16,14 +16,12 @@ namespace kafka_tests.Integration
     [Category("Integration")]
     public class ProducerConsumerTests
     {
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(10, 1000)]
         [TestCase(100, 1000)]
         [TestCase(1000, 1000)]
         public async Task SendAsyncShouldHandleHighVolumeOfMessages(int amount, int maxAsync)
         {
-
-
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
             using (var producer = new Producer(router, maxAsync) { BatchSize = amount / 2 })
             {
@@ -43,10 +41,9 @@ namespace kafka_tests.Integration
                 Assert.That(results.Any(x => x.Any(y => y.Error != 0)), Is.False,
                     "Should not have received any results as failures.");
             }
-
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ConsumerShouldConsumeInSameOrderAsProduced()
         {
             var expected = new List<string> { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19" };
@@ -55,13 +52,11 @@ namespace kafka_tests.Integration
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
             using (var producer = new Producer(router))
             {
-
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result;
 
                 using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router),
                     offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
-
                     for (int i = 0; i < 20; i++)
                     {
                         producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString(), testId) }).Wait();
@@ -79,12 +74,10 @@ namespace kafka_tests.Integration
             }
         }
 
-
         /// <summary>
         /// order Should remain in the same ack leve and partition
         /// </summary>
         /// <returns></returns>
-        [Test]
         public async Task ConsumerShouldConsumeInSameOrderAsAsyncProduced()
         {
             int partition = 0;
@@ -107,7 +100,6 @@ namespace kafka_tests.Integration
             await Task.WhenAll(sendList.ToArray());
             Debug.WriteLine(String.Format("******************done send***********************"));
 
-
             Debug.WriteLine(String.Format("******************create Consumer***********************"));
             ConsumerOptions consumerOptions = new ConsumerOptions(IntegrationConfig.IntegrationTopic, router);
             consumerOptions.PartitionWhitelist = new List<int> { partition };
@@ -117,30 +109,27 @@ namespace kafka_tests.Integration
             int expected = 0;
             Debug.WriteLine(String.Format("******************start Consume***********************"));
             await Task.Run((() =>
-                  {
-                      var results = consumer.Consume().Take(numberOfMessage).ToList();
-                      Assert.IsTrue(results.Count() == numberOfMessage, "not Consume all ,messages");
-                      Debug.WriteLine(String.Format("******************done Consume***********************"));
+            {
+                var results = consumer.Consume().Take(numberOfMessage).ToList();
+                Assert.IsTrue(results.Count() == numberOfMessage, "not Consume all ,messages");
+                Debug.WriteLine(String.Format("******************done Consume***********************"));
 
-                      foreach (Message message in results)
-                      {
-                          Assert.That(message.Value.ToUtf8String(), Is.EqualTo(expected.ToString()),
-                              "Expected the message list in the correct order.");
-                          expected++;
-                      }
-                  }));
+                foreach (Message message in results)
+                {
+                    Assert.That(message.Value.ToUtf8String(), Is.EqualTo(expected.ToString()),
+                        "Expected the message list in the correct order.");
+                    expected++;
+                }
+            }));
             Debug.WriteLine(String.Format("******************start producer Dispose***********************"));
             producer.Dispose();
             Debug.WriteLine(String.Format("******************start consumer Dispose***********************"));
             consumer.Dispose();
             Debug.WriteLine(String.Format("******************start router Dispose***********************"));
             router.Dispose();
-
         }
 
-
-
-        [Test]
+        [Test, Repeat(1)]
         [TestCase(1000, 200)]
         [TestCase(30000, 900)]
         [TestCase(50000, 1500)]
@@ -196,7 +185,6 @@ namespace kafka_tests.Integration
             Assert.IsTrue(doneConsume.IsCompleted, "not done to Consume in time");
             Assert.IsTrue(messages.Count() == numberOfMessage, "not Consume all ,messages");
 
-
             foreach (Message message in messages)
             {
                 Assert.That(message.Value.ToUtf8String(), Is.EqualTo(expected.ToString()),
@@ -213,9 +201,9 @@ namespace kafka_tests.Integration
 
             router.Dispose();
             Debug.WriteLine(String.Format("******************start router Dispose,time Milliseconds:{0}***********************", stopwatch.ElapsedMilliseconds));
-
         }
-        [Test]
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ConsumerShouldBeAbleToSeekBackToEarlierOffset()
         {
             var expected = new List<string> { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19" };
@@ -258,19 +246,17 @@ namespace kafka_tests.Integration
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ConsumerShouldBeAbleToGetCurrentOffsetInformation()
         {
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
             using (var producer = new Producer(router))
             {
-
                 var startOffsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result
                     .Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray();
 
                 using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router), startOffsets))
                 {
-
                     for (int i = 0; i < 20; i++)
                     {
                         producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString(), "1") }).Wait();
@@ -291,7 +277,7 @@ namespace kafka_tests.Integration
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ProducerShouldUsePartitionIdInsteadOfMessageKeyToChoosePartition()
         {
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
@@ -336,8 +322,7 @@ namespace kafka_tests.Integration
             return key;
         }
 
-
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ConsumerShouldNotLoseMessageWhenBlocked()
         {
             var testId = Guid.NewGuid().ToString();
@@ -351,7 +336,6 @@ namespace kafka_tests.Integration
                 using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router) { ConsumerBufferSize = 1 },
                       offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
-
                     for (int i = 0; i < 20; i++)
                     {
                         producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString(), testId) }).Wait();
@@ -367,12 +351,11 @@ namespace kafka_tests.Integration
             }
         }
 
-
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void ConsumerShouldMoveToNextAvailableOffsetWhenQueryingForNextMessage()
         {
             const int expectedCount = 1000;
-            var options = new KafkaOptions(IntegrationConfig.IntegrationUri) { Log = new ConsoleLog() };
+            var options = new KafkaOptions(IntegrationConfig.IntegrationUri) { Log = new DefaultTraceLog() };
 
             using (var producerRouter = new BrokerRouter(options))
             using (var producer = new Producer(producerRouter))
@@ -403,7 +386,6 @@ namespace kafka_tests.Integration
 
                     Assert.That(consumerOffset, Is.EqualTo(positionOffset), "The consumerOffset position should match the server offset position.");
                     Assert.That(data.Count, Is.EqualTo(expectedCount), "We should have received 2000 messages from the server.");
-
                 }
             }
         }

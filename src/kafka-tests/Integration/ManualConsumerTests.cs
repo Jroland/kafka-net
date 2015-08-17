@@ -1,11 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using NUnit.Framework;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Integration
 {
@@ -23,9 +24,9 @@ namespace kafka_tests.Integration
             _options = new KafkaOptions(_kafkaUri);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task SimpleGetMessages()
-        {            
+        {
             // Creating a broker router and a protocol gateway for the producer and consumer
             var brokerRouter = new BrokerRouter(_options);
             var protocolGateway = new ProtocolGateway(_kafkaUri);
@@ -40,7 +41,7 @@ namespace kafka_tests.Integration
             // Creating 5 messages
             List<Message> messages = CreateTestMessages(5, 1);
 
-            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout:TimeSpan.FromSeconds(3));
+            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));
 
             // Now let's consume
             var result = (await consumer.GetMessages(5, offset)).ToList();
@@ -48,7 +49,7 @@ namespace kafka_tests.Integration
             CheckMessages(messages, result);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task GetMessagesSecondFromCache()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
@@ -65,7 +66,7 @@ namespace kafka_tests.Integration
             // Creating 5 messages
             List<Message> messages = CreateTestMessages(10, 1);
 
-            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));                       
+            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));
 
             // Now let's consume
             var result = (await consumer.GetMessages(5, offset)).ToList();
@@ -78,7 +79,7 @@ namespace kafka_tests.Integration
             CheckMessages(messages.Skip(5).ToList(), result);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task GetMessagesMakeTwoFetchRequests()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
@@ -108,7 +109,7 @@ namespace kafka_tests.Integration
             CheckMessages(messages.Skip(5).ToList(), result);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task GetMessagesNoNewMessagesInQueue()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
@@ -146,13 +147,13 @@ namespace kafka_tests.Integration
 
                 for (int j = 0; j < messageSize; j++)
                 {
-                    payload.Add(Convert.ToByte(i));    
+                    payload.Add(Convert.ToByte(i));
                 }
-                
+
                 messages.Add(new Message() { Value = payload.ToArray() });
             }
 
             return messages;
-        }                
+        }
     }
 }

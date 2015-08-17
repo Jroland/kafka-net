@@ -1,13 +1,13 @@
-﻿using System;
+﻿using kafka_tests.Helpers;
+using KafkaNet;
+using KafkaNet.Common;
+using KafkaNet.Protocol;
+using NUnit.Framework;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using KafkaNet;
-using KafkaNet.Common;
-using KafkaNet.Model;
-using NUnit.Framework;
-using KafkaNet.Protocol;
 
 namespace kafka_tests.Unit
 {
@@ -58,7 +58,7 @@ namespace kafka_tests.Unit
             };
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void RoundRobinShouldRollOver()
         {
             var selector = new DefaultPartitionSelector();
@@ -72,7 +72,7 @@ namespace kafka_tests.Unit
             Assert.That(third.PartitionId, Is.EqualTo(0));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void RoundRobinShouldHandleMultiThreadedRollOver()
         {
             var selector = new DefaultPartitionSelector();
@@ -84,7 +84,7 @@ namespace kafka_tests.Unit
             Assert.That(bag.Count(x => x.PartitionId == 1), Is.EqualTo(50));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void RoundRobinShouldTrackEachTopicSeparately()
         {
             var selector = new DefaultPartitionSelector();
@@ -101,7 +101,7 @@ namespace kafka_tests.Unit
             Assert.That(b2.PartitionId, Is.EqualTo(1));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void RoundRobinShouldEvenlyDistributeAcrossManyPartitions()
         {
             const int TotalPartitions = 100;
@@ -117,12 +117,11 @@ namespace kafka_tests.Unit
             Parallel.For(0, TotalPartitions * 3, x => bag.Add(selector.Select(topic, null)));
 
             var eachPartitionHasThree = bag.GroupBy(x => x.PartitionId).Count();
-                
+
             Assert.That(eachPartitionHasThree, Is.EqualTo(TotalPartitions), "Each partition should have received three selections.");
         }
 
-
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void KeyHashShouldSelectEachPartitionType()
         {
             var selector = new DefaultPartitionSelector();
@@ -136,15 +135,15 @@ namespace kafka_tests.Unit
 
         private byte[] CreateKeyForPartition(int partitionId)
         {
-            while(true)
+            while (true)
             {
                 var key = Guid.NewGuid().ToString().ToIntSizedBytes();
                 if ((Crc32Provider.Compute(key) % 2) == partitionId)
-                return key;
+                    return key;
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(InvalidPartitionException))]
         public void KeyHashShouldThrowExceptionWhenChoosesAPartitionIdThatDoesNotExist()
         {
@@ -157,11 +156,10 @@ namespace kafka_tests.Unit
                     Partitions = list
                 };
 
-
             selector.Select(topic, CreateKeyForPartition(1));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(ApplicationException))]
         public void SelectorShouldThrowExceptionWhenPartitionsAreEmpty()
         {
@@ -173,6 +171,5 @@ namespace kafka_tests.Unit
             };
             selector.Select(topic, CreateKeyForPartition(1));
         }
-
     }
 }

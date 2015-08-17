@@ -166,6 +166,7 @@ namespace KafkaNet
                             var route = _options.Router.SelectBrokerRouteFromLocalCache(topic, partitionId);
 
                             var taskSend = route.Connection.SendAsync(fetchRequest);
+
                             await Task.WhenAny(taskSend, _disposeTask.Task).ConfigureAwait(false);
                             if (_disposeTask.Task.IsCompleted) return;
 
@@ -180,7 +181,11 @@ namespace KafkaNet
 
                                     foreach (var message in response.Messages)
                                     {
-                                        _fetchResponseQueue.Add(message, _disposeToken.Token);
+
+                                        await Task.Run(() =>
+                                        {
+                                            _fetchResponseQueue.Add(message, _disposeToken.Token);//this is a block!!!
+                                        },_disposeToken.Token);
 
                                         if (_disposeToken.IsCancellationRequested) return;
                                     }

@@ -1,4 +1,5 @@
-﻿using KafkaNet;
+﻿using kafka_tests.Helpers;
+using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using Moq;
@@ -43,7 +44,7 @@ namespace kafka_tests.Unit
         [TestCase(ErrorResponseCode.LeaderNotAvailable)]
         [TestCase(ErrorResponseCode.ConsumerCoordinatorNotAvailableCode)]
         [TestCase(ErrorResponseCode.BrokerNotAvailable)]
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task ShouldTryToRefreshMataDataIfCanRecoverByRefreshMetadata(ErrorResponseCode code)
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
@@ -76,7 +77,7 @@ namespace kafka_tests.Unit
             Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.EqualTo(2));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task ShouldTryToRefreshMataDataIfSocketException()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
@@ -147,7 +148,7 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(KafkaApplicationException))]
         [TestCase(ErrorResponseCode.InvalidMessage)]
         [TestCase(ErrorResponseCode.InvalidMessageSize)]
@@ -186,7 +187,7 @@ namespace kafka_tests.Unit
             await protocolGateway.SendProtocolRequest(fetchRequest, BrokerRouterProxy.TestTopic, partitionId);
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task ShouldUpdateMetadataOnes()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
@@ -223,7 +224,7 @@ namespace kafka_tests.Unit
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(1));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task ShouldRecoverUpdateMetadataForNewTopic()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);
@@ -266,10 +267,10 @@ namespace kafka_tests.Unit
             Assert.That(routerProxy.BrokerConn0.MetadataRequestCallCount, Is.EqualTo(2));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task ShouldRecoverFromFailerByUpdateMetadataOnce()//Do not debug this test !!
         {
-            var log = new ConsoleLog();
+            var log = new DefaultTraceLog();
             var routerProxy = new BrokerRouterProxy(_kernel);
             routerProxy._cacheExpiration = TimeSpan.FromMilliseconds(1000);
             var router = routerProxy.Create();

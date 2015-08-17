@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using NUnit.Framework;
-using kafka_tests.Helpers;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Integration
 {
@@ -26,8 +26,8 @@ namespace kafka_tests.Integration
 
             _conn = new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), endpoint), options.ResponseTimeoutMs, options.Log);
         }
-        
-        [Test]
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureTwoRequestsCanCallOneAfterAnother()
         {
             var result1 = _conn.SendAsync(new MetadataRequest()).Result;
@@ -36,7 +36,7 @@ namespace kafka_tests.Integration
             Assert.That(result2.Count, Is.EqualTo(1));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureAsyncRequestResponsesCorrelate()
         {
             var result1 = _conn.SendAsync(new MetadataRequest());
@@ -48,7 +48,7 @@ namespace kafka_tests.Integration
             Assert.That(result3.Result.Count, Is.EqualTo(1));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureMultipleAsyncRequestsCanReadResponses()
         {
             var requests = new List<Task<List<MetadataResponse>>>();
@@ -65,7 +65,7 @@ namespace kafka_tests.Integration
             Assert.That(results.Count, Is.EqualTo(20));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureDifferentTypesOfResponsesCanBeReadAsync()
         {
             //just ensure the topic exists for this test
@@ -74,7 +74,6 @@ namespace kafka_tests.Integration
             Assert.That(ensureTopic.Count, Is.GreaterThan(0));
             Assert.That(ensureTopic.First().Topics.Count, Is.EqualTo(1));
             Assert.That(ensureTopic.First().Topics.First().Name == IntegrationConfig.IntegrationTopic, Is.True, "ProduceRequest did not return expected topic.");
-
 
             var result1 = _conn.SendAsync(RequestFactory.CreateProduceRequest(IntegrationConfig.IntegrationTopic, "test"));
             var result2 = _conn.SendAsync(new MetadataRequest());
@@ -92,7 +91,6 @@ namespace kafka_tests.Integration
 
             Assert.That(result4.Result.Count, Is.EqualTo(1));
             Assert.That(result4.Result.First().Topic == IntegrationConfig.IntegrationTopic, Is.True, "FetchRequest did not return expected topic.");
-
         }
     }
 }
