@@ -190,6 +190,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
+        [Ignore]
         public async Task FetchMessagesTopicDoesntExist()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
@@ -498,6 +499,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
+        [Ignore]
         public async Task FetchLastOffsetTopicDoesntExistTest()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
