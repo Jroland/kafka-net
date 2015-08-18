@@ -72,10 +72,10 @@ namespace KafkaNet
         {
             if (string.IsNullOrEmpty(consumerGroup)) throw new ArgumentNullException("consumerGroup");
 
-            OffsetFetchRequest offsetFetchrequest = CreateOffsetFetchRequest(consumerGroup);
+            OffsetFetchRequest offsetFetchRequest = CreateOffsetFetchRequest(consumerGroup);
 
             // TODO: Should also bring timeout?
-            var response = await _gateway.SendProtocolRequest(offsetFetchrequest, _topic, _partitionId);
+            var response = await _gateway.SendProtocolRequest(offsetFetchRequest, _topic, _partitionId);
             return response.Offset;
         }
 
