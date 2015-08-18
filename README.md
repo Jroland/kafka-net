@@ -18,10 +18,14 @@ Examples
 var options = new KafkaOptions(new Uri("http://SERVER1:9092"), new Uri("http://SERVER2:9092"));
 var router = new BrokerRouter(options);
 var client = new Producer(router);
-
-client.SendMessageAsync("TestHarness", new[] { new Message("hello world")}).Wait();
-
-using (client) { }
+try
+ {
+     await client.SendMessageAsync("TestTopic", new Message("hello world"));
+ }
+catch (Exception)
+ {
+    client.Dispose();
+ }
 ```
 ##### Consumer
 ```sh
@@ -54,6 +58,9 @@ Provides async methods on a persistent connection to a kafka broker (server).  T
 ##### BrokerRouter
 Provides metadata based routing of messages to the correct Kafka partition.  This class also manages the multiple KafkaConnections for each Kafka server returned by the broker section in the metadata response.  Routing logic is provided by the IPartitionSelector.
 
+##### ProtocolGateway
+Wrap BrokerRouter Hide from you the implementation and handles failure by refreshing the metadata.
+
 ##### IPartitionSelector
 Provides the logic for routing which partition the BrokerRouter should choose.  The default selector is the DefaultPartitionSelector which will use round robin partition selection if the key property on the message is null and a mod/hash of the key value if present.
 
@@ -67,7 +74,6 @@ Provides a higher level class which will consumer messages from a whitelist of p
 
 Status
 -----------
-[![Build status](https://ci.appveyor.com/api/projects/status/3tg02biqn5q8uijy)](https://ci.appveyor.com/project/Jroland/kafka-net)
 
 
 The current version of this project is a functioning "work in progress" as it was only started in early February.  The wire protocol is complete except for Offset Commits to the servers (as there is a bug in 0.8.0 which prevents testing of this feature).  The library is functioning in that there is a complete Producer and Consumer class thus messages can pass to and from a Kafka server.  

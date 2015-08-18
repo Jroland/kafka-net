@@ -136,6 +136,16 @@ namespace KafkaNet
                                 .ToList();
         }
 
+        public Task<List<ProduceResponse>> SendMessageAsync(string topic, int partition, params Message[] messages)
+        {
+            return SendMessageAsync(topic, messages, partition: partition);
+        }
+
+        public Task<List<ProduceResponse>> SendMessageAsync(string topic, params Message[] messages)
+        {
+            return SendMessageAsync(topic, messages,acks:1);
+        }
+
         /// <summary>
         /// Get the metadata about a given topic.
         /// </summary>
@@ -215,7 +225,7 @@ namespace KafkaNet
 
         }
 
-      
+
         private bool IsNotDisposedOrHasMessagesToProcess()
         {
             return _asyncCollection.IsCompleted == false || _asyncCollection.Count > 0;
