@@ -9,10 +9,10 @@ namespace KafkaNet.Interfaces
     {
         Task UpdateOrCreateOffset(string consumerGroup, long offset);
 
-        Task<long> GetLastOffset();
+        Task<long> FetchLastOffset();
 
-        Task<long> GetOffset(string consumerGroup);
+        Task<long> FetchOffset(string consumerGroup);
 
-        Task<IEnumerable<Message>> GetMessages(int maxCount, long offset);
+        Task<IEnumerable<Message>> FetchMessages(int maxCount, long offset);
     }
 }

@@ -15,26 +15,26 @@ namespace KafkaNet
         private readonly string _topic;
         private readonly int _partitionId;
         private readonly ProtocolGateway _gateway;
-        private int _maxBytesInOneMessageIncludingHeader;
+        private readonly int _maxSizeOfMessageSet;
         private readonly string _clientId;
         private List<Message> _lastMessages;
 
         private const int MaxWaitTimeForKafka = 0;
         private const int UseBrokerTimestamp = -1;
         private const int NoOffsetFound = -1;
-        private const double MessageSizeMultiplier = 1.5;
 
-        public ManualConsumer(int partitionId, string topic, ProtocolGateway gateway, string clientId)
+        public ManualConsumer(int partitionId, string topic, ProtocolGateway gateway, string clientId, int maxSizeOfMessageSet)
         {
             if (string.IsNullOrEmpty(topic)) throw new ArgumentNullException("topic");
             if (gateway == null) throw new ArgumentNullException("gateway");
+            if (maxSizeOfMessageSet <= 0) throw new ArgumentOutOfRangeException("maxSizeOfMessageSet", "argument must be larger than zero");
 
             _gateway = gateway;
             _partitionId = partitionId;
             _topic = topic;            
             _clientId = clientId;
 
-            _maxBytesInOneMessageIncludingHeader = FetchRequest.DefaultBufferSize;
+            _maxSizeOfMessageSet = maxSizeOfMessageSet;
         }
 
         /// <summary>
@@ -56,9 +56,9 @@ namespace KafkaNet
         /// Get the max offset of the partition in the topic.
         /// </summary>
         /// <returns>The max offset, if no such offset found then returns -1</returns>
-        public async Task<long> GetLastOffset()
+        public async Task<long> FetchLastOffset()
         {
-            var request = CreateGetLastOffsetRequest();
+            var request = CreateFetchLastOffsetRequest();
             var response = await _gateway.SendProtocolRequest(request, _topic, _partitionId);
             return response.Offsets.Count > 0 ? response.Offsets.First() : NoOffsetFound;
         }
@@ -68,13 +68,12 @@ namespace KafkaNet
         /// </summary>
         /// <param name="consumerGroup">The name of the consumer group</param>
         /// <returns>The current offset of the consumerGroup</returns>
-        public async Task<long> GetOffset(string consumerGroup)
+        public async Task<long> FetchOffset(string consumerGroup)
         {
             if (string.IsNullOrEmpty(consumerGroup)) throw new ArgumentNullException("consumerGroup");
 
             OffsetFetchRequest offsetFetchRequest = CreateOffsetFetchRequest(consumerGroup);
 
-            // TODO: Should also bring timeout?
             var response = await _gateway.SendProtocolRequest(offsetFetchRequest, _topic, _partitionId);
             return response.Offset;
         }
@@ -85,56 +84,49 @@ namespace KafkaNet
         /// <param name="maxCount">The maximum amount of messages wanted. The function will return at most the wanted number of messages</param>
         /// <param name="offset">The offset to start from</param>
         /// <returns>An enumerable of the messages</returns>
-        public async Task<IEnumerable<Message>> GetMessages(int maxCount, long offset)
+        public async Task<IEnumerable<Message>> FetchMessages(int maxCount, long offset)
         {
             if (offset < 0) throw new ArgumentOutOfRangeException("offset", "offset must be positive or zero");
-
-            try
-            {                 
-                // Checking if the last fetch task has the wanted batch of messages
-                if (_lastMessages != null)
-                {
-                    var startIndex = _lastMessages.FindIndex(m => m.Meta.Offset == offset);
-                    var containsAllMessage = startIndex != -1 && startIndex + maxCount <= _lastMessages.Count;
-                    if (containsAllMessage)
-                    {
-                        return _lastMessages.GetRange(startIndex, maxCount);
-                    }
-                }
-
-                // If we arrived here, then we need to make a new fetch request and work with it
-                FetchRequest request = CreateFetchRequest(offset);
-
-                var response = await _gateway.SendProtocolRequest(request, _topic, _partitionId);
-
-                if (response.Messages.Count == 0)
-                {
-                    return response.Messages;
-                }
-
-                // Saving the last consumed offset and Returning the wanted amount                
-                _lastMessages = response.Messages;
-                var messagesToReturn = response.Messages.Take(maxCount);
-
-                return messagesToReturn;
-            }
-            catch (BufferUnderRunException ex)
+              
+            // Checking if the last fetch task has the wanted batch of messages
+            if (_lastMessages != null)
             {
-                _maxBytesInOneMessageIncludingHeader = (int)((ex.RequiredBufferSize + ex.MessageHeaderSize) * MessageSizeMultiplier);
-                return null;
-            }         
+                var startIndex = _lastMessages.FindIndex(m => m.Meta.Offset == offset);
+                var containsAllMessage = startIndex != -1 && startIndex + maxCount <= _lastMessages.Count;
+                if (containsAllMessage)
+                {
+                    return _lastMessages.GetRange(startIndex, maxCount);
+                }
+            }
+
+            // If we arrived here, then we need to make a new fetch request and work with it
+            FetchRequest request = CreateFetchRequest(offset);
+
+            var response = await _gateway.SendProtocolRequest(request, _topic, _partitionId);
+
+            if (response.Messages.Count == 0)
+            {
+                _lastMessages = null;
+                return response.Messages;                    
+            }
+
+            // Saving the last consumed offset and Returning the wanted amount                
+            _lastMessages = response.Messages;
+            var messagesToReturn = response.Messages.Take(maxCount);
+
+            return messagesToReturn;            
         }
 
         private FetchRequest CreateFetchRequest(long offset)
         {
-            Fetch fetch = new Fetch() { Offset = offset, PartitionId = _partitionId, Topic = _topic,MaxBytes = _maxBytesInOneMessageIncludingHeader};
+            Fetch fetch = new Fetch() { Offset = offset, PartitionId = _partitionId, Topic = _topic,MaxBytes = _maxSizeOfMessageSet};
 
             FetchRequest request = new FetchRequest()
             {
                 MaxWaitTime = MaxWaitTimeForKafka,
                 MinBytes = 0,
                 Fetches = new List<Fetch>() { fetch },
-                ClientId = _clientId
+                ClientId = _clientId                
             };
 
             return request;
@@ -173,7 +165,7 @@ namespace KafkaNet
             return request;
         }
 
-        private OffsetRequest CreateGetLastOffsetRequest()
+        private OffsetRequest CreateFetchLastOffsetRequest()
         {
             Offset offset = new Offset() {PartitionId = _partitionId, Topic = _topic, MaxOffsets = 1};
 
