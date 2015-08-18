@@ -32,7 +32,8 @@ namespace KafkaNet
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        /// <exception cref="SocketException">Thrown if none of the Default Brokers can be contacted.</exception>
+        /// <exception cref="ResponseTimeoutException">Thrown if none of the Default Brokers can be contacted.</exception>
+        ///     /// <exception cref="SocketException">Thrown if none of the Default Brokers can be contacted.</exception>
         /// <exception cref="KafkaApplicationException">Thrown if none of the Default Brokers can be contacted.</exception>
         public async Task<T> SendProtocolRequest<T>(IKafkaRequest<T> request, string topic, int partition) where T : class,IBaseResponse
         {
@@ -44,7 +45,7 @@ namespace KafkaNet
             while (retryTime < _maxRetry)
             {
                 bool needToRefreshTopicMetadata;
-                ExceptionDispatchInfo socketException = null;
+                ExceptionDispatchInfo exception = null;
                 try
                 {
                     await _brokerRouter.RefreshMissingTopicMetadata(topic);
@@ -58,16 +59,24 @@ namespace KafkaNet
                         return null; /*this can happened if you send ProduceRequest with ack level=0 */
                     }
 
-                    var error = (ErrorResponseCode)response.Error;
-                    if (error == ErrorResponseCode.NoError) { return response; }
+                    var error = (ErrorResponseCode) response.Error;
+                    if (error == ErrorResponseCode.NoError)
+                    {
+                        return response;
+                    }
 
                     //It means we had an error 
                     needToRefreshTopicMetadata = CanRecoverByRefreshMetadata(error);
 
                 }
+                catch (ResponseTimeoutException ex)
+                {
+                    exception = ExceptionDispatchInfo.Capture(ex);
+                    needToRefreshTopicMetadata = true;
+                }
                 catch (SocketException ex)
                 {
-                    socketException = ExceptionDispatchInfo.Capture(ex);
+                    exception = ExceptionDispatchInfo.Capture(ex);
                     needToRefreshTopicMetadata = true;
                 }
                 bool hasMoreRetry = retryTime + 1 < _maxRetry;
@@ -75,11 +84,11 @@ namespace KafkaNet
                 {
                     //Log Retry Sesion id
                     retryTime++;
-                    await TryRefreshTopicMetadata(topic, topicMetadataRefreshDate, socketException, response);
+                    await TryRefreshTopicMetadata(topic, topicMetadataRefreshDate, exception, response);
                 }
                 else
                 {
-                    throwError(socketException, response);
+                    throwError(exception, response);
                 }
 
             }
@@ -110,11 +119,11 @@ namespace KafkaNet
             }
         }
 
-        private static void throwError(ExceptionDispatchInfo socketException, IBaseResponse response)
+        private static void throwError(ExceptionDispatchInfo exception, IBaseResponse response)
         {
-            if (socketException != null)
+            if (exception != null)
             {
-                socketException.Throw();
+                exception.Throw();
             }
             throw new KafkaApplicationException("FetchResponse returned error condition.  ErrorCode:{0}", response.Error)
             {
