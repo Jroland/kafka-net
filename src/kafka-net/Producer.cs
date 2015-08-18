@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
@@ -60,6 +61,7 @@ namespace KafkaNet
         /// </summary>
         public IBrokerRouter BrokerRouter { get; private set; }
 
+        private readonly ProtocolGateway _protocolGateway;
         /// <summary>
         /// Construct a Producer class.
         /// </summary>
@@ -82,6 +84,7 @@ namespace KafkaNet
         public Producer(IBrokerRouter brokerRouter, int maximumAsyncRequests = MaximumAsyncRequests, int maximumMessageBuffer = MaximumMessageBuffer)
         {
             BrokerRouter = brokerRouter;
+            _protocolGateway = new ProtocolGateway(BrokerRouter);
             _maximumAsyncRequests = maximumAsyncRequests;
             _metadataQueries = new MetadataQueries(BrokerRouter);
             _asyncCollection = new AsyncCollection<TopicMessage>();
@@ -197,16 +200,7 @@ namespace KafkaNet
                         batch.AddRange(_asyncCollection.Drain());
                     }
 
-
-                    var sendTask = ProduceAndSendBatchAsync(batch, _stopToken.Token);
-                    try
-                    {
-                        await sendTask;//if not await the order is not going to be guaranteed
-                    }
-                    catch (Exception ex)
-                    {
-                        batch.ForEach(x => x.Tcs.TrySetException(ex));
-                    }
+                    await ProduceAndSendBatchAsync(batch, _stopToken.Token);
                 }
                 catch (Exception ex)
                 {
@@ -221,6 +215,7 @@ namespace KafkaNet
 
         }
 
+      
         private bool IsNotDisposedOrHasMessagesToProcess()
         {
             return _asyncCollection.IsCompleted == false || _asyncCollection.Count > 0;
@@ -262,7 +257,7 @@ namespace KafkaNet
 
                     await _semaphoreMaximumAsync.WaitAsync(cancellationToken).ConfigureAwait(false);
 
-                    var sendGroupTask = group.Key.Route.Connection.SendAsync(request);
+                    var sendGroupTask = _protocolGateway.SendProtocolRequest(request, group.Key.Topic, group.Key.Route.PartitionId);// group.Key.Route.Connection.SendAsync(request);
                     var brokerSendTask = new BrokerRouteSendBatch
                     {
                         Route = group.Key.Route,
@@ -283,7 +278,7 @@ namespace KafkaNet
                     foreach (var task in sendTasks)
                     {
                         //TODO when we dont ask for an ACK, result is an empty list.  Which FirstOrDefault returns null.  Dont like this...
-                        task.MessagesSent.ForEach(x => x.Tcs.TrySetResult(task.Task.Result.FirstOrDefault()));
+                        task.MessagesSent.ForEach(async x => x.Tcs.TrySetResult(await task.Task));
                     }
                 }
                 catch
@@ -342,7 +337,7 @@ namespace KafkaNet
     class BrokerRouteSendBatch
     {
         public BrokerRoute Route { get; set; }
-        public Task<List<ProduceResponse>> Task { get; set; }
+        public Task<ProduceResponse> Task { get; set; }
         public List<TopicMessage> MessagesSent { get; set; }
     }
 }
