@@ -3,10 +3,10 @@
   <metadata>
     <id>kafka-net</id>
     <version>$version$</version>
-    <authors>James Roland</authors>
-    <owners>James Roland</owners>
-    <licenseUrl>https://github.com/Jroland/kafka-net/blob/master/LICENSE</licenseUrl>
-    <projectUrl>https://github.com/Jroland/kafka-net</projectUrl>
+    <authors>gigya</authors>
+    <owners>gigya</owners>
+    <licenseUrl>https://github.com/gigya/kafka-net/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/gigya/kafka-net</projectUrl>
     <iconUrl>http://kafka.apache.org/images/kafka_logo.png</iconUrl>
     <title>kafka-net</title>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -14,7 +14,7 @@
     <summary>Native C# client for Apache Kafka.</summary>
     <copyright>Copyright James Roland 2014</copyright>
     <tags>C# Apache Kafka</tags>
-    <releaseNotes>https://github.com/Jroland/kafka-net/releases</releaseNotes>
+    <releaseNotes>https://github.com/gigya/kafka-net/releases</releaseNotes>
   </metadata>
   <files>
     <file src="bin\*" target="lib\net45" />
