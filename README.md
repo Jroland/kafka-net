@@ -73,7 +73,7 @@ Provides async methods on a persistent connection to a kafka broker (server).  T
 Provides metadata based routing of messages to the correct Kafka partition.  This class also manages the multiple KafkaConnections for each Kafka server returned by the broker section in the metadata response.  Routing logic is provided by the IPartitionSelector.
 
 ##### ProtocolGateway
-Wrap BrokerRouter Hide from you the implementation and handles failure by refreshing the metadata.
+A convenience class that allows sending Kafka protocol messages easily, including error handling and metadata refresh on failure.
 
 ##### IPartitionSelector
 Provides the logic for routing which partition the BrokerRouter should choose.  The default selector is the DefaultPartitionSelector which will use round robin partition selection if the key property on the message is null and a mod/hash of the key value if present.
