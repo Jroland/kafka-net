@@ -153,7 +153,7 @@ namespace KafkaNet
                         setDisposeExceptonToPenndingTask();
                         return;
                     }
-                    var netStream = await netStreamTask; //all reday done
+                    var netStream = await netStreamTask; //already done
                     await ProcessNetworkstreamTasks(netStream).ConfigureAwait(false);
                 }
                 catch (Exception ex)

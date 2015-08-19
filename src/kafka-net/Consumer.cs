@@ -167,7 +167,7 @@ namespace KafkaNet
                             await Task.WhenAny(taskSend, _disposeTask.Task).ConfigureAwait(false);
                             if (_disposeTask.Task.IsCompleted) return;
 
-                            var responses = await taskSend; //all ready done
+                            var responses = await taskSend; //already done
                             if (responses.Count > 0)
                             {
                                 var response = responses.FirstOrDefault(); //we only asked for one response
