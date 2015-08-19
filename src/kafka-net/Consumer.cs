@@ -128,9 +128,9 @@ namespace KafkaNet
                         {
                             await _options.Router.RefreshTopicMetadata(topic);
                             EnsurePartitionPollingThreads();
+                            refreshMetaData = false;
                         }
 
-                        refreshMetaData = false;
                         try
                         {
                             //get the current offset, or default to zero if not there.

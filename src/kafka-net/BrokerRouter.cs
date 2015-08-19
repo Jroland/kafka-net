@@ -147,13 +147,14 @@ namespace KafkaNet
                 }
 
                 _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
+              
                 //get the connections to query against and get metadata
                 var connections = _defaultConnectionIndex.Values.Union(_brokerConnectionIndex.Values).ToArray();
                 var taskMetadata = _kafkaMetadataProvider.Get(connections, topics);
                 await Task.WhenAny(Task.Delay(timeout), taskMetadata);
                 if (!taskMetadata.IsCompleted)
                 {
-                    var ex = new Exception("_kafkaMetadataProvider.Get not get in time");
+                    var ex = new Exception("Metadata refresh operation timed out");
 
                     throw ex;
                 }
