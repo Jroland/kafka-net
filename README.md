@@ -10,19 +10,27 @@ Copyright 2014, James Roland under Apache License, V2.0. See LICENSE file.
 Summary
 -----------
 
-This library is a fork of Jroland's kafka-net library, with adjustments and improvements.
+This library is a fork of [Jroland's kafka-net library](https://github.com/Jroland/kafka-net), with adjustments and improvements.
 The original project is a .NET implementation of the [Apache Kafka] protocol.  The wire protocol portion is based on the [kafka-python] library writen by [David Arthur] and the general class layout attempts to follow a similar pattern as his project.  To that end, this project builds up from the low level KafkaConnection object for handling async requests to/from the kafka server, all the way up to a higher level Producer/Consumer classes.
 
-##### Improvements and changes:
+##### Improvements and Changes:
 
 - All the code is now async all the way and all blocking operations were removed (except for the high-level Consumer class).
+
+- Bug fixes
+    * When sending messages to the same partition with the same Ack level, order is guaranteed.    
+
+- Tests
+    * Add data-load tests.
+    * Change existing tests to be more consistent.
+
 - BrokerRouter:
-
-    * Has changed and  now has a new interface.
-    * Added an expiration token to ensure that we don't refresh metadata too much.
-- ProtocolGateway handles failure by refreshing the metadata.
-- Producer uses ProtocolGateway in order to send messages (In order to be able to recover from failure).
-
+    * We made a major change to this class because a lot of async code is using it and the original code was using blocking operations and locks which caused misleading signatures. (was not async all-the-way)
+    * Has changed and now has a new interface.
+    * Added an expiration token to ensure that we don't refresh metadata too much. RefreshMetadata is a heavy operation which uses async lock and we wanted to call it less.
+- ProtocolGateway
+    * Added a new `ProtocolGateway` class to allow simple handling of Kafka protocol messages with error recovery and metadata refreshes.
+    * High-level Producer now uses ProtocolGateway when sending messages to Kafka (for better error recovery).
 
 
 
@@ -87,7 +95,8 @@ Provides a higher level class which uses the combination of the BrokerRouter and
 ##### Consumer
 Provides a higher level class which will consumer messages from a whitelist of partitions from a single topic.  The consumption mechanism is a blocking IEnumerable of messages.  If no whitelist is provided then all partitions will be consumed creating one KafkaConnection for each partition leader.
 
-
+#### ManualConsumer
+A class which enables simple manual consuming of messages which encapsulates the Kafka protocol details and enables message fetching, offset fetching, and offset updating. All of this operations are on demand.
 
 Status
 -----------
