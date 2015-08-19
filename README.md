@@ -11,6 +11,20 @@ Summary
 -----------
 This project is a .NET implementation of the [Apache Kafka] protocol.  The wire protocol portion is based on the [kafka-python] library writen by [David Arthur] and the general class layout attempts to follow a similar pattern as his project.  To that end, this project builds up from the low level KafkaConnection object for handling async requests to/from the kafka server, all the way up to a higher level Producer/Consumer classes.
 
+##### The major items that change:
+
+- All the code except the consumer class uses Async and all blocking operations were deleted.
+- BrokerRouter:
+    * Has changed and  now has a new interface.
+    * Added an expiration token to ensure that we don't refresh metadata too much.
+- ProtocolGateway handles failure by refreshing the metadata.
+- Producer uses ProtocolGateway in order to send messages (In order to be able to recover from failure).
+
+
+
+
+
+
 Examples
 -----------
 ##### Producer
