@@ -3,16 +3,16 @@
   <metadata>
     <id>KafkaClient</id>
     <version>$version$</version>
-    <authors>gigya</authors>
-    <owners>gigya</owners>
+    <authors>Gigya</authors>
+    <owners>Gigya</owners>
     <licenseUrl>https://github.com/gigya/kafka-net/blob/master/LICENSE</licenseUrl>
     <projectUrl>https://github.com/gigya/kafka-net</projectUrl>
     <iconUrl>http://kafka.apache.org/images/kafka_logo.png</iconUrl>
-    <title>kafka-net</title>
+    <title>KafkaClient</title>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>Provides high and low level classes for communicating with an Apache Kafka cluster.  The code is similar to the kafka-python library, but written entirely in C#.</description>
+    <description>Provides high and low level classes for communicating with an Apache Kafka cluster. A fork of kafka-net by Jroland, with improvements and adjustments (see project site).</description>
     <summary>Native C# client for Apache Kafka.</summary>
-    <copyright>Copyright James Roland 2014</copyright>
+    <copyright>Copyright Gigya 2015</copyright>
     <tags>C# Apache Kafka</tags>
     <releaseNotes>https://github.com/gigya/kafka-net/releases</releaseNotes>
   </metadata>
