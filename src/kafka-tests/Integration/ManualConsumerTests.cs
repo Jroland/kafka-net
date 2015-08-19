@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
@@ -13,17 +14,18 @@ namespace kafka_tests.Integration
     [Category("Integration")]
     public class ManualConsumerTests
     {
-        private const string KafkaUrl = "http://192.168.10.27:9092";
         private readonly KafkaOptions _options;
         private readonly Uri _kafkaUri;
         private const int DefaultMaxMessageSetSize = 4096*8;
-        private string _topic = "ManualConsumerTestTopic";
-        private string _defaultConsumerGroup = "ManualConsumerTestsConsumerGroup";
+        private readonly string _topic;
+        private readonly string _defaultConsumerGroup;
 
         public ManualConsumerTests()
         {
-            _kafkaUri = new Uri(KafkaUrl);
-            _options = new KafkaOptions(_kafkaUri);
+            _kafkaUri = IntegrationConfig.IntegrationUri;
+            _topic = IntegrationConfig.IntegrationTopic;
+            _defaultConsumerGroup = IntegrationConfig.IntegrationConsumer;
+            _options = new KafkaOptions(IntegrationConfig.IntegrationUri);
         }
 
         [Test]
