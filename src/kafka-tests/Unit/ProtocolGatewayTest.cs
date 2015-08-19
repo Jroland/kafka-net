@@ -15,7 +15,7 @@ namespace kafka_tests.Unit
 {
     [TestFixture]
     [Category("unit")]
-    public class FakeProtocolGatewayTest
+    public class ProtocolGatewayTest
     {
         private MoqMockingKernel _kernel;
         private Mock<IKafkaConnection> _mockKafkaConnection1;
