@@ -12,9 +12,7 @@ namespace KafkaNet.Model
         private const int DefaultRefreshMetadataTimeout = 200000;
 
         /// <summary>
-        /// refresh metadata Request get to server for all topic that there Cache Expire.
-        /// CacheExpiration is max time for topic to be valid after this time the Cache Expire for topic,
-        /// and be refresh on next refresh metadata Request.
+        /// Refresh metadata Request will try to refresh only the topics that were expired in the cache.
         /// </summary>
 
         public TimeSpan CacheExpiration { get; set; }

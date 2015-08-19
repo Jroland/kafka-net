@@ -55,7 +55,7 @@ namespace KafkaNet
         /// This function does not use any selector criteria.  If the given partitionId does not exist an exception will be thrown.
         /// </remarks>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
-        /// <exception cref="InvalidTopicNotExistsInCache">the Metadata is not exist in Cache.</exception>
+        /// <exception cref="InvalidTopicNotExistsInCache">Thrown if the topic metadata does not exist in the cache.</exception>
 
         public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, int partitionId)
         {
@@ -81,7 +81,7 @@ namespace KafkaNet
         /// <param name="topic">The topic to retreive a broker route for.</param>
         /// <param name="key">The key used by the IPartitionSelector to collate to a consistent partition. Null value means key will be ignored in selection process.</param>
         /// <returns>A broker route for the given topic.</returns>
-        /// <exception cref="InvalidTopicNotExistsInCache">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
+        /// <exception cref="InvalidTopicNotExistsInCache">Thrown if the topic metadata does not exist in the cache.</exception>
         public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, byte[] key = null)
         {
             //get topic either from cache or server.
@@ -104,7 +104,7 @@ namespace KafkaNet
         /// The topic metadata will by default check the cache first and then if it does not exist it will then
         /// request metadata from the server.  To force querying the metadata from the server use <see cref="RefreshTopicMetadata"/>
         /// </remarks>
-        /// <exception cref="InvalidTopicNotExistsInCache">Condition: not exists in Cache</exception>
+        /// <exception cref="InvalidTopicNotExistsInCache">Thrown if the topic metadata does not exist in the cache.</exception>
         public List<Topic> GetTopicMetadataFromLocalCache(params string[] topics)
         {
             var topicSearchResult = SearchCacheForTopics(topics, null);
@@ -132,10 +132,8 @@ namespace KafkaNet
         }
 
         /// <summary>
-        /// refresh metadata Request get to server for all topic that there Cache Expire.
-        /// CacheExpiration is max time for topic to be valid after this time the Cache Expire for topic,
-        /// and be refresh on next refresh metadata Request.
-        /// if cacheExpiration is null: refresh metadata Request get to server for all topic that dose not exists on Cache.
+        /// Refresh metadata Request will try to refresh only the topics that were expired in the cache.
+        /// If cacheExpiration is null: refresh metadata Request will try to refresh only topics that are not in the cache.
         /// </summary>
         private async Task<bool> RefreshTopicMetadata(TimeSpan? cacheExpiration, TimeSpan timeout, params string[] topics)
         {
