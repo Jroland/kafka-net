@@ -100,9 +100,9 @@ A class which enables simple manual consuming of messages which encapsulates the
 
 Status
 -----------
+Tested with Kafka 0.8.2.
+It is a work in progress and was still not deployed to production. We will update when it does.
 
-
-The current version of this project is a functioning "work in progress" as it was only started in early February.  The wire protocol is complete except for Offset Commits to the servers (as there is a bug in 0.8.0 which prevents testing of this feature).  The library is functioning in that there is a complete Producer and Consumer class thus messages can pass to and from a Kafka server.  
 
 ##### The major items that needs work are:
 * Better handling of options for providing customization of internal behaviour of the base API. (right now the classes pass around option parameters)
@@ -111,11 +111,6 @@ The current version of this project is a functioning "work in progress" as it wa
 * Currently only works with .NET Framework 4.5 as it uses the await command.
 * Test coverage.
 * Documentation.
-
-Comment
-----------
-This is a pet project for me and is not currently backed by a need for a Kafka server client.  Which means the client is only currently being tested against a small set of Kafka test servers and not against any server that has any real data load.  
-
 
 
 
