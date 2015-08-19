@@ -1,9 +1,9 @@
-﻿using System;
+﻿using KafkaNet.Interfaces;
+using KafkaNet.Protocol;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using KafkaNet.Interfaces;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
@@ -31,7 +31,7 @@ namespace KafkaNet
 
             _gateway = gateway;
             _partitionId = partitionId;
-            _topic = topic;            
+            _topic = topic;
             _clientId = clientId;
 
             _maxSizeOfMessageSet = maxSizeOfMessageSet;
@@ -49,7 +49,7 @@ namespace KafkaNet
             if (offset < 0) throw new ArgumentOutOfRangeException("offset", "offset must be positive or zero");
 
             OffsetCommitRequest request = CreateOffsetCommitRequest(offset, consumerGroup);
-            await _gateway.SendProtocolRequest(request, _topic, _partitionId);                                
+            await _gateway.SendProtocolRequest(request, _topic, _partitionId);
         }
 
         /// <summary>
@@ -87,7 +87,7 @@ namespace KafkaNet
         public async Task<IEnumerable<Message>> FetchMessages(int maxCount, long offset)
         {
             if (offset < 0) throw new ArgumentOutOfRangeException("offset", "offset must be positive or zero");
-              
+
             // Checking if the last fetch task has the wanted batch of messages
             if (_lastMessages != null)
             {
@@ -107,26 +107,26 @@ namespace KafkaNet
             if (response.Messages.Count == 0)
             {
                 _lastMessages = null;
-                return response.Messages;                    
+                return response.Messages;
             }
 
-            // Saving the last consumed offset and Returning the wanted amount                
+            // Saving the last consumed offset and Returning the wanted amount
             _lastMessages = response.Messages;
             var messagesToReturn = response.Messages.Take(maxCount);
 
-            return messagesToReturn;            
+            return messagesToReturn;
         }
 
         private FetchRequest CreateFetchRequest(long offset)
         {
-            Fetch fetch = new Fetch() { Offset = offset, PartitionId = _partitionId, Topic = _topic,MaxBytes = _maxSizeOfMessageSet};
+            Fetch fetch = new Fetch() { Offset = offset, PartitionId = _partitionId, Topic = _topic, MaxBytes = _maxSizeOfMessageSet };
 
             FetchRequest request = new FetchRequest()
             {
                 MaxWaitTime = MaxWaitTimeForKafka,
                 MinBytes = 0,
                 Fetches = new List<Fetch>() { fetch },
-                ClientId = _clientId                
+                ClientId = _clientId
             };
 
             return request;
@@ -134,15 +134,15 @@ namespace KafkaNet
 
         private OffsetFetchRequest CreateOffsetFetchRequest(string consumerGroup)
         {
-            OffsetFetch topicFetch = new OffsetFetch() {PartitionId = _partitionId, Topic = _topic};
+            OffsetFetch topicFetch = new OffsetFetch() { PartitionId = _partitionId, Topic = _topic };
             OffsetFetchRequest request = new OffsetFetchRequest()
             {
                 ConsumerGroup = consumerGroup,
-                Topics = new List<OffsetFetch>() {topicFetch},
+                Topics = new List<OffsetFetch>() { topicFetch },
                 ClientId = _clientId
             };
 
-            return request;            
+            return request;
         }
 
         private OffsetCommitRequest CreateOffsetCommitRequest(long offset, string consumerGroup)
@@ -157,8 +157,8 @@ namespace KafkaNet
 
             OffsetCommitRequest request = new OffsetCommitRequest()
             {
-                ConsumerGroup = consumerGroup, 
-                OffsetCommits = new List<OffsetCommit>(){commit}, 
+                ConsumerGroup = consumerGroup,
+                OffsetCommits = new List<OffsetCommit>() { commit },
                 ClientId = _clientId
             };
 
@@ -167,10 +167,10 @@ namespace KafkaNet
 
         private OffsetRequest CreateFetchLastOffsetRequest()
         {
-            Offset offset = new Offset() {PartitionId = _partitionId, Topic = _topic, MaxOffsets = 1};
+            Offset offset = new Offset() { PartitionId = _partitionId, Topic = _topic, MaxOffsets = 1 };
 
-            OffsetRequest request = new OffsetRequest() {Offsets = new List<Offset>() {offset}, ClientId = _clientId};
-            return request;            
+            OffsetRequest request = new OffsetRequest() { Offsets = new List<Offset>() { offset }, ClientId = _clientId };
+            return request;
         }
     }
 }

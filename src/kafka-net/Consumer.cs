@@ -1,17 +1,17 @@
-﻿using System;
+﻿using KafkaNet.Model;
+using KafkaNet.Protocol;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
     /// <summary>
     /// Provides a basic consumer of one Topic across all partitions or over a given whitelist of partitions.
-    /// 
+    ///
     /// TODO: provide automatic offset saving when the feature is available in 0.8.2
     /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
     /// </summary>
@@ -154,7 +154,7 @@ namespace KafkaNet
 
                             var fetchRequest = new FetchRequest
                             {
-                                MaxWaitTime =(int)Math.Min(int.MaxValue,_options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
+                                MaxWaitTime = (int)Math.Min(int.MaxValue, _options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
                                 MinBytes = _options.MinimumBytes,
                                 Fetches = fetches
                             };
@@ -178,11 +178,10 @@ namespace KafkaNet
 
                                     foreach (var message in response.Messages)
                                     {
-
                                         await Task.Run(() =>
                                         {
                                             _fetchResponseQueue.Add(message, _disposeToken.Token);//this is a block!!!
-                                        },_disposeToken.Token);
+                                        }, _disposeToken.Token);
 
                                         if (_disposeToken.IsCancellationRequested) return;
                                     }
@@ -216,7 +215,6 @@ namespace KafkaNet
                             //refresh our metadata and ensure we are polling the correct partitions
                             refreshMetaData = true;
                             _options.Log.ErrorFormat(ex.Message);
-
                         }
                         catch (TaskCanceledException ex)
                         {
@@ -226,7 +224,6 @@ namespace KafkaNet
                         {
                             _options.Log.ErrorFormat("Exception occured while polling topic:{0} partition:{1}.  Polling will continue.  Exception={2}", topic, partitionId, ex);
                         }
-
                     }
                 }
                 finally
@@ -244,6 +241,7 @@ namespace KafkaNet
             {
                 case ErrorResponseCode.NoError:
                     return;
+
                 case ErrorResponseCode.OffsetOutOfRange:
                     throw new OffsetOutOfRangeException("FetchResponse indicated we requested an offset that is out of range.  Requested Offset:{0}", request.Offset) { FetchRequest = request };
                 case ErrorResponseCode.BrokerNotAvailable:

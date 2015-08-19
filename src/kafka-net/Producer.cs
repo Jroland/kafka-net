@@ -1,12 +1,10 @@
-﻿using System;
+﻿using KafkaNet.Common;
+using KafkaNet.Protocol;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Common;
-using KafkaNet.Protocol;
-
 
 namespace KafkaNet
 {
@@ -32,7 +30,7 @@ namespace KafkaNet
         private int _inFlightMessageCount = 0;
 
         /// <summary>
-        /// Get the number of messages sitting in the buffer waiting to be sent. 
+        /// Get the number of messages sitting in the buffer waiting to be sent.
         /// </summary>
         public int BufferCount { get { return _asyncCollection.Count; } }
 
@@ -62,6 +60,7 @@ namespace KafkaNet
         public IBrokerRouter BrokerRouter { get; private set; }
 
         private readonly ProtocolGateway _protocolGateway;
+
         /// <summary>
         /// Construct a Producer class.
         /// </summary>
@@ -70,14 +69,14 @@ namespace KafkaNet
         /// <param name="maximumMessageBuffer">The maximum amount of messages to buffer if the async calls are blocking from sending.</param>
         /// <remarks>
         /// The maximumAsyncRequests parameter provides a mechanism for minimizing the amount of async requests in flight at any one time
-        /// by blocking the caller requesting the async call.  This affectively puts an upper limit on the amount of times a caller can 
+        /// by blocking the caller requesting the async call.  This affectively puts an upper limit on the amount of times a caller can
         /// call SendMessageAsync before the caller is blocked.
-        /// 
+        ///
         /// The MaximumMessageBuffer parameter provides a way to limit the max amount of memory the driver uses should the send pipeline get
-        /// overwhelmed and the buffer starts to fill up.  This is an inaccurate limiting memory use as the amount of memory actually used is 
+        /// overwhelmed and the buffer starts to fill up.  This is an inaccurate limiting memory use as the amount of memory actually used is
         /// dependant on the general message size being buffered.
-        /// 
-        /// A message will start its timeout countdown as soon as it is added to the producer async queue.  If there are a large number of 
+        ///
+        /// A message will start its timeout countdown as soon as it is added to the producer async queue.  If there are a large number of
         /// messages sitting in the async queue then a message may spend its entire timeout cycle waiting in this queue and never getting
         /// attempted to send to Kafka before a timeout exception is thrown.
         /// </remarks>
@@ -98,7 +97,6 @@ namespace KafkaNet
                 await BatchSendAsync().ConfigureAwait(false);
                 //TODO add log for ending the sending thread.
             });
-
         }
 
         /// <summary>
@@ -143,7 +141,7 @@ namespace KafkaNet
 
         public Task<List<ProduceResponse>> SendMessageAsync(string topic, params Message[] messages)
         {
-            return SendMessageAsync(topic, messages,acks:1);
+            return SendMessageAsync(topic, messages, acks: 1);
         }
 
         /// <summary>
@@ -155,7 +153,6 @@ namespace KafkaNet
         {
             return _metadataQueries.GetTopicFromCache(topic);
         }
-
 
         public Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
         {
@@ -183,8 +180,6 @@ namespace KafkaNet
 
         private async Task BatchSendAsync()
         {
-
-
             while (IsNotDisposedOrHasMessagesToProcess())
             {
                 List<TopicMessage> batch = null;
@@ -219,12 +214,8 @@ namespace KafkaNet
                         batch.ForEach(x => x.Tcs.TrySetException(ex));
                     }
                 }
-
-
             }
-
         }
-
 
         private bool IsNotDisposedOrHasMessagesToProcess()
         {
@@ -314,6 +305,7 @@ namespace KafkaNet
         }
 
         #region Dispose...
+
         public void Dispose()
         {
             //Clients really should call Stop() first, but just in case they didn't...
@@ -325,10 +317,11 @@ namespace KafkaNet
             {
             }
         }
-        #endregion
+
+        #endregion Dispose...
     }
 
-    class TopicMessage
+    internal class TopicMessage
     {
         public TaskCompletionSource<ProduceResponse> Tcs { get; set; }
         public short Acks { get; set; }
@@ -344,7 +337,7 @@ namespace KafkaNet
         }
     }
 
-    class BrokerRouteSendBatch
+    internal class BrokerRouteSendBatch
     {
         public BrokerRoute Route { get; set; }
         public Task<ProduceResponse> Task { get; set; }

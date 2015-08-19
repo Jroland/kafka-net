@@ -1,23 +1,22 @@
-﻿using System;
+﻿using KafkaNet.Protocol;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
     /// <summary>
     /// This provider blocks while it attempts to get the MetaData configuration of the Kafka servers.  If any retry errors occurs it will
-    /// continue to block the downstream call and then repeatedly query kafka until the retry errors subside.  This repeat call happens in 
+    /// continue to block the downstream call and then repeatedly query kafka until the retry errors subside.  This repeat call happens in
     /// a backoff manner, which each subsequent call waiting longer before a requery.
-    /// 
+    ///
     /// Error Codes:
     /// LeaderNotAvailable = 5
     /// NotLeaderForPartition = 6
     /// ConsumerCoordinatorNotAvailableCode = 15
     /// BrokerId = -1
-    /// 
+    ///
     /// Documentation:
     /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataResponse
     /// </summary>
@@ -63,13 +62,13 @@ namespace KafkaNet
                             performRetry = true;
                             _log.WarnFormat(validation.Message);
                             break;
+
                         case ValidationResult.Error:
                             throw validation.Exception;
                     }
                 }
 
                 await BackoffOnRetry(++retryAttempt, performRetry);
-
             } while (_interrupted == false && performRetry);
 
             return metadataResponse;
@@ -92,7 +91,6 @@ namespace KafkaNet
             {
                 try
                 {
-
                     var response = await conn.SendAsync(request);
                     if (response != null && response.Count > 0)
                     {
@@ -197,6 +195,7 @@ namespace KafkaNet
     }
 
     public enum ValidationResult { Valid, Error, Retry }
+
     public class MetadataValidationResult
     {
         public ValidationResult Status { get; set; }

@@ -1,3 +1,6 @@
+using KafkaNet.Common;
+using KafkaNet.Model;
+using KafkaNet.Protocol;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -5,17 +8,14 @@ using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Common;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
     /// <summary>
-    /// KafkaConnection represents the lowest level TCP stream connection to a Kafka broker. 
+    /// KafkaConnection represents the lowest level TCP stream connection to a Kafka broker.
     /// The Send and Receive are separated into two disconnected paths and must be combine outside
     /// this class by the correlation ID contained within the returned message.
-    /// 
+    ///
     /// The SendAsync function will return a Task and complete once the data has been sent to the outbound stream.
     /// The Read response is handled by a single thread polling the stream for data and firing an OnResponseReceived
     /// event when a response is received.
@@ -84,14 +84,12 @@ namespace KafkaNet
             return _client.WriteAsync(payload, token);
         }
 
-
         /// <summary>
         /// Send kafka payload to server and receive a task event when response is received.
         /// </summary>
         /// <typeparam name="T">A Kafka response object return by decode function.</typeparam>
         /// <param name="request">The IKafkaRequest to send to the kafka servers.</param>
         /// <returns></returns>
-
 
         public async Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
         {
@@ -104,11 +102,11 @@ namespace KafkaNet
             {
                 using (var asyncRequest = new AsyncRequestItem(request.CorrelationId))
                 {
-
                     try
                     {
                         AddAsyncRequestItemToResponseQueue(asyncRequest);
                         ExceptionDispatchInfo exceptionDispatchInfo = null;
+
                         try
                         {
                             await _client.WriteAsync(request.Encode()).ConfigureAwait(false);
@@ -117,8 +115,8 @@ namespace KafkaNet
                         {
                             exceptionDispatchInfo = ExceptionDispatchInfo.Capture(ex);
                         }
-                        asyncRequest.MarkRequestAsSent(exceptionDispatchInfo, _responseTimeoutMs, TriggerMessageTimeout);
 
+                        asyncRequest.MarkRequestAsSent(exceptionDispatchInfo, _responseTimeoutMs, TriggerMessageTimeout);
                     }
                     catch (OperationCanceledException)
                     {
@@ -131,7 +129,6 @@ namespace KafkaNet
                 }
             }
 
-
             //no response needed, just send
             await _client.WriteAsync(request.Encode()).ConfigureAwait(false);
             //TODO should this return a response of success for request?
@@ -139,6 +136,7 @@ namespace KafkaNet
         }
 
         #region Equals Override...
+
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj)) return false;
@@ -156,7 +154,8 @@ namespace KafkaNet
         {
             return (_client.Endpoint != null ? _client.Endpoint.GetHashCode() : 0);
         }
-        #endregion
+
+        #endregion Equals Override...
 
         private void StartReadStreamPoller()
         {
@@ -266,12 +265,12 @@ namespace KafkaNet
             using (_disposeToken)
             using (_client)
             {
-
             }
         }
 
         #region Class AsyncRequestItem...
-        class AsyncRequestItem : IDisposable
+
+        private class AsyncRequestItem : IDisposable
         {
             private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
@@ -297,16 +296,13 @@ namespace KafkaNet
                 _cancellationTokenSource.Token.Register(() => timeoutFunction(this));
             }
 
-
             public void Dispose()
             {
                 _cancellationTokenSource.Cancel();
                 _cancellationTokenSource.Dispose();
-
             }
         }
-        #endregion
+
+        #endregion Class AsyncRequestItem...
     }
-
-
 }

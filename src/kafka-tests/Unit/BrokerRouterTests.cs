@@ -196,7 +196,7 @@ namespace kafka_tests.Unit
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
-        [ExpectedException(typeof(InvalidTopicMetadataException))]
+        [ExpectedException(typeof(InvalidTopicNotExistsInCache))]
         public void SelectExactPartitionShouldThrowWhenTopicsCollectionIsEmpty()
         {
             var metadataResponse = CreateMetaResponse();
@@ -253,7 +253,7 @@ namespace kafka_tests.Unit
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
-        [ExpectedException(typeof(InvalidTopicMetadataException))]
+        [ExpectedException(typeof(InvalidTopicNotExistsInCache))]
         public void SelectPartitionShouldThrowWhenTopicsCollectionIsEmpty()
         {
             var metadataResponse = CreateMetaResponse();

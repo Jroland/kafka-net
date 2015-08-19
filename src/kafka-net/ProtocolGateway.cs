@@ -11,6 +11,7 @@ namespace KafkaNet
     public class ProtocolGateway : IDisposable
     {
         private readonly IBrokerRouter _brokerRouter;
+
         //Add Loger
         public ProtocolGateway(params Uri[] brokerUrl)
         {
@@ -22,6 +23,7 @@ namespace KafkaNet
         {
             _brokerRouter = brokerRouter;
         }
+
         public ProtocolGateway(KafkaOptions kafkaOptions)
         {
             _brokerRouter = new BrokerRouter(kafkaOptions);
@@ -59,15 +61,14 @@ namespace KafkaNet
                         return null; /*this can happened if you send ProduceRequest with ack level=0 */
                     }
 
-                    var error = (ErrorResponseCode) response.Error;
+                    var error = (ErrorResponseCode)response.Error;
                     if (error == ErrorResponseCode.NoError)
                     {
                         return response;
                     }
 
-                    //It means we had an error 
+                    //It means we had an error
                     needToRefreshTopicMetadata = CanRecoverByRefreshMetadata(error);
-
                 }
                 catch (ResponseTimeoutException ex)
                 {
@@ -90,19 +91,16 @@ namespace KafkaNet
                 {
                     throwError(exception, response);
                 }
-
             }
             throw new KafkaApplicationException("FetchResponse returned error condition.  ErrorCode:{0}", response.Error);
         }
 
         private static bool CanRecoverByRefreshMetadata(ErrorResponseCode error)
         {
-
             return error == ErrorResponseCode.BrokerNotAvailable ||
                                          error == ErrorResponseCode.ConsumerCoordinatorNotAvailableCode ||
                                          error == ErrorResponseCode.LeaderNotAvailable ||
                                          error == ErrorResponseCode.NotLeaderForPartition;
-
         }
 
         private async Task TryRefreshTopicMetadata(string topic, DateTime lastTopicMetadataRefreshDate,
@@ -110,8 +108,6 @@ namespace KafkaNet
         {
             bool metadataNotExpire = !await _brokerRouter.RefreshTopicMetadata(topic);//Do Not Change this order
             bool metadataNotUpdate = _brokerRouter.GetTopicMetadataRefreshTime(topic) == lastTopicMetadataRefreshDate;
-    
-
 
             if (metadataNotUpdate && metadataNotExpire)
             {

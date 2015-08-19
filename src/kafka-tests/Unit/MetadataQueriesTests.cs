@@ -67,7 +67,7 @@ namespace kafka_tests.Unit
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
-        [ExpectedException(typeof(InvalidTopicMetadataException))]
+        [ExpectedException(typeof(InvalidTopicNotExistsInCache))]
         public void EmptyTopicMetadataShouldThrowException()
         {
             var routerProxy = new BrokerRouterProxy(_kernel);

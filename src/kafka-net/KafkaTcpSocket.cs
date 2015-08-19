@@ -1,14 +1,14 @@
-﻿using System;
+﻿using KafkaNet.Common;
+using KafkaNet.Model;
+using KafkaNet.Protocol;
+using KafkaNet.Statistics;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Sockets;
-using System.Threading.Tasks;
 using System.Threading;
-using KafkaNet.Common;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
-using KafkaNet.Statistics;
+using System.Threading.Tasks;
 
 namespace KafkaNet
 {
@@ -19,9 +19,13 @@ namespace KafkaNet
     public class KafkaTcpSocket : IKafkaTcpSocket
     {
         public event Action OnServerDisconnected;
+
         public event Action<int> OnReconnectionAttempt;
+
         public event Action<int> OnReadFromSocketAttempt;
+
         public event Action<int> OnBytesReceived;
+
         public event Action<KafkaDataPayload> OnWriteToSocketAttempt;
 
         private const int DefaultReconnectionTimeout = 100;
@@ -58,7 +62,7 @@ namespace KafkaNet
             _readTaskQueue = new AsyncCollection<SocketPayloadReadTask>();
 
             //dedicate a long running task to the read/write operations
-            _socketTask = Task.Run(async () => {await DedicatedSocketTask(); });
+            _socketTask = Task.Run(async () => { await DedicatedSocketTask(); });
 
             _disposeTask = _disposeToken.Token.CreateTask();
             _disposeRegistration = _disposeToken.Token.Register(() =>
@@ -66,11 +70,10 @@ namespace KafkaNet
                 _sendTaskQueue.CompleteAdding();
                 _readTaskQueue.CompleteAdding();
             });
-
-
         }
 
         #region Interface Implementation...
+
         /// <summary>
         /// The IP Endpoint to the server.
         /// </summary>
@@ -117,7 +120,8 @@ namespace KafkaNet
         {
             return EnqueueWriteTask(payload, cancellationToken);
         }
-        #endregion
+
+        #endregion Interface Implementation...
 
         private Task<KafkaDataPayload> EnqueueWriteTask(KafkaDataPayload payload, CancellationToken cancellationToken)
         {
@@ -182,13 +186,12 @@ namespace KafkaNet
 
         private async Task ProcessNetworkstreamTasks(NetworkStream netStream)
         {
-
             Task lastWriteTask = Task.FromResult(true);
             Task lastReadTask = Task.FromResult(true);
             //reading/writing from network steam is not thread safe
-            //Read and write operations can be performed simultaneously on an instance of the NetworkStream class without the need for synchronization. 
-            //As long as there is one unique thread for the write operations and one unique thread for the read operations, there will be no cross-interference 
-            //between read and write threads and no synchronization is required. 
+            //Read and write operations can be performed simultaneously on an instance of the NetworkStream class without the need for synchronization.
+            //As long as there is one unique thread for the write operations and one unique thread for the read operations, there will be no cross-interference
+            //between read and write threads and no synchronization is required.
             //https://msdn.microsoft.com/en-us/library/z2xae4f4.aspx
             while (_disposeToken.IsCancellationRequested == false && netStream != null)
             {
@@ -209,7 +212,6 @@ namespace KafkaNet
                 {
                     var read = _readTaskQueue.Pop();
                     lastReadTask = ProcessReadTaskAsync(netStream, read);
-
                 }
             }
         }
@@ -401,11 +403,9 @@ namespace KafkaNet
                 _socketTask.SafeWait(TimeSpan.FromSeconds(30));
             }
         }
-
-
     }
 
-    class SocketPayloadReadTask : IDisposable
+    internal class SocketPayloadReadTask : IDisposable
     {
         public CancellationToken CancellationToken { get; private set; }
         public TaskCompletionSource<byte[]> Tcp { get; set; }
@@ -425,12 +425,11 @@ namespace KafkaNet
         {
             using (_cancellationTokenRegistration)
             {
-
             }
         }
     }
 
-    class SocketPayloadSendTask : IDisposable
+    internal class SocketPayloadSendTask : IDisposable
     {
         public TaskCompletionSource<KafkaDataPayload> Tcp { get; set; }
         public KafkaDataPayload Payload { get; set; }
@@ -449,12 +448,10 @@ namespace KafkaNet
                 );
         }
 
-
         public void Dispose()
         {
             using (_cancellationTokenRegistration)
             {
-
             }
         }
     }
@@ -464,10 +461,12 @@ namespace KafkaNet
         public int CorrelationId { get; set; }
         public ApiKeyRequestType ApiKey { get; set; }
         public int MessageCount { get; set; }
+
         public bool TrackPayload
         {
             get { return MessageCount > 0; }
         }
+
         public byte[] Buffer { get; set; }
     }
 }

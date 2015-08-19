@@ -1,13 +1,12 @@
-﻿using System;
+﻿using KafkaNet.Protocol;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
     /// <summary>
-    /// This class provides a set of common queries that are useful for both the Consumer and Producer classes.  
+    /// This class provides a set of common queries that are useful for both the Consumer and Producer classes.
     /// </summary>
     public class MetadataQueries : IMetadataQueries
     {
