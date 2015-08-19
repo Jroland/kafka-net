@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
-    <id>kafka-net</id>
+    <id>KafkaClient</id>
     <version>$version$</version>
     <authors>gigya</authors>
     <owners>gigya</owners>
