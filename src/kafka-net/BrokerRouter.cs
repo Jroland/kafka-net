@@ -29,7 +29,7 @@ namespace KafkaNet
         private readonly ConcurrentDictionary<string, Tuple<Topic, DateTime>> _topicIndex = new ConcurrentDictionary<string, Tuple<Topic, DateTime>>();
         private SemaphoreSlim _taskLocker = new SemaphoreSlim(1);
 
-
+        /// <exception cref="ServerUnreachableException">None of the provided Kafka servers are resolvable.</exception>
         public BrokerRouter(KafkaOptions kafkaOptions)
         {
             _kafkaOptions = kafkaOptions;
@@ -55,7 +55,7 @@ namespace KafkaNet
         /// This function does not use any selector criteria.  If the given partitionId does not exist an exception will be thrown.
         /// </remarks>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
-        /// /// <exception cref="InvalidTopicMetadataException">the Metadata is not exist in Cache.</exception>
+        /// <exception cref="InvalidTopicNotExistsInCache">the Metadata is not exist in Cache.</exception>
 
         public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, int partitionId)
         {
@@ -63,11 +63,14 @@ namespace KafkaNet
             var topicMetadata = cachedTopic.First();
             if (topicMetadata == null)
             {
-                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topic));
+                throw new InvalidTopicNotExistsInCache(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topic)));
             }
 
             var partition = topicMetadata.Partitions.FirstOrDefault(x => x.PartitionId == partitionId);
-            if (partition == null) throw new InvalidPartitionException(string.Format("The topic:{0} does not have a partitionId:{1} defined.", topic, partitionId));
+            if (partition == null)
+            {
+                throw new InvalidPartitionException(string.Format("The topic:{0} does not have a partitionId:{1} defined.", topic, partitionId));
+            }
 
             return GetCachedRoute(topicMetadata.Name, partition);
         }
@@ -78,14 +81,14 @@ namespace KafkaNet
         /// <param name="topic">The topic to retreive a broker route for.</param>
         /// <param name="key">The key used by the IPartitionSelector to collate to a consistent partition. Null value means key will be ignored in selection process.</param>
         /// <returns>A broker route for the given topic.</returns>
-        /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
+        /// <exception cref="InvalidTopicNotExistsInCache">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, byte[] key = null)
         {
             //get topic either from cache or server.
             var cachedTopic = GetTopicMetadataFromLocalCache(topic).FirstOrDefault();
 
             if (cachedTopic == null)
-                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
+                throw new InvalidTopicNotExistsInCache(String.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
 
             var partition = _kafkaOptions.PartitionSelector.Select(cachedTopic, key);
 
@@ -101,15 +104,14 @@ namespace KafkaNet
         /// The topic metadata will by default check the cache first and then if it does not exist it will then
         /// request metadata from the server.  To force querying the metadata from the server use <see cref="RefreshTopicMetadata"/>
         /// </remarks>
-        /// <exception cref="InvalidTopicMetadataException">Condition.</exception>
+        /// <exception cref="InvalidTopicNotExistsInCache">Condition: not exists in Cache</exception>
         public List<Topic> GetTopicMetadataFromLocalCache(params string[] topics)
         {
             var topicSearchResult = SearchCacheForTopics(topics, null);
 
-
             if (topicSearchResult.Missing.Count > 0)
             {
-                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topicSearchResult.Missing));
+                throw new InvalidTopicNotExistsInCache(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topicSearchResult.Missing)));
             }
 
             return topicSearchResult.Topics;
@@ -124,11 +126,11 @@ namespace KafkaNet
         /// Only call this method to force a metadata update.  For all other queries use <see cref="GetTopicMetadataFromLocalCache"/> which uses cached values.
         /// </remarks>
 
-
         public Task<bool> RefreshTopicMetadata(params string[] topics)
         {
             return RefreshTopicMetadata(_kafkaOptions.CacheExpiration, _kafkaOptions.RefreshMetadataTimeout, topics);
         }
+
         /// <summary>
         /// refresh metadata Request get to server for all topic that there Cache Expire.
         /// CacheExpiration is max time for topic to be valid after this time the Cache Expire for topic,
@@ -289,7 +291,6 @@ namespace KafkaNet
                 await RefreshTopicMetadata(null, _kafkaOptions.RefreshMetadataTimeout, topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
             }
         }
-
 
         public DateTime GetTopicMetadataRefreshTime(string topic)
         {

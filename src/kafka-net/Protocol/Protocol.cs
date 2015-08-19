@@ -36,7 +36,7 @@ namespace KafkaNet.Protocol
     }
 
     /// <summary>
-    /// Enumeration of numeric codes that the ApiKey in the request can take for each request types. 
+    /// Enumeration of numeric codes that the ApiKey in the request can take for each request types.
     /// </summary>
     public enum ApiKeyRequestType
     {
@@ -162,29 +162,45 @@ namespace KafkaNet.Protocol
     }
 
     #region Exceptions...
+
     public class FailCrcCheckException : ApplicationException
     {
-        public FailCrcCheckException(string message, params object[] args) : base(string.Format(message, args)) { }
+        public FailCrcCheckException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
 
     public class ResponseTimeoutException : ApplicationException
     {
-        public ResponseTimeoutException(string message, params object[] args) : base(string.Format(message, args)) { }
+        public ResponseTimeoutException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
 
     public class InvalidPartitionException : ApplicationException
     {
-        public InvalidPartitionException(string message, params object[] args) : base(string.Format(message, args)) { }
+        public InvalidPartitionException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
 
     public class ServerDisconnectedException : ApplicationException
     {
-        public ServerDisconnectedException(string message, params object[] args) : base(string.Format(message, args)) { }
+        public ServerDisconnectedException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
 
     public class ServerUnreachableException : ApplicationException
     {
-        public ServerUnreachableException(string message, params object[] args) : base(string.Format(message, args)) { }
+        public ServerUnreachableException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
 
     public class InvalidTopicMetadataException : ApplicationException
@@ -194,29 +210,52 @@ namespace KafkaNet.Protocol
         {
             ErrorResponseCode = code;
         }
+
         public ErrorResponseCode ErrorResponseCode { get; private set; }
+    }
+
+    public class InvalidTopicNotExistsInCache : Exception
+    {
+        public InvalidTopicNotExistsInCache(string info)
+            : base(info)
+        {
+        }
     }
 
     public class LeaderNotFoundException : ApplicationException
     {
-        public LeaderNotFoundException(string message, params object[] args) : base(string.Format(message, args)) { }
+        public LeaderNotFoundException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
 
     public class UnresolvedHostnameException : ApplicationException
     {
-        public UnresolvedHostnameException(string message, params object[] args) : base(string.Format(message, args)) { }
+        public UnresolvedHostnameException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
 
     public class InvalidMetadataException : ApplicationException
     {
         public int ErrorCode { get; set; }
-        public InvalidMetadataException(string message, params object[] args) : base(string.Format(message, args)) { }
+
+        public InvalidMetadataException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
 
     public class OffsetOutOfRangeException : ApplicationException
     {
         public Fetch FetchRequest { get; set; }
-        public OffsetOutOfRangeException(string message, params object[] args) : base(string.Format(message, args)) { }
+
+        public OffsetOutOfRangeException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
 
     public class BufferUnderRunException : ApplicationException
@@ -235,9 +274,12 @@ namespace KafkaNet.Protocol
     public class KafkaApplicationException : ApplicationException
     {
         public int ErrorCode { get; set; }
-        public KafkaApplicationException(string message, params object[] args) : base(string.Format(message, args)) { }
+
+        public KafkaApplicationException(string message, params object[] args)
+            : base(string.Format(message, args))
+        {
+        }
     }
-    #endregion
 
-
+    #endregion Exceptions...
 }

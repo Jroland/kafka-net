@@ -9,12 +9,15 @@ Copyright 2014, James Roland under Apache License, V2.0. See LICENSE file.
 
 Summary
 -----------
-This project is a .NET implementation of the [Apache Kafka] protocol.  The wire protocol portion is based on the [kafka-python] library writen by [David Arthur] and the general class layout attempts to follow a similar pattern as his project.  To that end, this project builds up from the low level KafkaConnection object for handling async requests to/from the kafka server, all the way up to a higher level Producer/Consumer classes.
 
-##### The major items that change:
+This library is a fork of Jroland's kafka-net library, with adjustments and improvements.
+The original project is a .NET implementation of the [Apache Kafka] protocol.  The wire protocol portion is based on the [kafka-python] library writen by [David Arthur] and the general class layout attempts to follow a similar pattern as his project.  To that end, this project builds up from the low level KafkaConnection object for handling async requests to/from the kafka server, all the way up to a higher level Producer/Consumer classes.
 
-- All the code except the consumer class uses Async and all blocking operations were deleted.
+##### Improvements and changes:
+
+- All the code is now async all the way and all blocking operations were removed (except for the high-level Consumer class).
 - BrokerRouter:
+
     * Has changed and  now has a new interface.
     * Added an expiration token to ensure that we don't refresh metadata too much.
 - ProtocolGateway handles failure by refreshing the metadata.
