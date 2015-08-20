@@ -16,7 +16,6 @@ namespace kafka_tests.Integration
     [Category("Integration")]
     public class ProducerConsumerTests
     {
-
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(10, 1000)]
         [TestCase(100, 1000)]
@@ -141,14 +140,14 @@ namespace kafka_tests.Integration
             Stopwatch stopwatch = new Stopwatch();
             stopwatch.Start();
 
-           IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("create BrokerRouter ,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("create BrokerRouter ,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
             var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri) { Log = IntegrationConfig.NoDebugLog });
             stopwatch.Restart();
             var producer = new Producer(router) { BatchDelayTime = TimeSpan.FromMilliseconds(10), BatchSize = numberOfMessage / 10 };
-          IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("create producer ,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("create producer ,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
             stopwatch.Restart();
             List<OffsetResponse> offsets = await producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic);
-          IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("request Offset,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("request Offset,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
             stopwatch.Restart();
             List<Task> sendList = new List<Task>(numberOfMessage);
             for (int i = 0; i < numberOfMessage; i++)
@@ -194,14 +193,14 @@ namespace kafka_tests.Integration
             }
             stopwatch.Restart();
             producer.Dispose();
-             IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start producer Dispose ,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start producer Dispose ,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
 
             consumer.Dispose();
-           IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start consumer Dispose ,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start consumer Dispose ,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
             stopwatch.Restart();
 
             router.Dispose();
-           IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start router Dispose,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
+            IntegrationConfig.NoDebugLog.InfoFormat(IntegrationConfig.Highlight("start router Dispose,time Milliseconds:{0}", stopwatch.ElapsedMilliseconds));
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]

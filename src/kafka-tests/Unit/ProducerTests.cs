@@ -117,7 +117,6 @@ namespace kafka_tests.Unit
 
                 Task.Run(async () =>
                 {
-
                     var t = producer.SendMessageAsync(BrokerRouterProxy.TestTopic, messages);
                     Interlocked.Increment(ref count);
                     await t;

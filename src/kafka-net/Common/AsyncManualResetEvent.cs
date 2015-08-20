@@ -5,8 +5,6 @@ using System.Threading.Tasks;
 
 namespace KafkaNet.Common
 {
-
-
     /// <summary>
     /// Async version of a manual reset event.
     /// </summary>

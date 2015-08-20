@@ -268,7 +268,6 @@ namespace kafka_tests.Unit
 
             Console.WriteLine("Left in collection: {0}", collection.Count);
             Assert.That(dataTask.Result.Count, Is.EqualTo(expected));
-
         }
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
@@ -308,7 +307,6 @@ namespace kafka_tests.Unit
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void AddRangeShouldBePerformant()
         {
-
             AsyncCollection<int> collection = new AsyncCollection<int>();
             var sw = Stopwatch.StartNew();
             collection.AddRange(Enumerable.Range(0, 1000000));
@@ -337,7 +335,6 @@ namespace kafka_tests.Unit
             Assert.That(list.Count, Is.EqualTo(dataSize));
             Assert.That(sw.ElapsedMilliseconds, Is.LessThan(200));
         }
-
 
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task AddAndRemoveShouldBePerformant()

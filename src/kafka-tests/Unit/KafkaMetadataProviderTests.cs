@@ -179,7 +179,6 @@ namespace kafka_tests.Unit
 
         private async Task<List<MetadataResponse>> CreateMetadataResponse(ErrorResponseCode errorCode)
         {
-
             return new List<MetadataResponse>
             {
                 new MetadataResponse
@@ -196,7 +195,6 @@ namespace kafka_tests.Unit
                     }
                 }
             };
-
         }
     }
 }

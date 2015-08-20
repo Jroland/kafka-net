@@ -1,9 +1,9 @@
-﻿using System;
+﻿using KafkaNet.Model;
+using KafkaNet.Protocol;
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
@@ -28,7 +28,6 @@ namespace KafkaNet
             return kafkaEndpoint;
         }
 
-
         private static IPAddress GetFirstAddress(string hostname, IKafkaLog log)
         {
             try
@@ -47,7 +46,7 @@ namespace KafkaNet
                     return selectedAddress;
                 }
             }
-            catch 
+            catch
             {
                 throw new UnresolvedHostnameException("Could not resolve the following hostname: {0}", hostname);
             }

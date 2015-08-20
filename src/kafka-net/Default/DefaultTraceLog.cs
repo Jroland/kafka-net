@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace KafkaNet
 {
-    /// <summary>DefaultTraceLog
+    /// <summary>
     /// This class simply logs all information out to the Trace log provided by windows.
     /// The reason Trace is being used as the default it to remove extenal references from
     /// the base kafka-net package.  A proper logging framework like log4net is recommended.

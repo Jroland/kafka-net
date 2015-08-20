@@ -1,7 +1,6 @@
-﻿
+﻿using KafkaNet.Protocol;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using KafkaNet.Protocol;
 
 namespace KafkaNet.Interfaces
 {

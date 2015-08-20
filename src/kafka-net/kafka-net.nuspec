@@ -3,8 +3,8 @@
   <metadata>
     <id>KafkaNetClient</id>
     <version>$version$</version>
-    <authors>Gigya</authors>
-    <owners>Gigya</owners>
+    <authors>Gigya Inc</authors>
+    <owners>Gigya Inc</owners>
     <licenseUrl>https://github.com/gigya/kafka-net/blob/master/LICENSE</licenseUrl>
     <projectUrl>https://github.com/gigya/kafka-net</projectUrl>
     <iconUrl>http://kafka.apache.org/images/kafka_logo.png</iconUrl>

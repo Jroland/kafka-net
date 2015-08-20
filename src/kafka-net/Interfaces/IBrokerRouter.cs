@@ -1,7 +1,7 @@
-﻿using System;
+﻿using KafkaNet.Protocol;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
@@ -32,7 +32,7 @@ namespace KafkaNet
         BrokerRoute SelectBrokerRouteFromLocalCache(string topic, byte[] key = null);
 
         /// <summary>
-        /// Returns Topic metadata for each topic requested. 
+        /// Returns Topic metadata for each topic requested.
         /// </summary>
         /// <param name="topics">Collection of topids to request metadata for.</param>
         /// <returns>List of Topics as provided by Kafka.</returns>

@@ -20,6 +20,7 @@ namespace KafkaNet
         private const int DefaultBatchDelayMS = 100;
         private const int DefaultBatchSize = 100;
 
+        private readonly ProtocolGateway _protocolGateway;
         private readonly CancellationTokenSource _stopToken = new CancellationTokenSource();
         private readonly int _maximumAsyncRequests;
         private readonly AsyncCollection<TopicMessage> _asyncCollection;
@@ -58,8 +59,6 @@ namespace KafkaNet
         /// The broker router this producer uses to route messages.
         /// </summary>
         public IBrokerRouter BrokerRouter { get; private set; }
-
-        private readonly ProtocolGateway _protocolGateway;
 
         /// <summary>
         /// Construct a Producer class.

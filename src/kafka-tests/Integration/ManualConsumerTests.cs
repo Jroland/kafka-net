@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using kafka_tests.Helpers;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using NUnit.Framework;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Integration
 {
@@ -16,7 +16,7 @@ namespace kafka_tests.Integration
     {
         private readonly KafkaOptions _options;
         private readonly Uri _kafkaUri;
-        private const int DefaultMaxMessageSetSize = 4096*8;
+        private const int DefaultMaxMessageSetSize = 4096 * 8;
         private readonly string _topic;
         private readonly string _defaultConsumerGroup;
 
@@ -45,7 +45,7 @@ namespace kafka_tests.Integration
             // Creating 5 messages
             List<Message> messages = CreateTestMessages(5, 1);
 
-            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout:TimeSpan.FromSeconds(3));
+            await producer.SendMessageAsync(topic, messages, partition: partitionId, timeout: TimeSpan.FromSeconds(3));
 
             // Now let's consume
             var result = (await consumer.FetchMessages(5, offset)).ToList();
@@ -59,7 +59,7 @@ namespace kafka_tests.Integration
             // Creating a broker router and a protocol gateway for the producer and consumer
             var brokerRouter = new BrokerRouter(_options);
             var protocolGateway = new ProtocolGateway(_kafkaUri);
-            var partitionId = 1;            
+            var partitionId = 1;
 
             Producer producer = new Producer(brokerRouter);
             ManualConsumer consumer = new ManualConsumer(partitionId, _topic, protocolGateway, "TestClient", DefaultMaxMessageSetSize);
@@ -234,7 +234,7 @@ namespace kafka_tests.Integration
             var brokerRouter = new BrokerRouter(_options);
             var protocolGateway = new ProtocolGateway(_kafkaUri);
             var partitionId = 1;
-            var smallMessageSet = 4096/2;
+            var smallMessageSet = 4096 / 2;
 
             Producer producer = new Producer(brokerRouter);
             ManualConsumer consumer = new ManualConsumer(partitionId, _topic, protocolGateway, "TestClient", smallMessageSet);
@@ -295,7 +295,7 @@ namespace kafka_tests.Integration
             await consumer.FetchOffset(consumerGroup);
         }
 
-        [Test]        
+        [Test]
         public async Task FetchOffsetConsumerGroupExistsTest()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
@@ -315,7 +315,7 @@ namespace kafka_tests.Integration
 
         [Test]
         [ExpectedException(typeof(ArgumentNullException))]
-        public async Task FetchOffsetConsumerGroupIsNullTest()            
+        public async Task FetchOffsetConsumerGroupIsNullTest()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer
             var protocolGateway = new ProtocolGateway(_kafkaUri);
@@ -362,7 +362,7 @@ namespace kafka_tests.Integration
             await consumer.UpdateOrCreateOffset(consumerGroup, offest);
             var res = await consumer.FetchOffset(consumerGroup);
 
-            Assert.AreEqual(offest, res);            
+            Assert.AreEqual(offest, res);
         }
 
         [Test]
@@ -390,7 +390,7 @@ namespace kafka_tests.Integration
         }
 
         [Test]
-        [ExpectedException(typeof (InvalidPartitionException))]
+        [ExpectedException(typeof(InvalidPartitionException))]
         public async Task UpdateOrCreateOffsetPartitionDoesntExistTest()
         {
             // Creating a broker router and a protocol gateway for the producer and consumer

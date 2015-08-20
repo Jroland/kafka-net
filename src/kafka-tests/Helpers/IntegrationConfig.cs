@@ -1,6 +1,6 @@
-﻿using System;
+﻿using KafkaNet;
+using System;
 using System.Configuration;
-using KafkaNet;
 
 namespace kafka_tests.Helpers
 {
@@ -15,13 +15,13 @@ namespace kafka_tests.Helpers
 
         public static string Highlight(string message)
         {
-            return String.Format("**************************{0}**************************", message); 
+            return String.Format("**************************{0}**************************", message);
         }
-        public static string Highlight(string message,params object[] args)
+
+        public static string Highlight(string message, params object[] args)
         {
             return String.Format("**************************{0}**************************", string.Format(message, args));
         }
-
 
         public static Uri IntegrationUri
         {

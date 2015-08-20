@@ -1,5 +1,5 @@
-﻿using System;
-using KafkaNet.Common;
+﻿using KafkaNet.Common;
+using System;
 
 namespace KafkaNet.Protocol
 {
@@ -8,7 +8,7 @@ namespace KafkaNet.Protocol
         public int BrokerId { get; set; }
         public string Host { get; set; }
         public int Port { get; set; }
-        public Uri Address { get { return new Uri(string.Format("http://{0}:{1}", Host, Port));} }
+        public Uri Address { get { return new Uri(string.Format("http://{0}:{1}", Host, Port)); } }
 
         public static Broker FromStream(BigEndianBinaryReader stream)
         {

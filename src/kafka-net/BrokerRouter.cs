@@ -147,7 +147,7 @@ namespace KafkaNet
                 }
 
                 _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
-              
+
                 //get the connections to query against and get metadata
                 var connections = _defaultConnectionIndex.Values.Union(_brokerConnectionIndex.Values).ToArray();
                 var taskMetadata = _kafkaMetadataProvider.Get(connections, topics);

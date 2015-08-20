@@ -89,7 +89,7 @@ namespace KafkaNet
                 }
                 else
                 {
-                    throwError(exception, response);
+                    ThrowError(exception, response);
                 }
             }
             throw new KafkaApplicationException("FetchResponse returned error condition.  ErrorCode:{0}", response.Error);
@@ -111,11 +111,11 @@ namespace KafkaNet
 
             if (metadataNotUpdate && metadataNotExpire)
             {
-                throwError(socketException, response);
+                ThrowError(socketException, response);
             }
         }
 
-        private static void throwError(ExceptionDispatchInfo exception, IBaseResponse response)
+        private static void ThrowError(ExceptionDispatchInfo exception, IBaseResponse response)
         {
             if (exception != null)
             {

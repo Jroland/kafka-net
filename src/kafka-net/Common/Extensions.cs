@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace KafkaNet.Common
 {
@@ -163,7 +163,6 @@ namespace KafkaNet.Common
             }
             return true;
         }
-
 
         public static Task CreateTask(this CancellationToken cancellationToken)
         {

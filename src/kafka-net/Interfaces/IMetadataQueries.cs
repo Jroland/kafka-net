@@ -2,12 +2,13 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+
 namespace KafkaNet
 {
     /// <summary>
     /// Contains common metadata query commands that are used by both a consumer and producer.
     /// </summary>
-    interface IMetadataQueries : IDisposable
+    internal interface IMetadataQueries : IDisposable
     {
         /// <summary>
         /// Get metadata on the given topic.

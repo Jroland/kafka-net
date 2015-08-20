@@ -150,7 +150,7 @@ namespace KafkaNet
                     await Task.WhenAny(_disposeTask, netStreamTask).ConfigureAwait(false);
                     if (_disposeToken.IsCancellationRequested)
                     {
-                        setDisposeExceptonToPenndingTask();
+                        SetDisposeExceptonToPenndingTask();
                         return;
                     }
                     var netStream = await netStreamTask; //already done
@@ -160,7 +160,7 @@ namespace KafkaNet
                 {
                     if (_disposeToken.IsCancellationRequested)
                     {
-                        setDisposeExceptonToPenndingTask();
+                        SetDisposeExceptonToPenndingTask();
                         return;
                     }
 
@@ -176,7 +176,7 @@ namespace KafkaNet
             }
         }
 
-        private void setDisposeExceptonToPenndingTask()
+        private void SetDisposeExceptonToPenndingTask()
         {
             _log.WarnFormat("KafkaTcpSocket thread shutting down because of a dispose call.");
             var disposeException = new ObjectDisposedException("Object is disposing.");
@@ -188,6 +188,7 @@ namespace KafkaNet
         {
             Task lastWriteTask = Task.FromResult(true);
             Task lastReadTask = Task.FromResult(true);
+
             //reading/writing from network steam is not thread safe
             //Read and write operations can be performed simultaneously on an instance of the NetworkStream class without the need for synchronization.
             //As long as there is one unique thread for the write operations and one unique thread for the read operations, there will be no cross-interference

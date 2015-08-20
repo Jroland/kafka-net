@@ -18,19 +18,19 @@ namespace KafkaNet.Common
     /// <remarks>
     /// BigEndianBinaryWriter code provided by Zoltu
     /// https://github.com/Zoltu/Zoltu.EndianAwareBinaryReaderWriter
-    /// 
+    ///
     /// The code was modified to provide Kafka specific logic and helper functions.
     /// </remarks>
     public class BigEndianBinaryReader : BinaryReader
     {
         private const int KafkaNullSize = -1;
 
-        public BigEndianBinaryReader(IEnumerable<byte> payload) : base(new MemoryStream(payload.ToArray()), Encoding.UTF8)
+        public BigEndianBinaryReader(IEnumerable<byte> payload)
+            : base(new MemoryStream(payload.ToArray()), Encoding.UTF8)
         {
-
         }
 
-        public long Length{get{return base.BaseStream.Length;}}
+        public long Length { get { return base.BaseStream.Length; } }
         public long Position { get { return base.BaseStream.Position; } set { base.BaseStream.Position = 0; } }
         public bool HasData { get { return base.BaseStream.Position < base.BaseStream.Length; } }
 

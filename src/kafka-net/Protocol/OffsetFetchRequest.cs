@@ -1,8 +1,7 @@
-﻿using System;
+﻿using KafkaNet.Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-
-using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
@@ -62,7 +61,6 @@ namespace KafkaNet.Protocol
             return DecodeOffsetFetchResponse(payload);
         }
 
-
         protected IEnumerable<OffsetFetchResponse> DecodeOffsetFetchResponse(byte[] data)
         {
             using (var stream = new BigEndianBinaryReader(data))
@@ -90,7 +88,6 @@ namespace KafkaNet.Protocol
                 }
             }
         }
-
     }
 
     public class OffsetFetch
@@ -99,30 +96,35 @@ namespace KafkaNet.Protocol
         /// The topic the offset came from.
         /// </summary>
         public string Topic { get; set; }
+
         /// <summary>
         /// The partition the offset came from.
         /// </summary>
         public int PartitionId { get; set; }
     }
 
-    public class OffsetFetchResponse:IBaseResponse
+    public class OffsetFetchResponse : IBaseResponse
     {
         /// <summary>
         /// The name of the topic this response entry is for.
         /// </summary>
         public string Topic { get; set; }
+
         /// <summary>
         /// The id of the partition this response is for.
         /// </summary>
         public Int32 PartitionId { get; set; }
+
         /// <summary>
         /// The offset position saved to the server.
         /// </summary>
         public Int64 Offset { get; set; }
+
         /// <summary>
         /// Any arbitrary metadata stored during a CommitRequest.
         /// </summary>
         public string MetaData { get; set; }
+
         /// <summary>
         /// Error code of exception that occured during the request.  Zero if no error.
         /// </summary>
@@ -132,6 +134,5 @@ namespace KafkaNet.Protocol
         {
             return string.Format("[OffsetFetchResponse TopicName={0}, PartitionID={1}, Offset={2}, MetaData={3}, ErrorCode={4}]", Topic, PartitionId, Offset, MetaData, Error);
         }
-
     }
 }
