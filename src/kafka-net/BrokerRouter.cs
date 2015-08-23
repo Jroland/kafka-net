@@ -242,6 +242,7 @@ namespace KafkaNet
 
             foreach (var broker in brokerEndpoints)
             {
+
                 //if the connection is in our default connection index already, remove it and assign it to the broker index.
                 IKafkaConnection connection;
                 if (_defaultConnectionIndex.TryRemove(broker.Endpoint, out connection))
@@ -269,6 +270,7 @@ namespace KafkaNet
                     i => newConnection,
                     (i, existingConnection) =>
                     {
+
                         //if a connection changes for a broker close old connection and create a new one
                         if (existingConnection.Endpoint.Equals(newConnection.Endpoint)) return existingConnection;
                         _kafkaOptions.Log.WarnFormat("Broker:{0} Uri changed from:{1} to {2}", brokerId, existingConnection.Endpoint, newConnection.Endpoint);
@@ -292,6 +294,7 @@ namespace KafkaNet
             //update metadata for all missing topics
             if (topicSearchResult.Missing.Count > 0)
             {
+
                 //double check for missing topics and query
                 await RefreshTopicMetadata(null, _kafkaOptions.RefreshMetadataTimeout, topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
             }

@@ -82,9 +82,9 @@ namespace KafkaNet
                     needToRefreshTopicMetadata = true;
                 }
                 bool hasMoreRetry = retryTime + 1 < _maxRetry;
+
                 if (needToRefreshTopicMetadata && hasMoreRetry)
                 {
-                    //Log Retry Sesion id
                     retryTime++;
                     await _brokerRouter.RefreshTopicMetadata(topic);
                 }

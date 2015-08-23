@@ -32,6 +32,7 @@ namespace KafkaNet
         {
             try
             {
+                
                 //lookup the IP address from the provided host name
                 var addresses = Dns.GetHostAddresses(hostname);
 
