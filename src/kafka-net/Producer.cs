@@ -91,9 +91,9 @@ namespace KafkaNet
             BatchSize = DefaultBatchSize;
             BatchDelayTime = TimeSpan.FromMilliseconds(DefaultBatchDelayMS);
 
-            _postTask = Task.Run(async () =>
+            _postTask = Task.Run(() =>
             {
-                await BatchSendAsync().ConfigureAwait(false);
+                BatchSendAsync();
                 //TODO add log for ending the sending thread.
             });
         }

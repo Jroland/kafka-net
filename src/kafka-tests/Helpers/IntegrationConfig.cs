@@ -10,7 +10,10 @@ namespace kafka_tests.Helpers
         public static string IntegrationTopic = "IntegrationTopic";
         public static string IntegrationConsumer = "IntegrationConsumer";
         public const int NumberOfRepeat = 1;
-        public static IKafkaLog NoDebugLog = new DefaultTraceLog(LogLevel.Info);// Some of the tests measured performance.my log is too slow so i change the log level to only critical  message
+
+        // Some of the tests measured performance.my log is too slow so i change the log level to only critical  message
+        public static IKafkaLog NoDebugLog = new DefaultTraceLog(LogLevel.Info);
+
         public static IKafkaLog AllLog = new DefaultTraceLog();
 
         public static string Highlight(string message)

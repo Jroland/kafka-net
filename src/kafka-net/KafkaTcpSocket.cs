@@ -145,7 +145,6 @@ namespace KafkaNet
                 try
                 {
                     //block here until we can get connections then start loop pushing data through network stream
-
                     var netStreamTask = GetStreamAsync();
                     await Task.WhenAny(_disposeTask, netStreamTask).ConfigureAwait(false);
                     if (_disposeToken.IsCancellationRequested)
@@ -153,7 +152,9 @@ namespace KafkaNet
                         SetDisposeExceptonToPenndingTask();
                         return;
                     }
-                    var netStream = await netStreamTask; //already done
+
+                    //already done
+                    var netStream = await netStreamTask;
                     await ProcessNetworkstreamTasks(netStream).ConfigureAwait(false);
                 }
                 catch (Exception ex)
@@ -374,7 +375,7 @@ namespace KafkaNet
                         throw new ObjectDisposedException(" on ReEstablishConnectionAsync Object is disposing.");
 
                     _log.WarnFormat("Connection established to:{0}.", _endpoint);
-                   
+
                     //to throw connectTask exception(WhenAny don't throw exception).
                     await connectTask;
                     return _client;

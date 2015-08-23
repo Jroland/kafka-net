@@ -131,6 +131,7 @@ namespace KafkaNet
 
             //no response needed, just send
             await _client.WriteAsync(request.Encode()).ConfigureAwait(false);
+
             //TODO should this return a response of success for request?
             return new List<T>();
         }
@@ -219,7 +220,9 @@ namespace KafkaNet
         private int NextCorrelationId()
         {
             var id = Interlocked.Increment(ref _correlationIdSeed);
-            if (id > int.MaxValue - 100) //somewhere close to max reset.
+
+            //somewhere close to max reset.
+            if (id > int.MaxValue - 100)
             {
                 Interlocked.Exchange(ref _correlationIdSeed, 0);
             }
@@ -238,7 +241,9 @@ namespace KafkaNet
             if (asyncRequestItem == null) return;
 
             AsyncRequestItem request;
-            _requestIndex.TryRemove(asyncRequestItem.CorrelationId, out request); //just remove it from the index
+
+            //just remove it from the index
+            _requestIndex.TryRemove(asyncRequestItem.CorrelationId, out request);
 
             if (_disposeToken.IsCancellationRequested)
             {
