@@ -309,9 +309,9 @@ namespace KafkaNet
                     StatisticsTracker.IncrementGauge(StatisticGauge.ActiveWriteOperation);
 
                     if (OnWriteToSocketAttempt != null) OnWriteToSocketAttempt(sendTask.Payload);
-                    _log.DebugFormat("Send to netStream WriteAsync CorrelationId:{0}", sendTask.Payload.CorrelationId);
+                    _log.DebugFormat("Sending data for CorrelationId:{0} Connection:{1}", sendTask.Payload.CorrelationId, Endpoint);
                     await netStream.WriteAsync(sendTask.Payload.Buffer, 0, sendTask.Payload.Buffer.Length).ConfigureAwait(false);
-
+                    _log.DebugFormat("Data sent to CorrelationId:{0} Connection:{1}", sendTask.Payload.CorrelationId, Endpoint);
                     sendTask.Tcp.TrySetResult(sendTask.Payload);
                 }
                 catch (Exception ex)
@@ -374,7 +374,9 @@ namespace KafkaNet
                         throw new ObjectDisposedException(" on ReEstablishConnectionAsync Object is disposing.");
 
                     _log.WarnFormat("Connection established to:{0}.", _endpoint);
-                    await connectTask;//for ex to throw!!
+                   
+                    //to throw connectTask exception(WhenAny don't throw exception).
+                    await connectTask;
                     return _client;
                 }
                 catch
@@ -441,12 +443,7 @@ namespace KafkaNet
         {
             Tcp = new TaskCompletionSource<KafkaDataPayload>();
             Payload = payload;
-            _cancellationTokenRegistration = cancellationToken.Register(
-                () =>
-                {
-                    Tcp.TrySetCanceled();
-                }
-                );
+            _cancellationTokenRegistration = cancellationToken.Register(() => { Tcp.TrySetCanceled(); });
         }
 
         public void Dispose()

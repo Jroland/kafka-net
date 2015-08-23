@@ -378,10 +378,10 @@ namespace kafka_tests.Integration
                     Console.WriteLine("Reading message back out from consumer.");
                     var data = stream.Take(expectedCount).ToList();
 
-                    var consumerOffset = consumer.GetOffsetPosition().OrderBy(x => x.Offset).ToList();
+                    var consumerOffset = consumer.GetOffsetPosition().OrderBy(x => x.PartitionId).ToList();
                     var serverOffset = await producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).ConfigureAwait(false);
                     var positionOffset = serverOffset.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max()))
-                        .OrderBy(x => x.Offset)
+                        .OrderBy(x => x.PartitionId)
                         .ToList();
 
                     Assert.That(consumerOffset, Is.EqualTo(positionOffset), "The consumerOffset position should match the server offset position.");

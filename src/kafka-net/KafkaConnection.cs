@@ -96,7 +96,7 @@ namespace KafkaNet
             //assign unique correlationId
             request.CorrelationId = NextCorrelationId();
 
-            _log.DebugFormat("SendAsync CorrelationId:{0}", request.CorrelationId);
+            _log.DebugFormat("Entered SendAsync for CorrelationId:{0} Connection:{1}", request.CorrelationId, this.Endpoint);
             //if response is expected, register a receive data task and send request
             if (request.ExpectResponse)
             {
@@ -207,7 +207,7 @@ namespace KafkaNet
             AsyncRequestItem asyncRequest;
             if (_requestIndex.TryRemove(correlationId, out asyncRequest))
             {
-                _log.DebugFormat("Get Responce to correlationId:{0}", correlationId);
+                _log.DebugFormat("Get Response for CorrelationId:{0} Connection:{1}", correlationId, Endpoint);
                 asyncRequest.ReceiveTask.SetResult(payload);
             }
             else
@@ -283,7 +283,6 @@ namespace KafkaNet
             public int CorrelationId { get; private set; }
             public TaskCompletionSource<byte[]> ReceiveTask { get; private set; }
 
-            /// <exception cref="Exception">Condition.</exception>
             public void MarkRequestAsSent(ExceptionDispatchInfo exceptionDispatchInfo, TimeSpan timeout, Action<AsyncRequestItem> timeoutFunction)
             {
                 if (exceptionDispatchInfo != null)

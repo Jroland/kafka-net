@@ -42,15 +42,12 @@ Examples
 ```sh
 var options = new KafkaOptions(new Uri("http://SERVER1:9092"), new Uri("http://SERVER2:9092"));
 var router = new BrokerRouter(options);
-var client = new Producer(router);
-try
- {
+using(var client = new Producer(router))
+{
      await client.SendMessageAsync("TestTopic", new Message("hello world"));
- }
-catch (Exception)
- {
-    client.Dispose();
- }
+}
+
+
 ```
 ##### Consumer
 ```sh

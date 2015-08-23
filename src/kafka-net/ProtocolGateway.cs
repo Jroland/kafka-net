@@ -35,12 +35,10 @@ namespace KafkaNet
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
         /// <exception cref="ResponseTimeoutException">Thrown if none of the Default Brokers can be contacted.</exception>
-        ///     /// <exception cref="SocketException">Thrown if none of the Default Brokers can be contacted.</exception>
+        /// <exception cref="SocketException">Thrown if none of the Default Brokers can be contacted.</exception>
         /// <exception cref="KafkaApplicationException">Thrown if none of the Default Brokers can be contacted.</exception>
         public async Task<T> SendProtocolRequest<T>(IKafkaRequest<T> request, string topic, int partition) where T : class,IBaseResponse
         {
-            //Log Start  Sesion  Id
-            DateTime topicMetadataRefreshDate = DateTime.MinValue;
             T response = null;
             int retryTime = 0;
 
@@ -51,14 +49,16 @@ namespace KafkaNet
                 try
                 {
                     await _brokerRouter.RefreshMissingTopicMetadata(topic);
-                    topicMetadataRefreshDate = _brokerRouter.GetTopicMetadataRefreshTime(topic);
+
                     //find route it can chage after Metadata Refresh
                     var route = _brokerRouter.SelectBrokerRouteFromLocalCache(topic, partition);
                     var responses = await route.Connection.SendAsync(request);
                     response = responses.FirstOrDefault();
+
+                    /*this can happened if you send ProduceRequest with ack level=0 */
                     if (response == null)
                     {
-                        return null; /*this can happened if you send ProduceRequest with ack level=0 */
+                        return null;
                     }
 
                     var error = (ErrorResponseCode)response.Error;
@@ -68,6 +68,7 @@ namespace KafkaNet
                     }
 
                     //It means we had an error
+
                     needToRefreshTopicMetadata = CanRecoverByRefreshMetadata(error);
                 }
                 catch (ResponseTimeoutException ex)
@@ -85,7 +86,7 @@ namespace KafkaNet
                 {
                     //Log Retry Sesion id
                     retryTime++;
-                    await TryRefreshTopicMetadata(topic, topicMetadataRefreshDate, exception, response);
+                    await _brokerRouter.RefreshTopicMetadata(topic);
                 }
                 else
                 {
@@ -101,18 +102,6 @@ namespace KafkaNet
                                          error == ErrorResponseCode.ConsumerCoordinatorNotAvailableCode ||
                                          error == ErrorResponseCode.LeaderNotAvailable ||
                                          error == ErrorResponseCode.NotLeaderForPartition;
-        }
-
-        private async Task TryRefreshTopicMetadata(string topic, DateTime lastTopicMetadataRefreshDate,
-            ExceptionDispatchInfo socketException, IBaseResponse response)
-        {
-            bool metadataNotExpire = !await _brokerRouter.RefreshTopicMetadata(topic);//Do Not Change this order
-            bool metadataNotUpdate = _brokerRouter.GetTopicMetadataRefreshTime(topic) == lastTopicMetadataRefreshDate;
-
-            if (metadataNotUpdate && metadataNotExpire)
-            {
-                ThrowError(socketException, response);
-            }
         }
 
         private static void ThrowError(ExceptionDispatchInfo exception, IBaseResponse response)

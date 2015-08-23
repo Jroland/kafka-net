@@ -88,7 +88,9 @@ namespace KafkaNet
             var cachedTopic = GetTopicMetadataFromLocalCache(topic).FirstOrDefault();
 
             if (cachedTopic == null)
+            {
                 throw new InvalidTopicNotExistsInCache(String.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
+            }
 
             var partition = _kafkaOptions.PartitionSelector.Select(cachedTopic, key);
 
@@ -178,9 +180,13 @@ namespace KafkaNet
                 var cachedTopic = GetCachedTopic(topic, expiration);
 
                 if (cachedTopic == null)
+                {
                     result.Missing.Add(topic);
+                }
                 else
+                {
                     result.Topics.Add(cachedTopic);
+                }
             }
 
             return result;
