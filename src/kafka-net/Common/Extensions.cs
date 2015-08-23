@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics.Contracts;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace KafkaNet.Common
 {
@@ -49,7 +49,7 @@ namespace KafkaNet.Common
 
         public static KafkaDataPayload ToPayload(this byte[] data)
         {
-            return new KafkaDataPayload {Buffer = data};
+            return new KafkaDataPayload { Buffer = data };
         }
 
         public static byte[] ToBytes(this string value)
@@ -112,8 +112,8 @@ namespace KafkaNet.Common
         {
             var tcs = new TaskCompletionSource<bool>();
 
-            var cancelRegistration = cancellationToken.Register(source => ((TaskCompletionSource<bool>) source).TrySetResult(true), tcs);
-            
+            var cancelRegistration = cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs);
+
             using (cancelRegistration)
             {
                 if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
@@ -148,6 +148,28 @@ namespace KafkaNet.Common
             }
         }
 
+        public static async Task<bool> WithCancellationBool(this Task task, CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+
+            var cancelRegistration = cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs);
+
+            using (cancelRegistration)
+            {
+                if (task != await Task.WhenAny(task, tcs.Task).ConfigureAwait(false))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public static Task CreateTask(this CancellationToken cancellationToken)
+        {
+            var tcs = new TaskCompletionSource<bool>();
+            cancellationToken.Register(source => ((TaskCompletionSource<bool>)source).TrySetResult(true), tcs);
+            return tcs.Task;
+        }
 
         /// <summary>
         /// Returns true if <see cref="WaitHandle"/> before timeout expires./>
@@ -178,7 +200,7 @@ namespace KafkaNet.Common
                         // We take a lock here to make sure the outer method has completed setting the local variable callbackHandle.
                         lock (localVariableInitLock)
                         {
-                            if (callbackHandle!= null) callbackHandle.Unregister(null);
+                            if (callbackHandle != null) callbackHandle.Unregister(null);
                         }
                     },
                     state: null,
@@ -231,7 +253,7 @@ namespace KafkaNet.Common
             if (task.IsFaulted == false) return null;
             if (task.Exception != null)
                 return task.Exception.Flatten();
-            
+
             return new ApplicationException("Unknown exception occured.");
         }
     }

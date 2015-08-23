@@ -1,22 +1,22 @@
-﻿using System;
+﻿using KafkaNet.Protocol;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using KafkaNet.Protocol;
+using System.Threading.Tasks;
 
 namespace KafkaNet
 {
     /// <summary>
     /// This provider blocks while it attempts to get the MetaData configuration of the Kafka servers.  If any retry errors occurs it will
-    /// continue to block the downstream call and then repeatedly query kafka until the retry errors subside.  This repeat call happens in 
+    /// continue to block the downstream call and then repeatedly query kafka until the retry errors subside.  This repeat call happens in
     /// a backoff manner, which each subsequent call waiting longer before a requery.
-    /// 
+    ///
     /// Error Codes:
     /// LeaderNotAvailable = 5
     /// NotLeaderForPartition = 6
     /// ConsumerCoordinatorNotAvailableCode = 15
     /// BrokerId = -1
-    /// 
+    ///
     /// Documentation:
     /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataResponse
     /// </summary>
@@ -25,7 +25,7 @@ namespace KafkaNet
         private const int BackoffMilliseconds = 100;
 
         private readonly IKafkaLog _log;
-        
+
         private bool _interrupted;
 
         public KafkaMetadataProvider(IKafkaLog log)
@@ -39,7 +39,7 @@ namespace KafkaNet
         /// <param name="connections">The server connections to query.  Will cycle through the collection, starting at zero until a response is received.</param>
         /// <param name="topics">The collection of topics to get metadata for.</param>
         /// <returns>MetadataResponse validated to be complete.</returns>
-        public MetadataResponse Get(IKafkaConnection[] connections, IEnumerable<string> topics)
+        public async Task<MetadataResponse> Get(IKafkaConnection[] connections, IEnumerable<string> topics)
         {
             var request = new MetadataRequest { Topics = topics.ToList() };
             if (request.Topics.Count <= 0) return null;
@@ -51,7 +51,7 @@ namespace KafkaNet
             do
             {
                 performRetry = false;
-                metadataResponse = GetMetadataResponse(connections, request);
+                metadataResponse = await GetMetadataResponse(connections, request);
                 if (metadataResponse == null) return null;
 
                 foreach (var validation in ValidateResponse(metadataResponse))
@@ -62,37 +62,36 @@ namespace KafkaNet
                             performRetry = true;
                             _log.WarnFormat(validation.Message);
                             break;
+
                         case ValidationResult.Error:
                             throw validation.Exception;
                     }
                 }
 
-                BackoffOnRetry(++retryAttempt, performRetry);
-
+                await BackoffOnRetry(++retryAttempt, performRetry);
             } while (_interrupted == false && performRetry);
 
             return metadataResponse;
         }
 
-        private void BackoffOnRetry(int retryAttempt, bool performRetry)
+        private async Task BackoffOnRetry(int retryAttempt, bool performRetry)
         {
             if (performRetry && retryAttempt > 0)
             {
-                var backoff = retryAttempt*retryAttempt*BackoffMilliseconds;
+                var backoff = retryAttempt * retryAttempt * BackoffMilliseconds;
                 _log.WarnFormat("Backing off metadata request retry.  Waiting for {0}ms.", backoff);
-                Thread.Sleep(TimeSpan.FromMilliseconds(backoff));
+                await Task.Delay(TimeSpan.FromMilliseconds(backoff));
             }
         }
 
-        private MetadataResponse GetMetadataResponse(IKafkaConnection[] connections, MetadataRequest request)
+        private async Task<MetadataResponse> GetMetadataResponse(IKafkaConnection[] connections, MetadataRequest request)
         {
             //try each default broker until we find one that is available
             foreach (var conn in connections)
             {
                 try
                 {
-                    //TODO remove blocking result here!
-                    var response = conn.SendAsync(request).Result;
+                    var response = await conn.SendAsync(request);
                     if (response != null && response.Count > 0)
                     {
                         return response.FirstOrDefault();
@@ -196,6 +195,7 @@ namespace KafkaNet
     }
 
     public enum ValidationResult { Valid, Error, Retry }
+
     public class MetadataValidationResult
     {
         public ValidationResult Status { get; set; }

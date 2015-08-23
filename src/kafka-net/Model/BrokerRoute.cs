@@ -5,12 +5,14 @@
         public string Topic { get; set; }
         public int PartitionId { get; set; }
         public IKafkaConnection Connection { get; set; }
+
         public override string ToString()
         {
             return string.Format("{0} Topic:{1} PartitionId:{2}", Connection.Endpoint.ServeUri, Topic, PartitionId);
         }
 
         #region Equals Override...
+
         protected bool Equals(BrokerRoute other)
         {
             return string.Equals(Topic, other.Topic) && PartitionId == other.PartitionId;
@@ -31,6 +33,7 @@
             if (obj.GetType() != this.GetType()) return false;
             return Equals((BrokerRoute)obj);
         }
-        #endregion
+
+        #endregion Equals Override...
     }
 }

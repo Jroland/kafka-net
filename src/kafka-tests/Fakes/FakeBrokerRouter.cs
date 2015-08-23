@@ -1,12 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net;
+﻿using kafka_tests.Fakes;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
-using kafka_tests.Fakes;
-using System.Threading;
 using NSubstitute;
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Threading;
 
 namespace kafka_tests
 {
@@ -19,7 +19,7 @@ namespace kafka_tests
         private readonly FakeKafkaConnection _fakeConn0;
         private readonly FakeKafkaConnection _fakeConn1;
         private readonly IKafkaConnectionFactory _mockKafkaConnectionFactory;
-
+        public readonly TimeSpan _cacheExpiration = TimeSpan.FromMilliseconds(1);
         public FakeKafkaConnection BrokerConn0 { get { return _fakeConn0; } }
         public FakeKafkaConnection BrokerConn1 { get { return _fakeConn1; } }
         public IKafkaConnectionFactory KafkaConnectionMockKafkaConnectionFactory { get { return _mockKafkaConnectionFactory; } }
@@ -31,17 +31,18 @@ namespace kafka_tests
         public FakeBrokerRouter()
         {
             //setup mock IKafkaConnection
+
             _fakeConn0 = new FakeKafkaConnection(new Uri("http://localhost:1"));
-            _fakeConn0.ProduceResponseFunction = () => new ProduceResponse { Offset = _offset0++, PartitionId = 0, Topic = TestTopic };
-            _fakeConn0.MetadataResponseFunction = () => MetadataResponse();
-            _fakeConn0.OffsetResponseFunction = () => new OffsetResponse { Offsets = new List<long> { 0, 99 }, PartitionId = 0, Topic = TestTopic };
-            _fakeConn0.FetchResponseFunction = () => { Thread.Sleep(500); return null; };
+            _fakeConn0.ProduceResponseFunction = async () => new ProduceResponse { Offset = _offset0++, PartitionId = 0, Topic = TestTopic };
+            _fakeConn0.MetadataResponseFunction = async () => MetadataResponse();
+            _fakeConn0.OffsetResponseFunction = async () => new OffsetResponse { Offsets = new List<long> { 0, 99 }, PartitionId = 0, Topic = TestTopic };
+            _fakeConn0.FetchResponseFunction = async () => { Thread.Sleep(500); return null; };
 
             _fakeConn1 = new FakeKafkaConnection(new Uri("http://localhost:2"));
-            _fakeConn1.ProduceResponseFunction = () => new ProduceResponse { Offset = _offset1++, PartitionId = 1, Topic = TestTopic };
-            _fakeConn1.MetadataResponseFunction = () => MetadataResponse();
-            _fakeConn1.OffsetResponseFunction = () => new OffsetResponse { Offsets = new List<long> { 0, 100 }, PartitionId = 1, Topic = TestTopic };
-            _fakeConn1.FetchResponseFunction = () => { Thread.Sleep(500); return null; };
+            _fakeConn1.ProduceResponseFunction = async () => new ProduceResponse { Offset = _offset1++, PartitionId = 1, Topic = TestTopic };
+            _fakeConn1.MetadataResponseFunction = async () => MetadataResponse();
+            _fakeConn1.OffsetResponseFunction = async () => new OffsetResponse { Offsets = new List<long> { 0, 100 }, PartitionId = 1, Topic = TestTopic };
+            _fakeConn1.FetchResponseFunction = async () => { Thread.Sleep(500); return null; };
 
             _mockKafkaConnectionFactory = Substitute.For<IKafkaConnectionFactory>();
             _mockKafkaConnectionFactory.Create(Arg.Is<KafkaEndpoint>(e => e.Endpoint.Port == 1), Arg.Any<TimeSpan>(), Arg.Any<IKafkaLog>()).Returns(_fakeConn0);
@@ -61,6 +62,8 @@ namespace kafka_tests
                 KafkaServerUri = new List<Uri> { new Uri("http://localhost:1"), new Uri("http://localhost:2") },
                 KafkaConnectionFactory = _mockKafkaConnectionFactory,
                 PartitionSelector = PartitionSelector
+                ,
+                CacheExpiration = _cacheExpiration
             });
         }
 
@@ -109,7 +112,6 @@ namespace kafka_tests
                                                     Replicas = new List<int> {1},
                                                 }
                                         }
-
                                 }
                         }
                 };

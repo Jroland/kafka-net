@@ -1,6 +1,6 @@
-﻿using System;
+﻿using KafkaNet.Common;
+using System;
 using System.Collections.Generic;
-using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
@@ -35,18 +35,22 @@ namespace KafkaNet.Protocol
         /// Error code. 0 indicates no error occured.
         /// </summary>
         public Int16 ErrorCode { get; set; }
+
         /// <summary>
         /// The Id of the partition that this metadata describes.
         /// </summary>
         public int PartitionId { get; set; }
+
         /// <summary>
         /// The node id for the kafka broker currently acting as leader for this partition. If no leader exists because we are in the middle of a leader election this id will be -1.
         /// </summary>
         public int LeaderId { get; set; }
+
         /// <summary>
         /// The set of alive nodes that currently acts as slaves for the leader for this partition.
         /// </summary>
         public List<int> Replicas { get; set; }
+
         /// <summary>
         /// The set subset of the replicas that are "caught up" to the leader
         /// </summary>
@@ -54,7 +58,8 @@ namespace KafkaNet.Protocol
 
         public static Partition FromStream(BigEndianBinaryReader stream)
         {
-            var partition = new Partition {
+            var partition = new Partition
+            {
                 ErrorCode = stream.ReadInt16(),
                 PartitionId = stream.ReadInt32(),
                 LeaderId = stream.ReadInt32(),
@@ -92,8 +97,7 @@ namespace KafkaNet.Protocol
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
             if (obj.GetType() != this.GetType()) return false;
-            return Equals((Partition) obj);
+            return Equals((Partition)obj);
         }
     }
-
 }

@@ -1,7 +1,5 @@
-using System.Collections.Generic;
-using System.Linq;
 using KafkaNet.Common;
-using KafkaNet.Model;
+using System.Collections.Generic;
 
 namespace KafkaNet.Protocol
 {
@@ -77,12 +75,12 @@ namespace KafkaNet.Protocol
                 return response;
             }
         }
-
     }
 
     public class MetadataResponse
     {
         public int CorrelationId { get; set; }
+
         public MetadataResponse()
         {
             Brokers = new List<Broker>();

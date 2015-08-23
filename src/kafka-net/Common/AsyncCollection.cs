@@ -150,7 +150,6 @@ namespace KafkaNet.Common
                     }
                 }
             }
-
         }
     }
 }

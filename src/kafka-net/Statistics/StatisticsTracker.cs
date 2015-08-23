@@ -1,15 +1,15 @@
-﻿using System;
+﻿using KafkaNet.Common;
+using KafkaNet.Model;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using KafkaNet.Common;
-using KafkaNet.Model;
 
 namespace KafkaNet.Statistics
 {
     /// <summary>
-    /// Statistics tracker uses circular buffers to capture a maximum set of current statistics.  
+    /// Statistics tracker uses circular buffers to capture a maximum set of current statistics.
     /// </summary>
     public static class StatisticsTracker
     {
@@ -53,9 +53,11 @@ namespace KafkaNet.Statistics
                 case StatisticGauge.ActiveReadOperation:
                     Interlocked.Increment(ref Gauges.ActiveReadOperation);
                     break;
+
                 case StatisticGauge.ActiveWriteOperation:
                     Interlocked.Increment(ref Gauges.ActiveWriteOperation);
                     break;
+
                 case StatisticGauge.QueuedWriteOperation:
                     Interlocked.Increment(ref Gauges.QueuedWriteOperation);
                     break;
@@ -69,9 +71,11 @@ namespace KafkaNet.Statistics
                 case StatisticGauge.ActiveReadOperation:
                     Interlocked.Decrement(ref Gauges.ActiveReadOperation);
                     break;
+
                 case StatisticGauge.ActiveWriteOperation:
                     Interlocked.Decrement(ref Gauges.ActiveWriteOperation);
                     break;
+
                 case StatisticGauge.QueuedWriteOperation:
                     Interlocked.Decrement(ref Gauges.QueuedWriteOperation);
                     break;
@@ -127,7 +131,6 @@ namespace KafkaNet.Statistics
             QueuedNetworkWriteStatistics = queuedWrites;
             CompletedNetworkWriteStatistics = completedWrites;
             Gauges = gauges;
-
 
             if (queuedWrites.Count > 0 || completedWrites.Count > 0)
             {
@@ -315,8 +318,6 @@ namespace KafkaNet.Statistics
 
             CompressionRatio = MessageBytes == 0 ? 0 : Math.Round((double)compressedBytes / MessageBytes, 4);
         }
-
-
     }
 
     public static class MathHelper

@@ -1,31 +1,35 @@
-﻿using System.Collections.Concurrent;
+﻿using KafkaNet.Model;
+using KafkaNet.Protocol;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace KafkaNet
 {
     /// <summary>
     /// This class provides an abstraction from querying multiple Kafka servers for Metadata details and caching this data.
-    /// 
+    ///
     /// All metadata queries are cached lazily.  If metadata from a topic does not exist in cache it will be queried for using
     /// the default brokers provided in the constructor.  Each Uri will be queried to get metadata information in turn until a
     /// response is received.  It is recommended therefore to provide more than one Kafka Uri as this API will be able to to get
     /// metadata information even if one of the Kafka servers goes down.
-    /// 
-    /// The metadata will stay in cache until an error condition is received indicating the metadata is out of data.  This error 
+    ///
+    /// The metadata will stay in cache until an error condition is received indicating the metadata is out of data.  This error
     /// can be in the form of a socket disconnect or an error code from a response indicating a broker no longer hosts a partition.
     /// </summary>
     public class BrokerRouter : IBrokerRouter
     {
-        private readonly object _threadLock = new object();
         private readonly KafkaOptions _kafkaOptions;
         private readonly KafkaMetadataProvider _kafkaMetadataProvider;
         private readonly ConcurrentDictionary<KafkaEndpoint, IKafkaConnection> _defaultConnectionIndex = new ConcurrentDictionary<KafkaEndpoint, IKafkaConnection>();
         private readonly ConcurrentDictionary<int, IKafkaConnection> _brokerConnectionIndex = new ConcurrentDictionary<int, IKafkaConnection>();
-        private readonly ConcurrentDictionary<string, Topic> _topicIndex = new ConcurrentDictionary<string, Topic>();
+        private readonly ConcurrentDictionary<string, Tuple<Topic, DateTime>> _topicIndex = new ConcurrentDictionary<string, Tuple<Topic, DateTime>>();
+        private SemaphoreSlim _taskLocker = new SemaphoreSlim(1);
 
+        /// <exception cref="ServerUnreachableException">None of the provided Kafka servers are resolvable.</exception>
         public BrokerRouter(KafkaOptions kafkaOptions)
         {
             _kafkaOptions = kafkaOptions;
@@ -50,20 +54,23 @@ namespace KafkaNet
         /// <remarks>
         /// This function does not use any selector criteria.  If the given partitionId does not exist an exception will be thrown.
         /// </remarks>
-        /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
-        /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        public BrokerRoute SelectBrokerRoute(string topic, int partitionId)
+        /// <exception cref="InvalidTopicNotExistsInCache">Thrown if the topic metadata does not exist in the cache.</exception>
+
+        public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, int partitionId)
         {
-            var cachedTopic = GetTopicMetadata(topic);
-
-            if (cachedTopic.Count <= 0)
-                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
-
+            var cachedTopic = GetTopicMetadataFromLocalCache(topic);
             var topicMetadata = cachedTopic.First();
+            if (topicMetadata == null)
+            {
+                throw new InvalidTopicNotExistsInCache(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topic)));
+            }
 
             var partition = topicMetadata.Partitions.FirstOrDefault(x => x.PartitionId == partitionId);
-            if (partition == null) throw new InvalidPartitionException(string.Format("The topic:{0} does not have a partitionId:{1} defined.", topic, partitionId));
+            if (partition == null)
+            {
+                throw new InvalidPartitionException(string.Format("The topic:{0} does not have a partitionId:{1} defined.", topic, partitionId));
+            }
 
             return GetCachedRoute(topicMetadata.Name, partition);
         }
@@ -74,15 +81,16 @@ namespace KafkaNet
         /// <param name="topic">The topic to retreive a broker route for.</param>
         /// <param name="key">The key used by the IPartitionSelector to collate to a consistent partition. Null value means key will be ignored in selection process.</param>
         /// <returns>A broker route for the given topic.</returns>
-        /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
-        /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        public BrokerRoute SelectBrokerRoute(string topic, byte[] key = null)
+        /// <exception cref="InvalidTopicNotExistsInCache">Thrown if the topic metadata does not exist in the cache.</exception>
+        public BrokerRoute SelectBrokerRouteFromLocalCache(string topic, byte[] key = null)
         {
             //get topic either from cache or server.
-            var cachedTopic = GetTopicMetadata(topic).FirstOrDefault();
+            var cachedTopic = GetTopicMetadataFromLocalCache(topic).FirstOrDefault();
 
             if (cachedTopic == null)
-                throw new InvalidTopicMetadataException(ErrorResponseCode.NoError, "The Metadata is invalid as it returned no data for the given topic:{0}", topic);
+            {
+                throw new InvalidTopicNotExistsInCache(String.Format("The Metadata is invalid as it returned no data for the given topic:{0}", topic));
+            }
 
             var partition = _kafkaOptions.PartitionSelector.Select(cachedTopic, key);
 
@@ -90,7 +98,7 @@ namespace KafkaNet
         }
 
         /// <summary>
-        /// Returns Topic metadata for each topic requested. 
+        /// Returns Topic metadata for each topic requested.
         /// </summary>
         /// <param name="topics">Collection of topics to request metadata for.</param>
         /// <returns>List of Topics as provided by Kafka.</returns>
@@ -98,18 +106,14 @@ namespace KafkaNet
         /// The topic metadata will by default check the cache first and then if it does not exist it will then
         /// request metadata from the server.  To force querying the metadata from the server use <see cref="RefreshTopicMetadata"/>
         /// </remarks>
-        public List<Topic> GetTopicMetadata(params string[] topics)
+        /// <exception cref="InvalidTopicNotExistsInCache">Thrown if the topic metadata does not exist in the cache.</exception>
+        public List<Topic> GetTopicMetadataFromLocalCache(params string[] topics)
         {
-            var topicSearchResult = SearchCacheForTopics(topics);
+            var topicSearchResult = SearchCacheForTopics(topics, null);
 
-            //update metadata for all missing topics
             if (topicSearchResult.Missing.Count > 0)
             {
-                //double check for missing topics and query
-                RefreshTopicMetadata(topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
-
-                var refreshedTopics = topicSearchResult.Missing.Select(GetCachedTopic).Where(x => x != null);
-                topicSearchResult.Topics.AddRange(refreshedTopics);
+                throw new InvalidTopicNotExistsInCache(string.Format("The Metadata is invalid as it returned no data for the given topic:{0}", string.Join(",", topicSearchResult.Missing)));
             }
 
             return topicSearchResult.Topics;
@@ -121,57 +125,91 @@ namespace KafkaNet
         /// <param name="topics">List of topics to update metadata for.</param>
         /// <remarks>
         /// This method will ignore the cache and initiate a call to the kafka servers for all given topics, updating the cache with the resulting metadata.
-        /// Only call this method to force a metadata update.  For all other queries use <see cref="GetTopicMetadata"/> which uses cached values.
+        /// Only call this method to force a metadata update.  For all other queries use <see cref="GetTopicMetadataFromLocalCache"/> which uses cached values.
         /// </remarks>
-        public void RefreshTopicMetadata(params string[] topics)
+
+        public Task<bool> RefreshTopicMetadata(params string[] topics)
         {
-            //TODO need to remove lock here, try and move to lock free design
-            lock (_threadLock)
+            return RefreshTopicMetadata(_kafkaOptions.CacheExpiration, _kafkaOptions.RefreshMetadataTimeout, topics);
+        }
+
+        /// <summary>
+        /// Refresh metadata Request will try to refresh only the topics that were expired in the cache.
+        /// If cacheExpiration is null: refresh metadata Request will try to refresh only topics that are not in the cache.
+        /// </summary>
+        private async Task<bool> RefreshTopicMetadata(TimeSpan? cacheExpiration, TimeSpan timeout, params string[] topics)
+        {
+            try
             {
+                await _taskLocker.WaitAsync(timeout);
+                int missingFromCache = SearchCacheForTopics(topics, cacheExpiration).Missing.Count;
+                if (missingFromCache == 0)
+                {
+                    return false;
+                }
+
                 _kafkaOptions.Log.DebugFormat("BrokerRouter: Refreshing metadata for topics: {0}", string.Join(",", topics));
 
                 //get the connections to query against and get metadata
                 var connections = _defaultConnectionIndex.Values.Union(_brokerConnectionIndex.Values).ToArray();
-                var metadataResponse = _kafkaMetadataProvider.Get(connections, topics);
+                var taskMetadata = _kafkaMetadataProvider.Get(connections, topics);
+                await Task.WhenAny(Task.Delay(timeout), taskMetadata);
+                if (!taskMetadata.IsCompleted)
+                {
+                    var ex = new Exception("Metadata refresh operation timed out");
+
+                    throw ex;
+                }
+                var metadataResponse = await taskMetadata;
 
                 UpdateInternalMetadataCache(metadataResponse);
             }
+            finally
+            {
+                _taskLocker.Release();
+            }
+            return true;
         }
 
-        private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics)
+        private TopicSearchResult SearchCacheForTopics(IEnumerable<string> topics, TimeSpan? expiration)
         {
             var result = new TopicSearchResult();
 
             foreach (var topic in topics)
             {
-                var cachedTopic = GetCachedTopic(topic);
+                var cachedTopic = GetCachedTopic(topic, expiration);
 
                 if (cachedTopic == null)
+                {
                     result.Missing.Add(topic);
+                }
                 else
+                {
                     result.Topics.Add(cachedTopic);
+                }
             }
 
             return result;
         }
 
-        private Topic GetCachedTopic(string topic)
+        private Topic GetCachedTopic(string topic, TimeSpan? expiration = null)
         {
-            Topic cachedTopic;
-            return _topicIndex.TryGetValue(topic, out cachedTopic) ? cachedTopic : null;
+            Tuple<Topic, DateTime> cachedTopic;
+            if (_topicIndex.TryGetValue(topic, out cachedTopic))
+            {
+                bool hasExpirationPolicy = expiration.HasValue;
+                bool isNotExpired = expiration.HasValue && (DateTime.Now - cachedTopic.Item2).TotalMilliseconds < expiration.Value.TotalMilliseconds;
+                if (!hasExpirationPolicy || isNotExpired)
+                {
+                    return cachedTopic.Item1;
+                }
+            }
+            return null;
         }
 
         private BrokerRoute GetCachedRoute(string topic, Partition partition)
         {
             var route = TryGetRouteFromCache(topic, partition);
-
-            //leader could not be found, refresh the broker information and try one more time
-            if (route == null)
-            {
-                RefreshTopicMetadata(topic);
-                route = TryGetRouteFromCache(topic, partition);
-            }
-
             if (route != null) return route;
 
             throw new LeaderNotFoundException(string.Format("Lead broker cannot be found for parition: {0}, leader: {1}", partition.PartitionId, partition.LeaderId));
@@ -192,10 +230,9 @@ namespace KafkaNet
 
             return null;
         }
-        
+
         private void UpdateInternalMetadataCache(MetadataResponse metadata)
         {
-
             //resolve each broker
             var brokerEndpoints = metadata.Brokers.Select(broker => new
             {
@@ -205,6 +242,7 @@ namespace KafkaNet
 
             foreach (var broker in brokerEndpoints)
             {
+
                 //if the connection is in our default connection index already, remove it and assign it to the broker index.
                 IKafkaConnection connection;
                 if (_defaultConnectionIndex.TryRemove(broker.Endpoint, out connection))
@@ -220,7 +258,7 @@ namespace KafkaNet
 
             foreach (var topic in metadata.Topics)
             {
-                var localTopic = topic;
+                var localTopic = new Tuple<Topic, DateTime>(topic, DateTime.Now);
                 _topicIndex.AddOrUpdate(topic.Name, s => localTopic, (s, existing) => localTopic);
             }
         }
@@ -232,6 +270,7 @@ namespace KafkaNet
                     i => newConnection,
                     (i, existingConnection) =>
                     {
+
                         //if a connection changes for a broker close old connection and create a new one
                         if (existingConnection.Endpoint.Equals(newConnection.Endpoint)) return existingConnection;
                         _kafkaOptions.Log.WarnFormat("Broker:{0} Uri changed from:{1} to {2}", brokerId, existingConnection.Endpoint, newConnection.Endpoint);
@@ -247,9 +286,28 @@ namespace KafkaNet
             _defaultConnectionIndex.Values.ToList().ForEach(conn => { using (conn) { } });
             _brokerConnectionIndex.Values.ToList().ForEach(conn => { using (conn) { } });
         }
+
+        public async Task RefreshMissingTopicMetadata(params string[] topics)
+        {
+            var topicSearchResult = SearchCacheForTopics(topics, null);
+
+            //update metadata for all missing topics
+            if (topicSearchResult.Missing.Count > 0)
+            {
+
+                //double check for missing topics and query
+                await RefreshTopicMetadata(null, _kafkaOptions.RefreshMetadataTimeout, topicSearchResult.Missing.Where(x => _topicIndex.ContainsKey(x) == false).ToArray());
+            }
+        }
+
+        public DateTime GetTopicMetadataRefreshTime(string topic)
+        {
+            return _topicIndex[topic].Item2;
+        }
     }
 
     #region BrokerCache Class...
+
     public class TopicSearchResult
     {
         public List<Topic> Topics { get; set; }
@@ -261,5 +319,6 @@ namespace KafkaNet
             Missing = new List<string>();
         }
     }
-    #endregion
+
+    #endregion BrokerCache Class...
 }

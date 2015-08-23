@@ -117,6 +117,7 @@ namespace KafkaNet.Common
                 case StringPrefixEncoding.Int16:
                     Write((Int16)value.Length);
                     break;
+
                 case StringPrefixEncoding.Int32:
                     Write(value.Length);
                     break;
@@ -134,6 +135,7 @@ namespace KafkaNet.Common
                     case StringPrefixEncoding.Int16:
                         Write((Int16)(-1));
                         return;
+
                     default:
                         Write(-1);
                         return;
@@ -145,6 +147,7 @@ namespace KafkaNet.Common
                 case StringPrefixEncoding.Int16:
                     Write((Int16)value.Length);
                     break;
+
                 case StringPrefixEncoding.Int32:
                     Write(value.Length);
                     break;
@@ -152,7 +155,6 @@ namespace KafkaNet.Common
 
             Write(Encoding.UTF8.GetBytes(value));
         }
-
 
         private void WriteBigEndian(Byte[] bytes)
         {

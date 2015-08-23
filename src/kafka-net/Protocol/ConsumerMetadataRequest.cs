@@ -1,12 +1,12 @@
-﻿using System;
+﻿using KafkaNet.Common;
+using System;
 using System.Collections.Generic;
-using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
     /// <summary>
     /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetFetchRequest
-    /// The offsets for a given consumer group is maintained by a specific broker called the offset coordinator. i.e., a consumer needs 
+    /// The offsets for a given consumer group is maintained by a specific broker called the offset coordinator. i.e., a consumer needs
     /// to issue its offset commit and fetch requests to this specific broker. It can discover the current offset coordinator by issuing a consumer metadata request.
     /// </summary>
     public class ConsumerMetadataRequest : BaseRequest, IKafkaRequest<ConsumerMetadataResponse>
@@ -18,7 +18,6 @@ namespace KafkaNet.Protocol
         {
             return EncodeConsumerMetadataRequest(this);
         }
-
 
         public IEnumerable<ConsumerMetadataResponse> Decode(byte[] payload)
         {

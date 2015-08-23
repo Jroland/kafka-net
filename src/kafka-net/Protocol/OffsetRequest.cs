@@ -1,12 +1,12 @@
+using KafkaNet.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
     /// <summary>
-    /// A funky Protocol for requesting the starting offset of each segment for the requested partition 
+    /// A funky Protocol for requesting the starting offset of each segment for the requested partition
     /// </summary>
     public class OffsetRequest : BaseRequest, IKafkaRequest<OffsetResponse>
     {
@@ -58,7 +58,6 @@ namespace KafkaNet.Protocol
             }
         }
 
-
         private IEnumerable<OffsetResponse> DecodeOffsetResponse(byte[] data)
         {
             using (var stream = new BigEndianBinaryReader(data))
@@ -100,18 +99,21 @@ namespace KafkaNet.Protocol
             Time = -1;
             MaxOffsets = 1;
         }
+
         public string Topic { get; set; }
         public int PartitionId { get; set; }
+
         /// <summary>
-        /// Used to ask for all messages before a certain time (ms). There are two special values. 
-        /// Specify -1 to receive the latest offsets and -2 to receive the earliest available offset. 
+        /// Used to ask for all messages before a certain time (ms). There are two special values.
+        /// Specify -1 to receive the latest offsets and -2 to receive the earliest available offset.
         /// Note that because offsets are pulled in descending order, asking for the earliest offset will always return you a single element.
         /// </summary>
         public long Time { get; set; }
+
         public int MaxOffsets { get; set; }
     }
 
-    public class OffsetResponse
+    public class OffsetResponse : IBaseResponse
     {
         public string Topic { get; set; }
         public int PartitionId { get; set; }
@@ -121,12 +123,16 @@ namespace KafkaNet.Protocol
 
     public class OffsetPosition
     {
-        public OffsetPosition() { }
+        public OffsetPosition()
+        {
+        }
+
         public OffsetPosition(int partitionId, long offset)
         {
             PartitionId = partitionId;
             Offset = offset;
         }
+
         public int PartitionId { get; set; }
         public long Offset { get; set; }
 

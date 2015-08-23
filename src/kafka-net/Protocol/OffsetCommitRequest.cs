@@ -1,12 +1,12 @@
+using KafkaNet.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
     /// <summary>
-    /// Class that represents the api call to commit a specific set of offsets for a given topic.  The offset is saved under the 
+    /// Class that represents the api call to commit a specific set of offsets for a given topic.  The offset is saved under the
     /// arbitrary ConsumerGroup name provided by the call.
     /// </summary>
     public class OffsetCommitRequest : BaseRequest, IKafkaRequest<OffsetCommitResponse>
@@ -95,18 +95,22 @@ namespace KafkaNet.Protocol
         /// The topic the offset came from.
         /// </summary>
         public string Topic { get; set; }
+
         /// <summary>
         /// The partition the offset came from.
         /// </summary>
         public int PartitionId { get; set; }
+
         /// <summary>
         /// The offset number to commit as completed.
         /// </summary>
         public long Offset { get; set; }
+
         /// <summary>
         /// If the time stamp field is set to -1, then the broker sets the time stamp to the receive time before committing the offset.
         /// </summary>
         public long TimeStamp { get; set; }
+
         /// <summary>
         /// Descriptive metadata about this commit.
         /// </summary>
@@ -116,22 +120,23 @@ namespace KafkaNet.Protocol
         {
             TimeStamp = -1;
         }
-    
     }
 
-    public class OffsetCommitResponse
+    public class OffsetCommitResponse : IBaseResponse
     {
         /// <summary>
         /// The name of the topic this response entry is for.
         /// </summary>
-        public string Topic;
+        public string Topic { get; set; }
+
         /// <summary>
         /// The id of the partition this response is for.
         /// </summary>
-        public Int32 PartitionId;
+        public Int32 PartitionId { get; set; }
+
         /// <summary>
         /// Error code of exception that occured during the request.  Zero if no error.
         /// </summary>
-        public Int16 Error;
+        public Int16 Error { get; set; }
     }
 }

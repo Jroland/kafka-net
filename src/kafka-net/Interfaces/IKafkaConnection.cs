@@ -1,7 +1,7 @@
-﻿using System;
+﻿using KafkaNet.Model;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using KafkaNet.Model;
 
 namespace KafkaNet
 {

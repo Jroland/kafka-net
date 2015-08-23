@@ -69,7 +69,7 @@ namespace KafkaNet.Common
     /// <summary>
     /// TODO there is a bug in this that sometimes calls the do function twice on startup
     /// Timer class which providers a fluent interface for scheduling task for threads to execute at some future point.
-    /// 
+    ///
     /// Thanks goes to Jeff Vanzella for this nifty little fluent class for scheduling tasks.
     /// </summary>
     public class ScheduledTimer : IScheduledTimer
@@ -216,7 +216,7 @@ namespace KafkaNet.Common
         /// Sets the timer to execute and restart the timer without waiting for the Do method to finish.
         /// </summary>
         /// <remarks>
-        /// Setting this will start the countdown timer to the next execution imediately 
+        /// Setting this will start the countdown timer to the next execution imediately
         /// after the current execution is triggered.  If the execution action takes longer than
         /// the timer interval, the execution task will stack and run concurrently.
         /// </remarks>

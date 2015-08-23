@@ -1,11 +1,11 @@
-﻿using System;
+﻿using kafka_tests.Helpers;
+using KafkaNet.Common;
+using NUnit.Framework;
+using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Common;
-using kafka_tests.Helpers;
-using NUnit.Framework;
 
 namespace kafka_tests.Unit
 {
@@ -13,7 +13,7 @@ namespace kafka_tests.Unit
     [Category("Unit")]
     public class AsyncLockTests
     {
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(OperationCanceledException))]
         public async void AsyncLockCancelShouldThrowOperationCanceledException()
         {
@@ -33,7 +33,7 @@ namespace kafka_tests.Unit
             Assert.That(count, Is.EqualTo(1), "Only the first call should succeed.  The second should timeout.");
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async void AsyncLockCancelShouldNotAllowInsideLock()
         {
             var count = 0;
@@ -52,14 +52,14 @@ namespace kafka_tests.Unit
                     }
                 }
             }
-            catch 
+            catch
             {
             }
 
             Assert.That(count, Is.EqualTo(1));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void AsyncLockShouldAllowMultipleStackedWaits()
         {
             var count = 0;
@@ -82,8 +82,8 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
-        public void AsyncLockShouldAllowOnlyOneThread()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task AsyncLockShouldAllowOnlyOneThread()
         {
             var block = new SemaphoreSlim(0, 2);
             var count = 0;
@@ -99,7 +99,7 @@ namespace kafka_tests.Unit
                 block.Wait();//keep this thread busy
             });
 
-            TaskTest.WaitFor(() => count > 0);
+            await TaskTest.WaitFor(() => count > 0);
 
             alock.LockAsync().ContinueWith(t => Interlocked.Increment(ref count));
 
@@ -107,15 +107,14 @@ namespace kafka_tests.Unit
             Assert.That(firstCall.IsCompleted, Is.False, "Task should still be running.");
 
             block.Release();
-            TaskTest.WaitFor(() => count > 1);
+            await TaskTest.WaitFor(() => count > 1);
             Assert.That(count, Is.EqualTo(2), "Second call should get past lock.");
             Assert.That(firstCall.IsCompleted, Is.False, "First call should still be busy.");
             block.Release();
         }
 
-
-        [Test]
-        public void AsyncLockShouldUnlockEvenFromDifferentThreads()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task AsyncLockShouldUnlockEvenFromDifferentThreads()
         {
             var block = new SemaphoreSlim(0, 2);
             var count = 0;
@@ -133,7 +132,7 @@ namespace kafka_tests.Unit
                 }
             });
 
-            TaskTest.WaitFor(() => count > 0);
+            await TaskTest.WaitFor(() => count > 0);
 
             Task.Factory.StartNew(async () =>
             {
@@ -148,7 +147,7 @@ namespace kafka_tests.Unit
             Assert.That(count, Is.EqualTo(1), "Only one task should have gotten past lock.");
 
             block.Release();
-            TaskTest.WaitFor(() => count > 1);
+            await TaskTest.WaitFor(() => count > 1);
             Assert.That(count, Is.EqualTo(2), "Second call should get past lock.");
         }
 

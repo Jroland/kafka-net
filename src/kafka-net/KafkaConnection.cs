@@ -1,20 +1,21 @@
+using KafkaNet.Common;
+using KafkaNet.Model;
+using KafkaNet.Protocol;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Common;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
     /// <summary>
-    /// KafkaConnection represents the lowest level TCP stream connection to a Kafka broker. 
+    /// KafkaConnection represents the lowest level TCP stream connection to a Kafka broker.
     /// The Send and Receive are separated into two disconnected paths and must be combine outside
     /// this class by the correlation ID contained within the returned message.
-    /// 
+    ///
     /// The SendAsync function will return a Task and complete once the data has been sent to the outbound stream.
     /// The Read response is handled by a single thread polling the stream for data and firing an OnResponseReceived
     /// event when a response is received.
@@ -24,13 +25,13 @@ namespace KafkaNet
         private const int DefaultResponseTimeoutMs = 60000;
 
         private readonly ConcurrentDictionary<int, AsyncRequestItem> _requestIndex = new ConcurrentDictionary<int, AsyncRequestItem>();
-        private readonly TimeSpan _responseTimeoutMS;
+        private readonly TimeSpan _responseTimeoutMs;
         private readonly IKafkaLog _log;
         private readonly IKafkaTcpSocket _client;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
 
-        private int _disposeCount = 0;
-        private Task _connectionReadPollingTask = null;
+        private int _disposeCount;
+        private Task _connectionReadPollingTask;
         private int _ensureOneActiveReader;
         private int _correlationIdSeed;
 
@@ -44,7 +45,7 @@ namespace KafkaNet
         {
             _client = client;
             _log = log ?? new DefaultTraceLog();
-            _responseTimeoutMS = responseTimeoutMs ?? TimeSpan.FromMilliseconds(DefaultResponseTimeoutMs);
+            _responseTimeoutMs = responseTimeoutMs ?? TimeSpan.FromMilliseconds(DefaultResponseTimeoutMs);
 
             StartReadStreamPoller();
         }
@@ -83,50 +84,60 @@ namespace KafkaNet
             return _client.WriteAsync(payload, token);
         }
 
-
         /// <summary>
         /// Send kafka payload to server and receive a task event when response is received.
         /// </summary>
         /// <typeparam name="T">A Kafka response object return by decode function.</typeparam>
         /// <param name="request">The IKafkaRequest to send to the kafka servers.</param>
         /// <returns></returns>
+
         public async Task<List<T>> SendAsync<T>(IKafkaRequest<T> request)
         {
             //assign unique correlationId
             request.CorrelationId = NextCorrelationId();
 
+            _log.DebugFormat("Entered SendAsync for CorrelationId:{0} Connection:{1}", request.CorrelationId, this.Endpoint);
             //if response is expected, register a receive data task and send request
             if (request.ExpectResponse)
             {
                 using (var asyncRequest = new AsyncRequestItem(request.CorrelationId))
                 {
-
                     try
                     {
                         AddAsyncRequestItemToResponseQueue(asyncRequest);
-                        await _client.WriteAsync(request.Encode())
-                            .ContinueWith(t => asyncRequest.MarkRequestAsSent(t.Exception, _responseTimeoutMS, TriggerMessageTimeout))
-                            .ConfigureAwait(false);
+                        ExceptionDispatchInfo exceptionDispatchInfo = null;
+
+                        try
+                        {
+                            await _client.WriteAsync(request.Encode()).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            exceptionDispatchInfo = ExceptionDispatchInfo.Capture(ex);
+                        }
+
+                        asyncRequest.MarkRequestAsSent(exceptionDispatchInfo, _responseTimeoutMs, TriggerMessageTimeout);
                     }
                     catch (OperationCanceledException)
                     {
                         TriggerMessageTimeout(asyncRequest);
                     }
-                
+
                     var response = await asyncRequest.ReceiveTask.Task.ConfigureAwait(false);
 
                     return request.Decode(response).ToList();
                 }
             }
 
-
             //no response needed, just send
             await _client.WriteAsync(request.Encode()).ConfigureAwait(false);
+
             //TODO should this return a response of success for request?
             return new List<T>();
         }
 
         #region Equals Override...
+
         public override bool Equals(object obj)
         {
             if (ReferenceEquals(null, obj)) return false;
@@ -144,7 +155,8 @@ namespace KafkaNet
         {
             return (_client.Endpoint != null ? _client.Endpoint.GetHashCode() : 0);
         }
-        #endregion
+
+        #endregion Equals Override...
 
         private void StartReadStreamPoller()
         {
@@ -196,6 +208,7 @@ namespace KafkaNet
             AsyncRequestItem asyncRequest;
             if (_requestIndex.TryRemove(correlationId, out asyncRequest))
             {
+                _log.DebugFormat("Get Response for CorrelationId:{0} Connection:{1}", correlationId, Endpoint);
                 asyncRequest.ReceiveTask.SetResult(payload);
             }
             else
@@ -207,7 +220,9 @@ namespace KafkaNet
         private int NextCorrelationId()
         {
             var id = Interlocked.Increment(ref _correlationIdSeed);
-            if (id > int.MaxValue - 100) //somewhere close to max reset.
+
+            //somewhere close to max reset.
+            if (id > int.MaxValue - 100)
             {
                 Interlocked.Exchange(ref _correlationIdSeed, 0);
             }
@@ -226,7 +241,9 @@ namespace KafkaNet
             if (asyncRequestItem == null) return;
 
             AsyncRequestItem request;
-            _requestIndex.TryRemove(asyncRequestItem.CorrelationId, out request); //just remove it from the index
+
+            //just remove it from the index
+            _requestIndex.TryRemove(asyncRequestItem.CorrelationId, out request);
 
             if (_disposeToken.IsCancellationRequested)
             {
@@ -237,7 +254,7 @@ namespace KafkaNet
             {
                 asyncRequestItem.ReceiveTask.TrySetException(new ResponseTimeoutException(
                     string.Format("Timeout Expired. Client failed to receive a response from server after waiting {0}ms.",
-                        _responseTimeoutMS)));
+                        _responseTimeoutMs)));
             }
         }
 
@@ -253,12 +270,12 @@ namespace KafkaNet
             using (_disposeToken)
             using (_client)
             {
-
             }
         }
 
         #region Class AsyncRequestItem...
-        class AsyncRequestItem : IDisposable
+
+        private class AsyncRequestItem : IDisposable
         {
             private readonly CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
 
@@ -271,29 +288,25 @@ namespace KafkaNet
             public int CorrelationId { get; private set; }
             public TaskCompletionSource<byte[]> ReceiveTask { get; private set; }
 
-            public void MarkRequestAsSent(Exception ex, TimeSpan timeout, Action<AsyncRequestItem> timeoutFunction)
+            public void MarkRequestAsSent(ExceptionDispatchInfo exceptionDispatchInfo, TimeSpan timeout, Action<AsyncRequestItem> timeoutFunction)
             {
-                if (ex != null)
+                if (exceptionDispatchInfo != null)
                 {
-                    ReceiveTask.TrySetException(ex);
-                    throw ex;
+                    ReceiveTask.TrySetException(exceptionDispatchInfo.SourceException);
+                    exceptionDispatchInfo.Throw();
                 }
 
                 _cancellationTokenSource.CancelAfter(timeout);
                 _cancellationTokenSource.Token.Register(() => timeoutFunction(this));
             }
 
-
             public void Dispose()
             {
-                using (_cancellationTokenSource)
-                {
-
-                }
+                _cancellationTokenSource.Cancel();
+                _cancellationTokenSource.Dispose();
             }
         }
-        #endregion
+
+        #endregion Class AsyncRequestItem...
     }
-
-
 }

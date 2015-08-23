@@ -1,12 +1,10 @@
-﻿using System;
+﻿using KafkaNet.Common;
+using KafkaNet.Protocol;
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Common;
-using KafkaNet.Protocol;
-
 
 namespace KafkaNet
 {
@@ -22,6 +20,7 @@ namespace KafkaNet
         private const int DefaultBatchDelayMS = 100;
         private const int DefaultBatchSize = 100;
 
+        private readonly ProtocolGateway _protocolGateway;
         private readonly CancellationTokenSource _stopToken = new CancellationTokenSource();
         private readonly int _maximumAsyncRequests;
         private readonly AsyncCollection<TopicMessage> _asyncCollection;
@@ -32,7 +31,7 @@ namespace KafkaNet
         private int _inFlightMessageCount = 0;
 
         /// <summary>
-        /// Get the number of messages sitting in the buffer waiting to be sent. 
+        /// Get the number of messages sitting in the buffer waiting to be sent.
         /// </summary>
         public int BufferCount { get { return _asyncCollection.Count; } }
 
@@ -69,20 +68,21 @@ namespace KafkaNet
         /// <param name="maximumMessageBuffer">The maximum amount of messages to buffer if the async calls are blocking from sending.</param>
         /// <remarks>
         /// The maximumAsyncRequests parameter provides a mechanism for minimizing the amount of async requests in flight at any one time
-        /// by blocking the caller requesting the async call.  This affectively puts an upper limit on the amount of times a caller can 
+        /// by blocking the caller requesting the async call.  This affectively puts an upper limit on the amount of times a caller can
         /// call SendMessageAsync before the caller is blocked.
-        /// 
+        ///
         /// The MaximumMessageBuffer parameter provides a way to limit the max amount of memory the driver uses should the send pipeline get
-        /// overwhelmed and the buffer starts to fill up.  This is an inaccurate limiting memory use as the amount of memory actually used is 
+        /// overwhelmed and the buffer starts to fill up.  This is an inaccurate limiting memory use as the amount of memory actually used is
         /// dependant on the general message size being buffered.
-        /// 
-        /// A message will start its timeout countdown as soon as it is added to the producer async queue.  If there are a large number of 
+        ///
+        /// A message will start its timeout countdown as soon as it is added to the producer async queue.  If there are a large number of
         /// messages sitting in the async queue then a message may spend its entire timeout cycle waiting in this queue and never getting
         /// attempted to send to Kafka before a timeout exception is thrown.
         /// </remarks>
         public Producer(IBrokerRouter brokerRouter, int maximumAsyncRequests = MaximumAsyncRequests, int maximumMessageBuffer = MaximumMessageBuffer)
         {
             BrokerRouter = brokerRouter;
+            _protocolGateway = new ProtocolGateway(BrokerRouter);
             _maximumAsyncRequests = maximumAsyncRequests;
             _metadataQueries = new MetadataQueries(BrokerRouter);
             _asyncCollection = new AsyncCollection<TopicMessage>();
@@ -91,12 +91,11 @@ namespace KafkaNet
             BatchSize = DefaultBatchSize;
             BatchDelayTime = TimeSpan.FromMilliseconds(DefaultBatchDelayMS);
 
-            _postTask = Task.Run(async () =>
+            _postTask = Task.Run(() =>
             {
-                await BatchSendAsync().ConfigureAwait(false);
+                BatchSendAsync();
                 //TODO add log for ending the sending thread.
             });
-
         }
 
         /// <summary>
@@ -134,16 +133,25 @@ namespace KafkaNet
                                 .ToList();
         }
 
+        public Task<List<ProduceResponse>> SendMessageAsync(string topic, int partition, params Message[] messages)
+        {
+            return SendMessageAsync(topic, messages, partition: partition);
+        }
+
+        public Task<List<ProduceResponse>> SendMessageAsync(string topic, params Message[] messages)
+        {
+            return SendMessageAsync(topic, messages, acks: 1);
+        }
+
         /// <summary>
         /// Get the metadata about a given topic.
         /// </summary>
         /// <param name="topic">The name of the topic to get metadata for.</param>
         /// <returns>Topic with metadata information.</returns>
-        public Topic GetTopic(string topic)
+        public Topic GetTopicFromCache(string topic)
         {
-            return _metadataQueries.GetTopic(topic);
+            return _metadataQueries.GetTopicFromCache(topic);
         }
-
 
         public Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
         {
@@ -171,8 +179,7 @@ namespace KafkaNet
 
         private async Task BatchSendAsync()
         {
-            var outstandingSendTasks = new System.Collections.Concurrent.ConcurrentDictionary<Task, Task>();
-            while (_asyncCollection.IsCompleted == false || _asyncCollection.Count > 0)
+            while (IsNotDisposedOrHasMessagesToProcess())
             {
                 List<TopicMessage> batch = null;
 
@@ -197,22 +204,7 @@ namespace KafkaNet
                         batch.AddRange(_asyncCollection.Drain());
                     }
 
-                    //we want to fire the batch without blocking and then move on to fire another one
-                    var sendTask = ProduceAndSendBatchAsync(batch, _stopToken.Token);
-
-                    outstandingSendTasks.TryAdd(sendTask, sendTask);
-
-                    var sendTaskCleanup = sendTask.ContinueWith(result =>
-                    {
-                        if (result.IsFaulted && batch != null)
-                        {
-                            batch.ForEach(x => x.Tcs.TrySetException(result.ExtractException()));
-                        }
-
-                        //TODO add statistics tracking
-                        outstandingSendTasks.TryRemove(sendTask, out sendTask);
-                    });
-
+                    await ProduceAndSendBatchAsync(batch, _stopToken.Token);
                 }
                 catch (Exception ex)
                 {
@@ -222,17 +214,18 @@ namespace KafkaNet
                     }
                 }
             }
+        }
 
-            var referenceToOutstanding = outstandingSendTasks.Values.ToList();
-            if (referenceToOutstanding.Count > 0)
-            {
-                await Task.WhenAll(referenceToOutstanding).ConfigureAwait(false);
-            }
+        private bool IsNotDisposedOrHasMessagesToProcess()
+        {
+            return _asyncCollection.IsCompleted == false || _asyncCollection.Count > 0;
         }
 
         private async Task ProduceAndSendBatchAsync(List<TopicMessage> messages, CancellationToken cancellationToken)
         {
             Interlocked.Add(ref _inFlightMessageCount, messages.Count);
+            var topics = messages.GroupBy(batch => batch.Topic).Select(batch => batch.Key).ToArray();
+            await BrokerRouter.RefreshMissingTopicMetadata(topics);
 
             //we must send a different produce request for each ack level and timeout combination.
             foreach (var ackLevelBatch in messages.GroupBy(batch => new { batch.Acks, batch.Timeout }))
@@ -240,7 +233,7 @@ namespace KafkaNet
                 var messageByRouter = ackLevelBatch.Select(batch => new
                 {
                     TopicMessage = batch,
-                    Route = batch.Partition.HasValue ? BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Partition.Value) : BrokerRouter.SelectBrokerRoute(batch.Topic, batch.Message.Key) 
+                    Route = batch.Partition.HasValue ? BrokerRouter.SelectBrokerRouteFromLocalCache(batch.Topic, batch.Partition.Value) : BrokerRouter.SelectBrokerRouteFromLocalCache(batch.Topic, batch.Message.Key)
                 })
                                          .GroupBy(x => new { x.Route, x.TopicMessage.Topic, x.TopicMessage.Codec });
 
@@ -264,10 +257,11 @@ namespace KafkaNet
 
                     await _semaphoreMaximumAsync.WaitAsync(cancellationToken).ConfigureAwait(false);
 
+                    var sendGroupTask = _protocolGateway.SendProtocolRequest(request, group.Key.Topic, group.Key.Route.PartitionId);// group.Key.Route.Connection.SendAsync(request);
                     var brokerSendTask = new BrokerRouteSendBatch
                     {
                         Route = group.Key.Route,
-                        Task = group.Key.Route.Connection.SendAsync(request),
+                        Task = sendGroupTask,
                         MessagesSent = group.Select(x => x.TopicMessage).ToList()
                     };
 
@@ -284,7 +278,7 @@ namespace KafkaNet
                     foreach (var task in sendTasks)
                     {
                         //TODO when we dont ask for an ACK, result is an empty list.  Which FirstOrDefault returns null.  Dont like this...
-                        task.MessagesSent.ForEach(x => x.Tcs.TrySetResult(task.Task.Result.FirstOrDefault()));
+                        task.MessagesSent.ForEach(async x => x.Tcs.TrySetResult(await task.Task));
                     }
                 }
                 catch
@@ -310,6 +304,7 @@ namespace KafkaNet
         }
 
         #region Dispose...
+
         public void Dispose()
         {
             //Clients really should call Stop() first, but just in case they didn't...
@@ -321,10 +316,11 @@ namespace KafkaNet
             {
             }
         }
-        #endregion
+
+        #endregion Dispose...
     }
 
-    class TopicMessage
+    internal class TopicMessage
     {
         public TaskCompletionSource<ProduceResponse> Tcs { get; set; }
         public short Acks { get; set; }
@@ -340,10 +336,10 @@ namespace KafkaNet
         }
     }
 
-    class BrokerRouteSendBatch
+    internal class BrokerRouteSendBatch
     {
         public BrokerRoute Route { get; set; }
-        public Task<List<ProduceResponse>> Task { get; set; }
+        public Task<ProduceResponse> Task { get; set; }
         public List<TopicMessage> MessagesSent { get; set; }
     }
 }

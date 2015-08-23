@@ -1,13 +1,12 @@
 ﻿using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 [assembly: AssemblyTitle("kafka-net")]
 [assembly: AssemblyDescription("Native C# client for Apache Kafka.")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("James Roland")]
+[assembly: AssemblyCompany("Gigya Inc")]
 [assembly: AssemblyProduct("kafka-net")]
-[assembly: AssemblyCopyright("Copyright © James Roland 2014")]
+[assembly: AssemblyCopyright("Copyright ©Gigya Inc 2015")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 [assembly: ComVisible(false)]

@@ -1,8 +1,7 @@
-﻿using System;
+﻿using KafkaNet.Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
-using KafkaNet.Common;
 
 namespace KafkaNet.Protocol
 {
@@ -34,18 +33,22 @@ namespace KafkaNet.Protocol
         /// Metadata on source offset and partition location for this message.
         /// </summary>
         public MessageMetadata Meta { get; set; }
+
         /// <summary>
-        /// This is a version id used to allow backwards compatible evolution of the message binary format.  Reserved for future use.  
+        /// This is a version id used to allow backwards compatible evolution of the message binary format.  Reserved for future use.
         /// </summary>
         public byte MagicNumber { get; set; }
+
         /// <summary>
         /// Attribute value outside message body used for added codec/compression info.
         /// </summary>
         public byte Attribute { get; set; }
+
         /// <summary>
         /// Key value used for routing message to partitions.
         /// </summary>
         public byte[] Key { get; set; }
+
         /// <summary>
         /// The message body contents.  Can contain compress message set.
         /// </summary>
@@ -54,7 +57,9 @@ namespace KafkaNet.Protocol
         /// <summary>
         /// Construct an empty message.
         /// </summary>
-        public Message() { }
+        public Message()
+        {
+        }
 
         /// <summary>
         /// Convenience constructor will encode both the key and message to byte streams.
@@ -132,7 +137,7 @@ namespace KafkaNet.Protocol
         /// </remarks>
         public static byte[] EncodeMessage(Message message)
         {
-            using(var stream = new KafkaMessagePacker())
+            using (var stream = new KafkaMessagePacker())
             {
                 return stream.Pack(message.MagicNumber)
                     .Pack(message.Attribute)
@@ -172,6 +177,7 @@ namespace KafkaNet.Protocol
                         message.Value = stream.ReadIntPrefixedBytes();
                         yield return message;
                         break;
+
                     case MessageCodec.CodecGzip:
                         var gZipData = stream.ReadIntPrefixedBytes();
                         foreach (var m in DecodeMessageSet(Compression.Unzip(gZipData)))
@@ -179,6 +185,7 @@ namespace KafkaNet.Protocol
                             yield return m;
                         }
                         break;
+
                     default:
                         throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", codec));
                 }
@@ -199,6 +206,7 @@ namespace KafkaNet.Protocol
         /// The log offset of this message as stored by the Kafka server.
         /// </summary>
         public long Offset { get; set; }
+
         /// <summary>
         /// The partition id this offset is from.
         /// </summary>

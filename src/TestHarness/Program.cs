@@ -17,13 +17,13 @@ namespace TestHarness
             //create an options file that sets up driver preferences
             var options = new KafkaOptions(new Uri("http://CSDKAFKA01:9092"), new Uri("http://CSDKAFKA02:9092"))
             {
-                Log = new ConsoleLog()
+                Log = new DefaultTraceLog()
             };
 
             //start an out of process thread that runs a consumer that will write all received messages to the console
             Task.Run(() =>
             {
-                var consumer = new Consumer(new ConsumerOptions(topicName, new BrokerRouter(options)) { Log = new ConsoleLog() });
+                var consumer = new Consumer(new ConsumerOptions(topicName, new BrokerRouter(options)) { Log = new DefaultTraceLog() });
                 foreach (var data in consumer.Consume())
                 {
                     Console.WriteLine("Response: P{0},O{1} : {2}", data.Meta.PartitionId, data.Meta.Offset, data.Value.ToUtf8String());

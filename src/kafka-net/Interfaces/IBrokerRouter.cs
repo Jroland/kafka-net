@@ -1,6 +1,7 @@
-﻿using System;
+﻿using KafkaNet.Protocol;
+using System;
 using System.Collections.Generic;
-using KafkaNet.Protocol;
+using System.Threading.Tasks;
 
 namespace KafkaNet
 {
@@ -18,7 +19,7 @@ namespace KafkaNet
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        BrokerRoute SelectBrokerRoute(string topic, int partitionId);
+        BrokerRoute SelectBrokerRouteFromLocalCache(string topic, int partitionId);
 
         /// <summary>
         /// Select a broker for a given topic using the IPartitionSelector function.
@@ -28,15 +29,15 @@ namespace KafkaNet
         /// <returns>A broker route for the given topic.</returns>
         /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
         /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        BrokerRoute SelectBrokerRoute(string topic, byte[] key = null);
+        BrokerRoute SelectBrokerRouteFromLocalCache(string topic, byte[] key = null);
 
         /// <summary>
-        /// Returns Topic metadata for each topic requested. 
+        /// Returns Topic metadata for each topic requested.
         /// </summary>
         /// <param name="topics">Collection of topids to request metadata for.</param>
         /// <returns>List of Topics as provided by Kafka.</returns>
         /// <remarks>The topic metadata will by default check the cache first and then request metadata from the server if it does not exist in cache.</remarks>
-        List<Topic> GetTopicMetadata(params string[] topics);
+        List<Topic> GetTopicMetadataFromLocalCache(params string[] topics);
 
         /// <summary>
         /// Force a call to the kafka servers to refresh metadata for the given topics.
@@ -45,6 +46,11 @@ namespace KafkaNet
         /// <remarks>
         /// This method will initiate a call to the kafka servers and retrieve metadata for all given topics, updating the broke cache in the process.
         /// </remarks>
-        void RefreshTopicMetadata(params string[] topics);
+
+        Task<bool> RefreshTopicMetadata(params string[] topics);
+
+        Task RefreshMissingTopicMetadata(params string[] topics);
+
+        DateTime GetTopicMetadataRefreshTime(string topic);
     }
 }

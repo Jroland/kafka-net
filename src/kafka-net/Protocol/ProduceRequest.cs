@@ -1,9 +1,9 @@
+using KafkaNet.Common;
+using KafkaNet.Statistics;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using KafkaNet.Common;
-using KafkaNet.Statistics;
 
 namespace KafkaNet.Protocol
 {
@@ -13,23 +13,26 @@ namespace KafkaNet.Protocol
         /// Provide a hint to the broker call not to expect a response for requests without Acks.
         /// </summary>
         public override bool ExpectResponse { get { return Acks != 0; } }
+
         /// <summary>
         /// Indicates the type of kafka encoding this request is.
         /// </summary>
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.Produce; } }
+
         /// <summary>
         /// Time kafka will wait for requested ack level before returning.
         /// </summary>
         public int TimeoutMS = 1000;
+
         /// <summary>
         /// Level of ack required by kafka.  0 immediate, 1 written to leader, 2+ replicas synced, -1 all replicas
         /// </summary>
         public Int16 Acks = 1;
+
         /// <summary>
         /// Collection of payloads to post to kafka
         /// </summary>
         public List<Payload> Payload = new List<Payload>();
-
 
         public KafkaDataPayload Encode()
         {
@@ -42,6 +45,7 @@ namespace KafkaNet.Protocol
         }
 
         #region Protocol...
+
         private KafkaDataPayload EncodeProduceRequest(ProduceRequest request)
         {
             int totalCompressedBytes = 0;
@@ -70,15 +74,16 @@ namespace KafkaNet.Protocol
 
                     switch (groupedPayload.Key.Codec)
                     {
-
                         case MessageCodec.CodecNone:
                             message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
                             break;
+
                         case MessageCodec.CodecGzip:
                             var compressedBytes = CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages));
                             Interlocked.Add(ref totalCompressedBytes, compressedBytes.CompressedAmount);
                             message.Pack(Message.EncodeMessageSet(new[] { compressedBytes.CompressedMessage }));
                             break;
+
                         default:
                             throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
                     }
@@ -141,29 +146,33 @@ namespace KafkaNet.Protocol
                 }
             }
         }
-        #endregion
+
+        #endregion Protocol...
     }
 
-    class CompressedMessageResult
+    internal class CompressedMessageResult
     {
         public int CompressedAmount { get; set; }
         public Message CompressedMessage { get; set; }
     }
 
-    public class ProduceResponse
+    public class ProduceResponse : IBaseResponse
     {
         /// <summary>
         /// The topic the offset came from.
         /// </summary>
         public string Topic { get; set; }
+
         /// <summary>
         /// The partition the offset came from.
         /// </summary>
         public int PartitionId { get; set; }
+
         /// <summary>
         /// Error response code.  0 is success.
         /// </summary>
         public Int16 Error { get; set; }
+
         /// <summary>
         /// The offset number to commit as completed.
         /// </summary>

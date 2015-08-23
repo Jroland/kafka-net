@@ -10,7 +10,7 @@ namespace KafkaNet.Common
         private readonly int _maxSize;
         private long _count = 0;
         private int _head = -1;
-        readonly T[] _values;
+        private readonly T[] _values;
 
         public ConcurrentCircularBuffer(int max)
         {

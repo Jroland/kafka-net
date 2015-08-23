@@ -1,15 +1,15 @@
-﻿using System;
-using System.Threading.Tasks;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
 using Moq;
 using Ninject.MockingKernel.Moq;
 using NUnit.Framework;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using kafka_tests.Helpers;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Unit
 {
@@ -17,12 +17,11 @@ namespace kafka_tests.Unit
     [Category("Unit")]
     public class ConsumerTests
     {
-       
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void CancellationShouldInterruptConsumption()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = async () => { return new FetchResponse(); };
 
             var router = routerProxy.Create();
 
@@ -45,11 +44,11 @@ namespace kafka_tests.Unit
             }
         }
 
-        [Test]
-        public void ConsumerWhitelistShouldOnlyConsumeSpecifiedPartition()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task ConsumerWhitelistShouldOnlyConsumeSpecifiedPartition()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = async () => { return new FetchResponse(); };
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int> { 0 };
@@ -57,17 +56,18 @@ namespace kafka_tests.Unit
             {
                 var test = consumer.Consume();
 
-                TaskTest.WaitFor(() => consumer.ConsumerTaskCount > 0);
-                TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0);
+                await TaskTest.WaitFor(() => consumer.ConsumerTaskCount > 0);
+                await TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0);
 
-                Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(1), "Consumer should only create one consuming thread for partition 0.");
+                Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(1),
+                    "Consumer should only create one consuming thread for partition 0.");
                 Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1));
                 Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.EqualTo(0));
             }
         }
 
-        [Test]
-        public void ConsumerWithEmptyWhitelistShouldConsumeAllPartition()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task ConsumerWithEmptyWhitelistShouldConsumeAllPartition()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
 
@@ -79,21 +79,24 @@ namespace kafka_tests.Unit
             {
                 var test = consumer.Consume();
 
-                TaskTest.WaitFor(() => consumer.ConsumerTaskCount > 0);
-                TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0);
-                TaskTest.WaitFor(() => routerProxy.BrokerConn1.FetchRequestCallCount > 0);
+                await TaskTest.WaitFor(() => consumer.ConsumerTaskCount > 0);
+                await TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 0);
+                await TaskTest.WaitFor(() => routerProxy.BrokerConn1.FetchRequestCallCount > 0);
 
-                Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2), "Consumer should create one consuming thread for each partition.");
-                Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn0 not sent FetchRequest");
-                Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1), "BrokerConn1 not sent FetchRequest");
+                Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2),
+                    "Consumer should create one consuming thread for each partition.");
+                Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1),
+                    "BrokerConn0 not sent FetchRequest");
+                Assert.That(routerProxy.BrokerConn1.FetchRequestCallCount, Is.GreaterThanOrEqualTo(1),
+                    "BrokerConn1 not sent FetchRequest");
             }
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ConsumerShouldCreateTaskForEachBroker()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = async () => { return new FetchResponse(); };
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int>();
@@ -106,12 +109,11 @@ namespace kafka_tests.Unit
             }
         }
 
-
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void ConsumerShouldReturnOffset()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = async () => { return new FetchResponse(); };
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int>();
@@ -123,8 +125,8 @@ namespace kafka_tests.Unit
                 Assert.That(consumer.ConsumerTaskCount, Is.EqualTo(2));
             }
         }
-        
-        [Test]
+
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureConsumerDisposesRouter()
         {
             var router = new MoqMockingKernel().GetMock<IBrokerRouter>();
@@ -133,11 +135,11 @@ namespace kafka_tests.Unit
             router.Verify(x => x.Dispose(), Times.Once());
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EnsureConsumerDisposesAllTasks()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
-            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+            routerProxy.BrokerConn0.FetchResponseFunction = async () => { return new FetchResponse(); };
             var router = routerProxy.Create();
             var options = CreateOptions(router);
             options.PartitionWhitelist = new List<int>();

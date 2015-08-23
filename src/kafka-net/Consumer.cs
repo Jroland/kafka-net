@@ -1,17 +1,17 @@
-﻿using System;
+﻿using KafkaNet.Model;
+using KafkaNet.Protocol;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using KafkaNet.Model;
-using KafkaNet.Protocol;
 
 namespace KafkaNet
 {
     /// <summary>
     /// Provides a basic consumer of one Topic across all partitions or over a given whitelist of partitions.
-    /// 
+    ///
     /// TODO: provide automatic offset saving when the feature is available in 0.8.2
     /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
     /// </summary>
@@ -20,6 +20,7 @@ namespace KafkaNet
         private readonly ConsumerOptions _options;
         private readonly BlockingCollection<Message> _fetchResponseQueue;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
+        private TaskCompletionSource<int> _disposeTask;
         private readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
         private readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
         private readonly IMetadataQueries _metadataQueries;
@@ -33,7 +34,7 @@ namespace KafkaNet
             _options = options;
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
             _metadataQueries = new MetadataQueries(_options.Router);
-            
+            _disposeTask = new TaskCompletionSource<int>();
             SetOffsetPosition(positions);
         }
 
@@ -83,7 +84,8 @@ namespace KafkaNet
                 if (Interlocked.Increment(ref _ensureOneThread) == 1)
                 {
                     _options.Log.DebugFormat("Consumer: Refreshing partitions for topic: {0}", _options.Topic);
-                    var topic = _options.Router.GetTopicMetadata(_options.Topic);
+                    _options.Router.RefreshMissingTopicMetadata(_options.Topic).Wait();
+                    var topic = _options.Router.GetTopicMetadataFromLocalCache(_options.Topic);
                     if (topic.Count <= 0) throw new ApplicationException(string.Format("Unable to get metadata for topic:{0}.", _options.Topic));
                     _topic = topic.First();
 
@@ -112,6 +114,7 @@ namespace KafkaNet
 
         private Task ConsumeTopicPartitionAsync(string topic, int partitionId)
         {
+            bool refreshMetaData = false;
             return Task.Run(async () =>
             {
                 try
@@ -121,11 +124,22 @@ namespace KafkaNet
                     _options.Log.DebugFormat("Consumer: Creating polling task for topic: {0} on parition: {1}", topic, partitionId);
                     while (_disposeToken.IsCancellationRequested == false)
                     {
+                        if (refreshMetaData)
+                        {
+                            await _options.Router.RefreshTopicMetadata(topic);
+                            EnsurePartitionPollingThreads();
+                            refreshMetaData = false;
+                        }
+
                         try
                         {
                             //get the current offset, or default to zero if not there.
                             long offset = 0;
-                            _partitionOffsetIndex.AddOrUpdate(partitionId, i => offset, (i, currentOffset) => { offset = currentOffset; return currentOffset; });
+                            _partitionOffsetIndex.AddOrUpdate(partitionId, i => offset, (i, currentOffset) =>
+                            {
+                                offset = currentOffset;
+                                return currentOffset;
+                            });
 
                             //build a fetch request for partition at offset
                             var fetch = new Fetch
@@ -139,17 +153,21 @@ namespace KafkaNet
                             var fetches = new List<Fetch> { fetch };
 
                             var fetchRequest = new FetchRequest
-                                {
-                                    MaxWaitTime = (int)Math.Min((long)int.MaxValue, _options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
-                                    MinBytes = _options.MinimumBytes,
-                                    Fetches = fetches
-                                };
+                            {
+                                MaxWaitTime = (int)Math.Min(int.MaxValue, _options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
+                                MinBytes = _options.MinimumBytes,
+                                Fetches = fetches
+                            };
 
                             //make request and post to queue
-                            var route = _options.Router.SelectBrokerRoute(topic, partitionId);
+                            var route = _options.Router.SelectBrokerRouteFromLocalCache(topic, partitionId);
 
-                            var responses = await route.Connection.SendAsync(fetchRequest).ConfigureAwait(false);
+                            var taskSend = route.Connection.SendAsync(fetchRequest);
 
+                            await Task.WhenAny(taskSend, _disposeTask.Task).ConfigureAwait(false);
+                            if (_disposeTask.Task.IsCompleted) return;
+
+                            var responses = await taskSend; //already done
                             if (responses.Count > 0)
                             {
                                 var response = responses.FirstOrDefault(); //we only asked for one response
@@ -160,7 +178,10 @@ namespace KafkaNet
 
                                     foreach (var message in response.Messages)
                                     {
-                                        _fetchResponseQueue.Add(message, _disposeToken.Token);
+                                        await Task.Run(() =>
+                                        {
+                                            _fetchResponseQueue.Add(message, _disposeToken.Token);//this is a block!!!
+                                        }, _disposeToken.Token);
 
                                         if (_disposeToken.IsCancellationRequested) return;
                                     }
@@ -174,12 +195,14 @@ namespace KafkaNet
                             }
 
                             //no message received from server wait a while before we try another long poll
-                            Thread.Sleep(_options.BackoffInterval);
+                            await Task.Delay(_options.BackoffInterval, _disposeToken.Token);
                         }
                         catch (BufferUnderRunException ex)
                         {
-                            bufferSizeHighWatermark = (int)(ex.RequiredBufferSize * _options.FetchBufferMultiplier) + ex.MessageHeaderSize;
-                            _options.Log.InfoFormat("Buffer underrun.  Increasing buffer size to: {0}", bufferSizeHighWatermark);
+                            bufferSizeHighWatermark = (int)(ex.RequiredBufferSize * _options.FetchBufferMultiplier) +
+                                                      ex.MessageHeaderSize;
+                            _options.Log.InfoFormat("Buffer underrun.  Increasing buffer size to: {0}",
+                                bufferSizeHighWatermark);
                         }
                         catch (OffsetOutOfRangeException ex)
                         {
@@ -190,9 +213,12 @@ namespace KafkaNet
                         catch (InvalidMetadataException ex)
                         {
                             //refresh our metadata and ensure we are polling the correct partitions
+                            refreshMetaData = true;
                             _options.Log.ErrorFormat(ex.Message);
-                            _options.Router.RefreshTopicMetadata(topic);
-                            EnsurePartitionPollingThreads();
+                        }
+                        catch (TaskCanceledException ex)
+                        {
+                            //TODO :LOG
                         }
                         catch (Exception ex)
                         {
@@ -215,6 +241,7 @@ namespace KafkaNet
             {
                 case ErrorResponseCode.NoError:
                     return;
+
                 case ErrorResponseCode.OffsetOutOfRange:
                     throw new OffsetOutOfRangeException("FetchResponse indicated we requested an offset that is out of range.  Requested Offset:{0}", request.Offset) { FetchRequest = request };
                 case ErrorResponseCode.BrokerNotAvailable:
@@ -251,9 +278,9 @@ namespace KafkaNet
                    });
         }
 
-        public Topic GetTopic(string topic)
+        public Topic GetTopicFromCache(string topic)
         {
-            return _metadataQueries.GetTopic(topic);
+            return _metadataQueries.GetTopicFromCache(topic);
         }
 
         public Task<List<OffsetResponse>> GetTopicOffsetAsync(string topic, int maxOffsets = 2, int time = -1)
@@ -267,7 +294,7 @@ namespace KafkaNet
 
             _options.Log.DebugFormat("Consumer: Disposing...");
             _disposeToken.Cancel();
-
+            _disposeTask.SetResult(1);
             //wait for all threads to unwind
             foreach (var task in _partitionPollingIndex.Values.Where(task => task != null))
             {

@@ -24,7 +24,7 @@ namespace KafkaNet.Model
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
             if (obj.GetType() != this.GetType()) return false;
-            return Equals((KafkaEndpoint) obj);
+            return Equals((KafkaEndpoint)obj);
         }
 
         public override string ToString()
