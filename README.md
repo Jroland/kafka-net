@@ -1,36 +1,33 @@
-kafka-net
+KafkaNetClient
 =========
 
 Native C# client for Apache Kafka.  
 
 License
 -----------
-Copyright 2014, James Roland under Apache License, V2.0. See LICENSE file.
+Copyright 2015, Gigya Inc under Apache License, V2.0. See LICENSE file.
 
 Summary
 -----------
 
-This library is a fork of [Jroland's kafka-net library](https://github.com/Jroland/kafka-net), with adjustments and improvements.
+This library is a fork of Jroland's [kafka-net](https://github.com/Jroland/kafka-net) library, with adjustments and improvements (not interchangeable with kafka-net, as there are breaking changes).
+
 The original project is a .NET implementation of the [Apache Kafka] protocol.  The wire protocol portion is based on the [kafka-python] library writen by [David Arthur] and the general class layout attempts to follow a similar pattern as his project.  To that end, this project builds up from the low level KafkaConnection object for handling async requests to/from the kafka server, all the way up to a higher level Producer/Consumer classes.
 
 ##### Improvements and Changes:
 
-- All the code is now async all the way and all blocking operations were removed (except for the high-level Consumer class).
-
+- All the code is now async all the way and all blocking operations were removed (**except for the high-level `Consumer` class**).
+- `ProtocolGateway`:
+    * New class that allows simple handling of Kafka protocol messages with error recovery and metadata refreshes.
+- `BrokerRouter`:
+    * Breaking changes were made in order to make it async all-the-way.
+    * Interface was changed to allow greater control working with broker metadata.
+- `Producer`:
+    * Was refactored to use `ProtocolGateway` when sending messages to Kafka (for better error recovery).
+- `ManualConsumer`:
+    * New class (uses `ProtocolGateway`) that allows simple fetches from Kafka brokers (in contrast to the high-level `Consumer` class that includes internal caching and other optimizations).
 - Bug fixes
     * When sending messages to the same partition with the same Ack level, order is guaranteed.    
-
-- Tests
-    * Add data-load tests.
-    * Change existing tests to be more consistent.
-
-- BrokerRouter:
-    * We made a major change to this class because a lot of async code is using it and the original code was using blocking operations and locks which caused misleading signatures. (was not async all-the-way)
-    * Has changed and now has a new interface.
-    * Added an expiration token to ensure that we don't refresh metadata too much. RefreshMetadata is a heavy operation which uses async lock and we wanted to call it less.
-- ProtocolGateway
-    * Added a new `ProtocolGateway` class to allow simple handling of Kafka protocol messages with error recovery and metadata refreshes.
-    * High-level Producer now uses ProtocolGateway when sending messages to Kafka (for better error recovery).
 
 
 
@@ -98,7 +95,8 @@ A class which enables simple manual consuming of messages which encapsulates the
 Status
 -----------
 Tested with Kafka 0.8.2.
-It is a work in progress and was still not deployed to production. We will update when it does.
+
+This library is still work in progress and was still not deployed to production. We will update when it does.
 
 
 ##### The major items that needs work are:

@@ -31,12 +31,12 @@ namespace KafkaNet
 
         private readonly int _maxRetry = 2;
 
-        /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing.</exception>
+        /// <exception cref="InvalidTopicMetadataException">Thrown if the returned metadata for the given topic is invalid or missing</exception>
         /// <exception cref="InvalidPartitionException">Thrown if the give partitionId does not exist for the given topic.</exception>
-        /// <exception cref="ServerUnreachableException">Thrown if none of the Default Brokers can be contacted.</exception>
-        /// <exception cref="ResponseTimeoutException">Thrown if none of the Default Brokers can be contacted.</exception>
-        /// <exception cref="SocketException">Thrown if none of the Default Brokers can be contacted.</exception>
-        /// <exception cref="KafkaApplicationException">Thrown if none of the Default Brokers can be contacted.</exception>
+        /// <exception cref="ServerUnreachableException">Thrown if none of the default brokers can be contacted</exception>
+        /// <exception cref="ResponseTimeoutException">Thrown if there request times out</exception>
+        /// <exception cref="SocketException">Thrown in case of network error contacting broker (after retries)</exception>
+        /// <exception cref="KafkaApplicationException">Thrown in case of an unexpected error in the request</exception>
         public async Task<T> SendProtocolRequest<T>(IKafkaRequest<T> request, string topic, int partition) where T : class,IBaseResponse
         {
             T response = null;
@@ -55,7 +55,7 @@ namespace KafkaNet
                     var responses = await route.Connection.SendAsync(request);
                     response = responses.FirstOrDefault();
 
-                    /*this can happened if you send ProduceRequest with ack level=0 */
+                    //this can happened if you send ProduceRequest with ack level=0
                     if (response == null)
                     {
                         return null;
@@ -90,9 +90,15 @@ namespace KafkaNet
                 }
                 else
                 {
-                    ThrowError(exception, response);
+                    if (exception != null)
+                    {
+                        exception.Throw();
+                    }
+
+                    throw new KafkaApplicationException("FetchResponse returned error condition.  ErrorCode:{0}", response.Error) { ErrorCode = response.Error };
                 }
             }
+
             throw new KafkaApplicationException("FetchResponse returned error condition.  ErrorCode:{0}", response.Error);
         }
 
@@ -102,18 +108,6 @@ namespace KafkaNet
                                          error == ErrorResponseCode.ConsumerCoordinatorNotAvailableCode ||
                                          error == ErrorResponseCode.LeaderNotAvailable ||
                                          error == ErrorResponseCode.NotLeaderForPartition;
-        }
-
-        private static void ThrowError(ExceptionDispatchInfo exception, IBaseResponse response)
-        {
-            if (exception != null)
-            {
-                exception.Throw();
-            }
-            throw new KafkaApplicationException("FetchResponse returned error condition.  ErrorCode:{0}", response.Error)
-            {
-                ErrorCode = response.Error
-            };
         }
 
         public void Dispose()
