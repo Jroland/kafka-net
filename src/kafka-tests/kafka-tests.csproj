@@ -104,9 +104,9 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\kafka-net\kafka-net.csproj">
+    <ProjectReference Include="..\KafkaNetClient\KafkaNetClient.csproj">
       <Project>{1343eb68-55cb-4452-8386-24a9989de1c0}</Project>
-      <Name>kafka-net</Name>
+      <Name>KafkaNetClient</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
