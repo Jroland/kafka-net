@@ -5,8 +5,8 @@
     <version>$version$</version>
     <authors>Gigya Inc</authors>
     <owners>Gigya Inc</owners>
-    <licenseUrl>https://github.com/gigya/kafka-net/blob/master/LICENSE</licenseUrl>
-    <projectUrl>https://github.com/gigya/kafka-net</projectUrl>
+    <licenseUrl>https://github.com/gigya/KafkaNetClient/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/gigya/KafkaNetClient</projectUrl>
     <iconUrl>http://kafka.apache.org/images/kafka_logo.png</iconUrl>
     <title>KafkaNetClient</title>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
@@ -14,7 +14,7 @@
     <summary>Native C# client for Apache Kafka.</summary>
     <copyright>Copyright Gigya 2015</copyright>
     <tags>C# Apache Kafka</tags>
-    <releaseNotes>https://github.com/gigya/kafka-net/releases</releaseNotes>
+    <releaseNotes>https://github.com/gigya/KafkaNetClient/releases</releaseNotes>
   </metadata>
   <files>
     <file src="bin\*" target="lib\net45" />

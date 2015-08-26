@@ -94,7 +94,7 @@
     <Compile Include="KafkaTcpSocket.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="kafka-net.nuspec" />
+    <None Include="KafkaNetClient.nuspec" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="lib\net45\" />
