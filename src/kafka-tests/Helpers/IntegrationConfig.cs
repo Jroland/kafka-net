@@ -6,9 +6,9 @@ namespace kafka_tests.Helpers
 {
     public static class IntegrationConfig
     {
-        public static string IntegrationCompressionTopic = "IntegrationCompressionTopic2";
-        public static string IntegrationTopic = "IntegrationTopic2";
-        public static string IntegrationConsumer = "IntegrationConsumer2";
+        public static string IntegrationCompressionTopic = Environment.MachineName + "IntegrationCompressionTopic";
+        public static string IntegrationTopic = Environment.MachineName + "IntegrationCompressionTopic";
+        public static string IntegrationConsumer = Environment.MachineName + "IntegrationConsumer";
         public const int NumberOfRepeat = 1;
 
         // Some of the tests measured performance.my log is too slow so i change the log level to only critical  message

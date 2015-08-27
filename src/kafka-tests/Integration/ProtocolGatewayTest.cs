@@ -17,6 +17,16 @@ namespace kafka_tests.Integration
     {
         private readonly KafkaOptions Options = new KafkaOptions(IntegrationConfig.IntegrationUri);
 
+        [ExpectedException(typeof(ArgumentOutOfRangeException))]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task ShedThrowExceptionIfTopicIsNotValid()
+        {
+            string invalidTopic = " ";
+            var fetchRequest = new FetchRequest();
+            ProtocolGateway protocolGateway = new ProtocolGateway(IntegrationConfig.IntegrationUri);
+            await protocolGateway.SendProtocolRequest(fetchRequest, invalidTopic, 0);
+        }
+
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task ProtocolGateway()
         {
@@ -30,21 +40,21 @@ namespace kafka_tests.Integration
 
             ProtocolGateway protocolGateway = new ProtocolGateway(IntegrationConfig.IntegrationUri);
             var fetch = new Fetch
-                         {
-                             Topic = IntegrationConfig.IntegrationTopic,
-                             PartitionId = partitionId,
-                             Offset = offset,
-                             MaxBytes = 32000,
-                         };
+            {
+                Topic = IntegrationConfig.IntegrationTopic,
+                PartitionId = partitionId,
+                Offset = offset,
+                MaxBytes = 32000,
+            };
 
             var fetches = new List<Fetch> { fetch };
 
             var fetchRequest = new FetchRequest
-                {
-                    MaxWaitTime = 1000,
-                    MinBytes = 10,
-                    Fetches = fetches
-                };
+            {
+                MaxWaitTime = 1000,
+                MinBytes = 10,
+                Fetches = fetches
+            };
 
             var r = await protocolGateway.SendProtocolRequest(fetchRequest, IntegrationConfig.IntegrationTopic, partitionId);
             //  var r1 = await protocolGateway.SendProtocolRequest(fetchRequest, IntegrationConfig.IntegrationTopic, partitionId);
