@@ -37,7 +37,7 @@ namespace KafkaNet
         /// <exception cref="ResponseTimeoutException">Thrown if there request times out</exception>
         /// <exception cref="SocketException">Thrown in case of network error contacting broker (after retries)</exception>
         /// <exception cref="KafkaApplicationException">Thrown in case of an unexpected error in the request</exception>
-        /// <exception cref="ArgumentOutOfRangeException">Thrown in case of Topic is not valid</exception>
+        /// <exception cref="FormatException">Thrown in case the topic name is invalid</exception>
         public async Task<T> SendProtocolRequest<T>(IKafkaRequest<T> request, string topic, int partition) where T : class,IBaseResponse
         {
             ValidateTopic(topic);
@@ -121,7 +121,7 @@ namespace KafkaNet
         {
             if (topic.Contains(" "))
             {
-                throw new ArgumentOutOfRangeException("Topic is not valid");
+                throw new FormatException("topic name is invalid");
             }
         }
     }

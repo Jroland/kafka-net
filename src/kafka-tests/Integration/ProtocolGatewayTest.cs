@@ -17,16 +17,6 @@ namespace kafka_tests.Integration
     {
         private readonly KafkaOptions Options = new KafkaOptions(IntegrationConfig.IntegrationUri);
 
-        [ExpectedException(typeof(ArgumentOutOfRangeException))]
-        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
-        public async Task ShedThrowExceptionIfTopicIsNotValid()
-        {
-            string invalidTopic = " ";
-            var fetchRequest = new FetchRequest();
-            ProtocolGateway protocolGateway = new ProtocolGateway(IntegrationConfig.IntegrationUri);
-            await protocolGateway.SendProtocolRequest(fetchRequest, invalidTopic, 0);
-        }
-
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task ProtocolGateway()
         {

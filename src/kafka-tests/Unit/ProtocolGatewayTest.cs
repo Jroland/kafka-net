@@ -77,6 +77,18 @@ namespace kafka_tests.Unit
             Assert.That(routerProxy.BrokerConn0.FetchRequestCallCount, Is.EqualTo(2));
         }
 
+        [ExpectedException(typeof(FormatException))]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task ShouldThrowFormatExceptionWhenTopicIsInvalid()
+        {
+            var routerProxy = new BrokerRouterProxy(_kernel);
+            var router = routerProxy.Create();
+            string invalidTopic = " ";
+            var fetchRequest = new FetchRequest();
+            ProtocolGateway protocolGateway = new ProtocolGateway(router);
+            await protocolGateway.SendProtocolRequest(fetchRequest, invalidTopic, 0);
+        }
+
         [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public async Task ShouldTryToRefreshMataDataIfSocketException()
         {
