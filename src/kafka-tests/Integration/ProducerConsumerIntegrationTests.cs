@@ -88,10 +88,8 @@ namespace kafka_tests.Integration
 
                 using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router), offsets))
                 {
-                    for (int i = 0; i < 200; i++)
-                    {
-                        producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString(), testId) }).Wait();
-                    }
+                    int iter = 0;
+                    producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new int[1000].Select(i => new Message(iter++.ToString(), testId))).Wait();
 
                     var sentMessages = consumer.Consume().Take(20).ToList();
 
