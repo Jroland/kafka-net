@@ -21,7 +21,7 @@ namespace KafkaNet
         private readonly BlockingCollection<Message> _fetchResponseQueue;
         private readonly CancellationTokenSource _disposeToken = new CancellationTokenSource();
         private readonly ConcurrentDictionary<int, Task> _partitionPollingIndex = new ConcurrentDictionary<int, Task>();
-        private readonly ConcurrentDictionary<int, long> _partitionOffsetIndex = new ConcurrentDictionary<int, long>();
+        private readonly ConcurrentDictionary<int, Tuple<long, bool>> _partitionOffsetIndex = new ConcurrentDictionary<int, Tuple<long, bool>>();
         private readonly IMetadataQueries _metadataQueries;
 
         private int _disposeCount;
@@ -33,7 +33,7 @@ namespace KafkaNet
             _options = options;
             _fetchResponseQueue = new BlockingCollection<Message>(_options.ConsumerBufferSize);
             _metadataQueries = new MetadataQueries(_options.Router);
-            
+
             SetOffsetPosition(positions);
         }
 
@@ -62,7 +62,7 @@ namespace KafkaNet
             foreach (var position in positions)
             {
                 var temp = position;
-                _partitionOffsetIndex.AddOrUpdate(position.PartitionId, i => temp.Offset, (i, l) => temp.Offset);
+                _partitionOffsetIndex.AddOrUpdate(position.PartitionId, i => new Tuple<long, bool>(temp.Offset, true), (i, l) => new Tuple<long, bool>(temp.Offset, true));
             }
         }
 
@@ -73,7 +73,7 @@ namespace KafkaNet
         /// <remarks>Will only return data if the consumer is actively being consumed.</remarks>
         public List<OffsetPosition> GetOffsetPosition()
         {
-            return _partitionOffsetIndex.Select(x => new OffsetPosition { PartitionId = x.Key, Offset = x.Value }).ToList();
+            return _partitionOffsetIndex.Select(x => new OffsetPosition { PartitionId = x.Key, Offset = x.Value.Item1 }).ToList();
         }
 
         private void EnsurePartitionPollingThreads()
@@ -125,7 +125,7 @@ namespace KafkaNet
                         {
                             //get the current offset, or default to zero if not there.
                             long offset = 0;
-                            _partitionOffsetIndex.AddOrUpdate(partitionId, i => offset, (i, currentOffset) => { offset = currentOffset; return currentOffset; });
+                            _partitionOffsetIndex.AddOrUpdate(partitionId, i => new Tuple<long, bool>(offset, false), (i, currentOffset) => { offset = currentOffset.Item1; return currentOffset; });
 
                             //build a fetch request for partition at offset
                             var fetch = new Fetch
@@ -139,11 +139,11 @@ namespace KafkaNet
                             var fetches = new List<Fetch> { fetch };
 
                             var fetchRequest = new FetchRequest
-                                {
-                                    MaxWaitTime = (int)Math.Min((long)int.MaxValue, _options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
-                                    MinBytes = _options.MinimumBytes,
-                                    Fetches = fetches
-                                };
+                            {
+                                MaxWaitTime = (int)Math.Min((long)int.MaxValue, _options.MaxWaitTimeForMinimumBytes.TotalMilliseconds),
+                                MinBytes = _options.MinimumBytes,
+                                Fetches = fetches
+                            };
 
                             //make request and post to queue
                             var route = _options.Router.SelectBrokerRoute(topic, partitionId);
@@ -166,7 +166,7 @@ namespace KafkaNet
                                     }
 
                                     var nextOffset = response.Messages.Max(x => x.Meta.Offset) + 1;
-                                    _partitionOffsetIndex.AddOrUpdate(partitionId, i => nextOffset, (i, l) => nextOffset);
+                                    _partitionOffsetIndex.AddOrUpdate(partitionId, i => new Tuple<long, bool>(nextOffset, false), (i, l) => l.Item2 ? l : new Tuple<long, bool>(nextOffset, false));
 
                                     // sleep is not needed if responses were received
                                     continue;

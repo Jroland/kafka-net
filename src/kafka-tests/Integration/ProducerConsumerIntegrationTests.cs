@@ -88,7 +88,7 @@ namespace kafka_tests.Integration
 
                 using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router), offsets))
                 {
-                    for (int i = 0; i < 20; i++)
+                    for (int i = 0; i < 200; i++)
                     {
                         producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new[] { new Message(i.ToString(), testId) }).Wait();
                     }
@@ -105,10 +105,10 @@ namespace kafka_tests.Integration
                     //seek back to initial offset
                     consumer.SetOffsetPosition(offsets);
 
-                    var resetPositionMessages = consumer.Consume().Take(20).ToList();
+                    var resetPositionMessages = consumer.Consume().SkipWhile(x => x.Meta.Offset != offsets.First().Offset).Take(20).ToList();
 
                     //ensure all produced messages arrive again
-                    Console.WriteLine("Message order:  {0}", string.Join(", ", resetPositionMessages.Select(x => x.Value).ToList()));
+                    Console.WriteLine("Message order:  {0}", string.Join(", ", resetPositionMessages.Select(x => x.Value.ToUtf8String()).ToList()));
 
                     Assert.That(resetPositionMessages.Count, Is.EqualTo(20));
                     Assert.That(resetPositionMessages.Select(x => x.Value.ToUtf8String()).ToList(), Is.EqualTo(expected));
@@ -198,7 +198,7 @@ namespace kafka_tests.Integration
                      offsets.Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray()))
                 {
                     Console.WriteLine("Sending {0} test messages", expectedCount);
-                    var response = await producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, 
+                    var response = await producer.SendMessageAsync(IntegrationConfig.IntegrationTopic,
                         Enumerable.Range(0, expectedCount).Select(x => new Message(x.ToString())));
 
                     Assert.That(response.Any(x => x.Error != (int)ErrorResponseCode.NoError), Is.False, "Error occured sending test messages to server.");
