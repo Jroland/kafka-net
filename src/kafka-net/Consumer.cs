@@ -125,7 +125,7 @@ namespace KafkaNet
                         {
                             //get the current offset, or default to zero if not there.
                             long offset = 0;
-                            _partitionOffsetIndex.AddOrUpdate(partitionId, i => new Tuple<long, bool>(offset, false), (i, currentOffset) => { offset = currentOffset.Item1; return currentOffset; });
+                            _partitionOffsetIndex.AddOrUpdate(partitionId, i => new Tuple<long, bool>(offset, false), (i, currentOffset) => { offset = currentOffset.Item1; return new Tuple<long, bool>(currentOffset.Item1, false); });
 
                             //build a fetch request for partition at offset
                             var fetch = new Fetch
