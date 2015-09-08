@@ -166,7 +166,7 @@ namespace KafkaNet
                                     }
 
                                     var nextOffset = response.Messages.Max(x => x.Meta.Offset) + 1;
-                                    _partitionOffsetIndex.AddOrUpdate(partitionId, i => new Tuple<long, bool>(nextOffset, false), (i, l) => l.Item2 ? l : new Tuple<long, bool>(nextOffset, false));
+                                    _partitionOffsetIndex.AddOrUpdate(partitionId, i => new Tuple<long, bool>(nextOffset, false), (i, l) => l.Item2 ? new Tuple<long, bool>(l.Item1, false) : new Tuple<long, bool>(nextOffset, false));
 
                                     // sleep is not needed if responses were received
                                     continue;
