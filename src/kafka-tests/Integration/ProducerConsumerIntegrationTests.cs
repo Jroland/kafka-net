@@ -77,7 +77,9 @@ namespace kafka_tests.Integration
         [Test]
         public void ConsumerShouldBeAbleToSeekBackToEarlierOffset()
         {
-            var expected = new List<string> { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19" };
+            var expectedFrom0 = new List<string> { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19" };
+            var expectedFrom250 = new List<string> { "250", "251", "252", "253", "254", "255", "256", "257", "258", "259", "260", "261", "262", "263", "264", "265", "266", "267", "268", "269" };
+            var expectedFrom500 = new List<string> { "500", "501", "502", "503", "504", "505", "506", "507", "508", "509", "510", "511", "512", "513", "514", "515", "516", "517", "518", "519" };
             var testId = Guid.NewGuid().ToString();
 
             using (var router = new BrokerRouter(new KafkaOptions(IntegrationConfig.IntegrationUri)))
@@ -86,21 +88,29 @@ namespace kafka_tests.Integration
                 var offsets = producer.GetTopicOffsetAsync(IntegrationConfig.IntegrationTopic).Result
                     .Select(x => new OffsetPosition(x.PartitionId, x.Offsets.Max())).ToArray();
 
+                var initialOffset = offsets.First().Offset;
+
                 using (var consumer = new Consumer(new ConsumerOptions(IntegrationConfig.IntegrationTopic, router), offsets))
                 {
                     int iter = 0;
                     producer.SendMessageAsync(IntegrationConfig.IntegrationTopic, new int[1000].Select(i => new Message(iter++.ToString(), testId))).Wait();
 
-                    var sentMessages = consumer.Consume().Take(20).ToList();
+                    consumer.Consume().Take(900).ToList();
+
+                    consumer.SetOffsetPosition(offsets);
+                    var sentMessages = consumer.Consume().SkipWhile(x => x.Meta.Offset != offsets.First().Offset).Take(20).ToList();
 
                     //ensure the produced messages arrived
                     Console.WriteLine("Message order:  {0}", string.Join(", ", sentMessages.Select(x => x.Value.ToUtf8String()).ToList()));
 
                     Assert.That(sentMessages.Count, Is.EqualTo(20));
-                    Assert.That(sentMessages.Select(x => x.Value.ToUtf8String()).ToList(), Is.EqualTo(expected));
+                    Assert.That(sentMessages.Select(x => x.Value.ToUtf8String()).ToList(), Is.EqualTo(expectedFrom0));
                     Assert.That(sentMessages.Any(x => x.Key.ToUtf8String() != testId), Is.False);
 
+                    consumer.Consume().Take(900).ToList();
+
                     //seek back to initial offset
+                    offsets.First().Offset = initialOffset + 500;
                     consumer.SetOffsetPosition(offsets);
 
                     var resetPositionMessages = consumer.Consume().SkipWhile(x => x.Meta.Offset != offsets.First().Offset).Take(20).ToList();
@@ -109,7 +119,23 @@ namespace kafka_tests.Integration
                     Console.WriteLine("Message order:  {0}", string.Join(", ", resetPositionMessages.Select(x => x.Value.ToUtf8String()).ToList()));
 
                     Assert.That(resetPositionMessages.Count, Is.EqualTo(20));
-                    Assert.That(resetPositionMessages.Select(x => x.Value.ToUtf8String()).ToList(), Is.EqualTo(expected));
+                    var actual = resetPositionMessages.Select(x => x.Value.ToUtf8String()).ToList();
+                    Assert.That(actual, Is.EqualTo(expectedFrom500));
+                    Assert.That(resetPositionMessages.Any(x => x.Key.ToUtf8String() != testId), Is.False);
+
+                    consumer.Consume().Take(400).ToList();
+
+                    //seek back to initial offset
+                    offsets.First().Offset = initialOffset + 250;
+                    consumer.SetOffsetPosition(offsets);
+
+                    resetPositionMessages = consumer.Consume().SkipWhile(x => x.Meta.Offset != offsets.First().Offset).Take(20).ToList();
+
+                    //ensure all produced messages arrive again
+                    Console.WriteLine("Message order:  {0}", string.Join(", ", resetPositionMessages.Select(x => x.Value.ToUtf8String()).ToList()));
+
+                    Assert.That(resetPositionMessages.Count, Is.EqualTo(20));
+                    Assert.That(resetPositionMessages.Select(x => x.Value.ToUtf8String()).ToList(), Is.EqualTo(expectedFrom250));
                     Assert.That(resetPositionMessages.Any(x => x.Key.ToUtf8String() != testId), Is.False);
                 }
             }
