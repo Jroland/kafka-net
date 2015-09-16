@@ -1,11 +1,11 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-using System.Text;
-using kafka_tests.Helpers;
+﻿using kafka_tests.Helpers;
 using KafkaNet.Common;
 using KafkaNet.Protocol;
 using NUnit.Framework;
+using System;
+using System.IO;
+using System.Linq;
+using System.Text;
 
 namespace kafka_tests.Unit
 {
@@ -13,7 +13,7 @@ namespace kafka_tests.Unit
     [Category("Unit")]
     public class ProtocolMessageTests
     {
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(FailCrcCheckException))]
         public void DecodeMessageShouldThrowWhenCrcFails()
         {
@@ -24,7 +24,7 @@ namespace kafka_tests.Unit
             var result = Message.DecodeMessage(0, encoded).First();
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase("test key", "test message")]
         [TestCase(null, "test message")]
         [TestCase("test key", null)]
@@ -40,7 +40,7 @@ namespace kafka_tests.Unit
             Assert.That(testMessage.Value, Is.EqualTo(result.Value));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void EncodeMessageSetEncodesMultipleMessages()
         {
             //expected generated from python library
@@ -63,19 +63,19 @@ namespace kafka_tests.Unit
             Assert.That(expected, Is.EqualTo(result));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void DecodeMessageSetShouldHandleResponseWithMaxBufferSizeHit()
         {
             //This message set has a truncated message bytes at the end of it
             var result = Message.DecodeMessageSet(MessageHelper.FetchResponseMaxBytesOverflow).ToList();
 
             var message = Encoding.UTF8.GetString(result.First().Value);
-            
+
             Assert.That(message, Is.EqualTo("test"));
             Assert.That(result.Count, Is.EqualTo(529));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void WhenMessageIsTruncatedThenBufferUnderRunExceptionIsThrown()
         {
             // arrange
@@ -93,7 +93,7 @@ namespace kafka_tests.Unit
             Assert.Throws<BufferUnderRunException>(() => Message.DecodeMessageSet(payloadBytes).ToList());
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         public void WhenMessageIsExactlyTheSizeOfBufferThenMessageIsDecoded()
         {
             // arrange

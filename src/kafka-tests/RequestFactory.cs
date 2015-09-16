@@ -1,5 +1,5 @@
-﻿using System.Collections.Generic;
-using KafkaNet.Protocol;
+﻿using KafkaNet.Protocol;
+using System.Collections.Generic;
 
 namespace kafka_tests
 {
@@ -60,7 +60,7 @@ namespace kafka_tests
             return new OffsetFetchRequest
             {
                 ConsumerGroup = "DefaultGroup",
-                Topics = new List<OffsetFetch>(new[] 
+                Topics = new List<OffsetFetch>(new[]
         		                          {
         		                          	new OffsetFetch
         		                          	{

@@ -1,10 +1,11 @@
-﻿using System;
-using System.Linq;
+﻿using kafka_tests.Helpers;
 using KafkaNet;
 using KafkaNet.Model;
 using KafkaNet.Protocol;
-using kafka_tests.Helpers;
 using NUnit.Framework;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace kafka_tests.Integration
 {
@@ -20,13 +21,13 @@ namespace kafka_tests.Integration
             return new KafkaConnection(new KafkaTcpSocket(new DefaultTraceLog(), endpoint), _options.ResponseTimeoutMs, _options.Log);
         }
 
-        [Test]
-        public void NewlyCreatedTopicShouldRetryUntilBrokerIsAssigned()
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
+        public async Task NewlyCreatedTopicShouldRetryUntilBrokerIsAssigned()
         {
             var expectedTopic = Guid.NewGuid().ToString();
             var repo = new KafkaMetadataProvider(_options.Log);
             var response = repo.Get(new[] { GetKafkaConnection() }, new[] { expectedTopic });
-            var topic = response.Topics.FirstOrDefault();
+            var topic = (await response).Topics.FirstOrDefault();
 
             Assert.That(topic, Is.Not.Null);
             Assert.That(topic.Name, Is.EqualTo(expectedTopic));

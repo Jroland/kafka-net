@@ -1,7 +1,8 @@
-﻿using System;
-using System.IO;
+﻿using kafka_tests.Helpers;
 using KafkaNet.Common;
 using NUnit.Framework;
+using System;
+using System.IO;
 
 namespace kafka_tests.Unit
 {
@@ -16,6 +17,7 @@ namespace kafka_tests.Unit
     {
         // validates my assumptions about the default implementation doing the opposite of this implementation
         [Theory]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase((Int32)0, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((Int32)1, new Byte[] { 0x01, 0x00, 0x00, 0x00 })]
         [TestCase((Int32)(-1), new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF })]
@@ -35,6 +37,7 @@ namespace kafka_tests.Unit
             Assert.That(expectedBytes, Is.EqualTo(actualBytes));
         }
 
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [Theory]
         [TestCase((Int32)0, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((Int32)1, new Byte[] { 0x00, 0x00, 0x00, 0x01 })]
@@ -55,6 +58,7 @@ namespace kafka_tests.Unit
             Assert.That(expectedBytes, Is.EqualTo(actualBytes));
         }
 
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [Theory]
         [TestCase((Int16)0, new Byte[] { 0x00, 0x00 })]
         [TestCase((Int16)1, new Byte[] { 0x00, 0x01 })]
@@ -75,6 +79,7 @@ namespace kafka_tests.Unit
             Assert.That(expectedBytes, Is.EqualTo(actualBytes));
         }
 
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [Theory]
         [TestCase((UInt32)0, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((UInt32)1, new Byte[] { 0x00, 0x00, 0x00, 0x01 })]
@@ -96,6 +101,7 @@ namespace kafka_tests.Unit
         }
 
         [Theory]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase((Single)(0), new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((Single)(1), new Byte[] { 0x3F, 0x80, 0x00, 0x00 })]
         [TestCase((Single)(-1), new Byte[] { 0xBF, 0x80, 0x00, 0x00 })]
@@ -119,6 +125,7 @@ namespace kafka_tests.Unit
         }
 
         [Theory]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase((Double)(0), new Byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((Double)(1), new Byte[] { 0x3F, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((Double)(-1), new Byte[] { 0xBF, 0xF0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 })]
@@ -141,7 +148,7 @@ namespace kafka_tests.Unit
             Assert.That(expectedBytes, Is.EqualTo(actualBytes));
         }
 
-        [Test]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [ExpectedException(typeof(NotSupportedException))]
         public void StringNotSupportedTest()
         {
@@ -166,7 +173,6 @@ namespace kafka_tests.Unit
         [TestCase(null, new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF }, StringPrefixEncoding.Int32)]
         public void StringTests(String value, Byte[] expectedBytes, StringPrefixEncoding encoding)
         {
-
             // arrange
             var memoryStream = new MemoryStream();
             var binaryWriter = new BigEndianBinaryWriter(memoryStream);
@@ -180,6 +186,7 @@ namespace kafka_tests.Unit
         }
 
         [Theory]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase('0', new Byte[] { 0x30 })]
         [TestCase('€', new Byte[] { 0xE2, 0x82, 0xAC })]
         public void CharTests(Char value, Byte[] expectedBytes)
@@ -197,6 +204,7 @@ namespace kafka_tests.Unit
         }
 
         [Theory]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(new Char[] { '0', '0', '0', '0' }, new Byte[] { 0x30, 0x30, 0x30, 0x30 })]
         [TestCase(new Char[] { '€', '€', '€', '€' }, new Byte[] { 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC })]
         public void CharArrayTests(Char[] value, Byte[] expectedBytes)
@@ -214,6 +222,7 @@ namespace kafka_tests.Unit
         }
 
         [Theory]
+        [Test, Repeat(IntegrationConfig.NumberOfRepeat)]
         [TestCase(new Char[] { '0', '1', '2', '3' }, 1, 2, new Byte[] { 0x31, 0x32 })]
         [TestCase(new Char[] { '€', '2', '€', '€' }, 1, 2, new Byte[] { 0x32, 0xE2, 0x82, 0xAC })]
         public void CharSubArrayTests(Char[] value, Int32 index, Int32 count, Byte[] expectedBytes)
@@ -229,6 +238,5 @@ namespace kafka_tests.Unit
             var actualBytes = memoryStream.ToArray();
             Assert.That(expectedBytes, Is.EqualTo(actualBytes));
         }
-
     }
 }

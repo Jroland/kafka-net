@@ -1,4 +1,5 @@
-﻿using System;
+﻿using KafkaNet;
+using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -11,8 +12,12 @@ namespace kafka_tests.Fakes
     public class FakeTcpServer : IDisposable
     {
         public event Action<byte[]> OnBytesReceived;
+
         public event Action OnClientConnected;
+
         public event Action OnClientDisconnected;
+
+        private IKafkaLog _log;
 
         private TcpClient _client;
         private readonly SemaphoreSlim _semaphoreSlim = new SemaphoreSlim(0);
@@ -26,8 +31,9 @@ namespace kafka_tests.Fakes
         public int DisconnectionEventCount = 0;
         public Task HasClientConnected { get { return _clientConnectedTrigger.Task; } }
 
-        public FakeTcpServer(int port)
+        public FakeTcpServer(IKafkaLog log, int port)
         {
+            _log = log;
             _listener = new TcpListener(IPAddress.Any, port);
             _listener.Start();
 
@@ -51,7 +57,7 @@ namespace kafka_tests.Fakes
             try
             {
                 await _semaphoreSlim.WaitAsync();
-                Console.WriteLine("FakeTcpServer: writing {0} bytes.", data.Length);
+                _log.DebugFormat("FakeTcpServer: writing {0} bytes.", data.Length);
                 await _client.GetStream().WriteAsync(data, 0, data.Length).ConfigureAwait(false);
             }
             finally
@@ -83,10 +89,10 @@ namespace kafka_tests.Fakes
         {
             while (_disposeToken.IsCancellationRequested == false)
             {
-                Console.WriteLine("FakeTcpServer: Accepting clients.");
+                _log.InfoFormat("FakeTcpServer: Accepting clients.");
                 _client = await _listener.AcceptTcpClientAsync();
 
-                Console.WriteLine("FakeTcpServer: Connected client");
+                _log.InfoFormat("FakeTcpServer: Connected client");
                 if (OnClientConnected != null) OnClientConnected();
                 _semaphoreSlim.Release();
 
@@ -113,11 +119,11 @@ namespace kafka_tests.Fakes
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("FakeTcpServer: Client exception...  Exception:{0}", ex.Message);
+                    _log.ErrorFormat("FakeTcpServer: Client exception...  Exception:{0}", ex.Message);
                 }
                 finally
                 {
-                    Console.WriteLine("FakeTcpServer: Client Disconnected.");
+                    _log.ErrorFormat("FakeTcpServer: Client Disconnected.");
                     _semaphoreSlim.Wait(); //remove the one client
                     if (OnClientDisconnected != null) OnClientDisconnected();
                 }
@@ -139,6 +145,4 @@ namespace kafka_tests.Fakes
             }
         }
     }
-
-
 }
