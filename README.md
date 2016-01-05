@@ -27,7 +27,7 @@ using (client) { }
 ```sh
 var options = new KafkaOptions(new Uri("http://SERVER1:9092"), new Uri("http://SERVER2:9092"));
 var router = new BrokerRouter(options);
-var consumer = new Consumer(new ConsumerOptions("TestHarness", new BrokerRouter(options)));
+var consumer = new Consumer(new ConsumerOptions("TestHarness", router));
 
 //Consume returns a blocking IEnumerable (ie: never ending stream)
 foreach (var message in consumer.Consume())
@@ -38,7 +38,7 @@ foreach (var message in consumer.Consume())
 ```
 
 ##### TestHarness
-The TestHarness project it a simple example console application that will read message from a kafka server and write them to the screen.  It will also take anything typed in the console and send this as a message to the kafka servers.  
+The TestHarness project is a simple example console application that will read messages from a kafka server and write them to the screen.  It will also take anything typed in the console and send this as a message to the kafka servers.  
 
 Simply modify the kafka server Uri in the code to point to a functioning test server.
 
@@ -61,7 +61,7 @@ Provides the logic for routing which partition the BrokerRouter should choose.  
 Provides a higher level class which uses the combination of the BrokerRouter and KafkaConnection to send batches of messages to a Kafka broker.
 
 ##### Consumer
-Provides a higher level class which will consumer messages from a whitelist of partitions from a single topic.  The consumption mechanism is a blocking IEnumerable of messages.  If no whitelist is provided then all partitions will be consumed creating one KafkaConnection for each partition leader.
+Provides a higher level class which will consume messages from a whitelist of partitions from a single topic.  The consumption mechanism is a blocking IEnumerable of messages.  If no whitelist is provided then all partitions will be consumed creating one KafkaConnection for each partition leader.
 
 
 
