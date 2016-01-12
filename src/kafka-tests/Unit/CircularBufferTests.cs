@@ -1,4 +1,7 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using KafkaNet.Common;
 using NUnit.Framework;
@@ -75,6 +78,40 @@ namespace kafka_tests.Unit
             Parallel.For(0, 100000, i => buffer.Enqueue(i));
             Assert.That(buffer.Count, Is.EqualTo(10));
             
+        }
+
+        [Test]
+        [Ignore("This actuall fails sometimes as there is still a possible concurrency issue.  However this buffer does not need to be perfect when tracking stats.")]
+        public void ConcurrentEnqueueShouldStoreLastXRecords()
+        {
+            Parallel.For(0, 1000, i => ConcurrentEnqueueTestRun(100000));
+        }
+
+        private void ConcurrentEnqueueTestRun(int batchSize)
+        {
+             var buffer = new ConcurrentCircularBuffer<int>(10);
+
+            try
+            {
+                int index = 0;
+                int testSize = batchSize;
+                Parallel.For(0, testSize, i => buffer.Enqueue(Interlocked.Increment(ref index)));
+                Assert.That(buffer.Count, Is.EqualTo(10));
+                for (var i = testSize; i > testSize - 10; i--)
+                {
+                    Assert.That(buffer.Contains(i));
+                }
+            }
+            catch 
+            {
+                foreach (var i in buffer)
+                {
+                    Console.WriteLine(i);
+                }
+
+                throw;
+            }
+           
         }
     }
 }

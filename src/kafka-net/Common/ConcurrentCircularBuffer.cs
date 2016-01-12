@@ -34,6 +34,7 @@ namespace KafkaNet.Common
 
             if (head > _maxSize - 1)
             {
+                //this should exchange to correct index even if interlocked called twice from different threads
                 Interlocked.Exchange(ref _head, head - _maxSize);
                 head = head - _maxSize;
             }
