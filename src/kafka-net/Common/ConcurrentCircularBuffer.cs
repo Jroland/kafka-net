@@ -1,21 +1,21 @@
-﻿using System;
-using System.Collections;
+﻿using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading;
 
 namespace KafkaNet.Common
 {
     public class ConcurrentCircularBuffer<T> : IEnumerable<T>
     {
+        private readonly object _syncObject = new object();
+
+        readonly ConcurrentQueue<T> _values = new ConcurrentQueue<T>();
+
         private readonly int _maxSize;
-        private long _count = 0;
-        private int _head = -1;
-        readonly T[] _values;
+
 
         public ConcurrentCircularBuffer(int max)
         {
             _maxSize = max;
-            _values = new T[_maxSize];
         }
 
         public int MaxSize { get { return _maxSize; } }
@@ -24,31 +24,37 @@ namespace KafkaNet.Common
         {
             get
             {
-                return Interlocked.Read(ref _count);
+                return _values.Count;
             }
         }
 
-        public ConcurrentCircularBuffer<T> Enqueue(T obj)
+        /// <summary>
+        /// Add <see cref="obj"/> to buffer
+        /// </summary>
+        /// <remarks>If count exceeds <see cref="MaxSize"/> then oldest object (FIFO) will be evicted</remarks>
+        /// <param name="obj"></param>
+        public void Enqueue(T obj)
         {
-            if (Interlocked.Increment(ref _head) > (_maxSize - 1))
-                Interlocked.Exchange(ref _head, 0);
-
-            _values[_head] = obj;
-
-            Interlocked.Exchange(ref _count,
-                Math.Min(Interlocked.Increment(ref _count), _maxSize));
-
-            return this;
+            _values.Enqueue(obj);
+            lock (_syncObject)
+            {
+                T overflow;
+                while (_values.Count > _maxSize && _values.TryDequeue(out overflow)) { }
+            }
         }
 
+        /// <summary>
+        /// returns a snapshot (moment-in-time) enumeration of the buffer
+        /// </summary>
+        /// <returns></returns>
         public IEnumerator<T> GetEnumerator()
         {
-            for (int i = 0; i < Count; i++)
-            {
-                yield return _values[i];
-            }
+            return _values.GetEnumerator();
         }
 
+        /// <summary>
+        /// returns a snapshot (moment-in-time) enumeration of the buffer
+        /// </summary>
         IEnumerator IEnumerable.GetEnumerator()
         {
             return GetEnumerator();
