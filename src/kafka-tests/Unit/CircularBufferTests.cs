@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using System.Threading.Tasks;
 using KafkaNet.Common;
 using NUnit.Framework;
 
@@ -65,6 +66,15 @@ namespace kafka_tests.Unit
             var buffer = new ConcurrentCircularBuffer<int>(2);
             buffer.Enqueue(1);
             Assert.That(buffer.First(), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ConcurrentEnqueueShouldNotLeakIndexPosition()
+        {
+            var buffer = new ConcurrentCircularBuffer<int>(10);
+            Parallel.For(0, 100000, i => buffer.Enqueue(i));
+            Assert.That(buffer.Count, Is.EqualTo(10));
+            
         }
     }
 }
