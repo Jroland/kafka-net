@@ -49,6 +49,7 @@
     <Compile Include="Common\AsyncCollection.cs" />
     <Compile Include="Common\ConcurrentCircularBuffer.cs" />
     <Compile Include="Common\KafkaMessagePacker.cs" />
+    <Compile Include="Interfaces\IStreamDecorator.cs" />
     <Compile Include="Statistics\StatisticsTracker.cs" />
     <Compile Include="Default\ConsoleLog.cs" />
     <Compile Include="Default\DefaultKafkaConnectionFactory.cs" />
