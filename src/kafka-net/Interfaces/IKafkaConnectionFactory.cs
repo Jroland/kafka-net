@@ -12,8 +12,9 @@ namespace KafkaNet
         /// <param name="responseTimeoutMs">The amount of time to wait for a message response to be received after sending a message to Kafka</param>
         /// <param name="log">Logging interface used to record any log messages created by the connection.</param>
         /// <param name="maximumReconnectionTimeout">The maximum time to wait when backing off on reconnection attempts.</param>
-        /// <returns>IKafkaConnection initialized to connecto to the given endpoint.</returns>
-        IKafkaConnection Create(KafkaEndpoint endpoint, TimeSpan responseTimeoutMs, IKafkaLog log, TimeSpan? maximumReconnectionTimeout = null);
+        /// <param name="streamDecorator">The decorator used to adjust the internal Tcp stream</param>
+        /// <returns>IKafkaConnection initialized to connect to the given endpoint.</returns>
+        IKafkaConnection Create(KafkaEndpoint endpoint, TimeSpan responseTimeoutMs, IKafkaLog log, TimeSpan? maximumReconnectionTimeout = null, IStreamDecorator streamDecorator = null);
 
         /// <summary>
         /// Resolves a generic Uri into a uniquely identifiable KafkaEndpoint.
