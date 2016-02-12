@@ -148,7 +148,8 @@ namespace kafka_tests.Unit
             Assert.That(count, Is.EqualTo(1), "Only one task should have gotten past lock.");
 
             block.Release();
-            TaskTest.WaitFor(() => count > 1);
+            //NOTE: this test is related to a timing issue of the test itself. need to give more time on the WaitFor to ensure Increment can happen
+            TaskTest.WaitFor(() => count > 1, 6000);
             Assert.That(count, Is.EqualTo(2), "Second call should get past lock.");
         }
 

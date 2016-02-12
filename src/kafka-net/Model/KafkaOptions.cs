@@ -65,5 +65,7 @@ namespace KafkaNet.Model
             KafkaConnectionFactory = new DefaultKafkaConnectionFactory();
             ResponseTimeoutMs = TimeSpan.FromMilliseconds(DefaultResponseTimeout);
         }
+
+        public IStreamDecorator StreamDecorator { get; set; }
     }
 }

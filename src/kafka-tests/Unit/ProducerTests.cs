@@ -83,7 +83,7 @@ namespace kafka_tests.Unit
                 Assert.That(producer.AsyncCount, Is.EqualTo(1), "One async operation should be sending.");
 
                 semaphore.Release();
-                sendTask.Wait(TimeSpan.FromMilliseconds(500));
+                sendTask.Wait(TimeSpan.FromMilliseconds(1000));
 
                 Assert.That(sendTask.IsCompleted, Is.True, "Send task should be marked as completed.");
                 Assert.That(producer.AsyncCount, Is.EqualTo(0), "Async should now show zero count.");

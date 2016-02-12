@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -41,6 +42,7 @@ namespace KafkaNet
         private readonly AsyncLock _clientLock = new AsyncLock();
         private TcpClient _client;
         private int _disposeCount;
+        private readonly IStreamDecorator _streamDecorator;
 
         /// <summary>
         /// Construct socket and open connection to a specified server.
@@ -48,8 +50,10 @@ namespace KafkaNet
         /// <param name="log">Logging facility for verbose messaging of actions.</param>
         /// <param name="endpoint">The IP endpoint to connect to.</param>
         /// <param name="maximumReconnectionTimeout">The maximum time to wait when backing off on reconnection attempts.</param>
-        public KafkaTcpSocket(IKafkaLog log, KafkaEndpoint endpoint, TimeSpan? maximumReconnectionTimeout = null)
+        /// <param name="streamDecorator">The stream decorator.</param>
+        public KafkaTcpSocket(IKafkaLog log, KafkaEndpoint endpoint, TimeSpan? maximumReconnectionTimeout = null, IStreamDecorator streamDecorator = null)
         {
+            _streamDecorator = streamDecorator;
             _log = log;
             _endpoint = endpoint;
             _maximumReconnectionTimeout = maximumReconnectionTimeout ?? TimeSpan.FromMinutes(MaxReconnectionTimeoutMinutes);
@@ -167,7 +171,7 @@ namespace KafkaNet
             }
         }
 
-        private void ProcessNetworkstreamTasks(NetworkStream netStream)
+        private void ProcessNetworkstreamTasks(Stream netStream)
         {
             Task writeTask = Task.FromResult(true);
             Task readTask = Task.FromResult(true);
@@ -196,7 +200,7 @@ namespace KafkaNet
             }
         }
 
-        private async Task ProcessReadTaskAsync(NetworkStream netStream, SocketPayloadReadTask readTask)
+        private async Task ProcessReadTaskAsync(Stream netStream, SocketPayloadReadTask readTask)
         {
             using (readTask)
             {
@@ -266,7 +270,7 @@ namespace KafkaNet
             }
         }
 
-        private async Task ProcessSentTasksAsync(NetworkStream netStream, SocketPayloadSendTask sendTask)
+        private async Task ProcessSentTasksAsync(Stream netStream, SocketPayloadSendTask sendTask)
         {
             if (sendTask == null) return;
 
@@ -305,7 +309,7 @@ namespace KafkaNet
             }
         }
 
-        private async Task<NetworkStream> GetStreamAsync()
+        private async Task<Stream> GetStreamAsync()
         {
             //using a semaphore here to allow async waiting rather than blocking locks
             using (await _clientLock.LockAsync(_disposeToken.Token).ConfigureAwait(false))
@@ -314,8 +318,12 @@ namespace KafkaNet
                 {
                     _client = await ReEstablishConnectionAsync().ConfigureAwait(false);
                 }
-
-                return _client == null ? null : _client.GetStream();
+                var currentStream = _client == null ? null : _client.GetStream();
+                if (_streamDecorator != null)
+                {
+                    return _streamDecorator.WrapStream(currentStream);
+                }
+                return currentStream;
             }
         }
 
