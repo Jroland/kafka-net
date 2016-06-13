@@ -17,8 +17,10 @@ namespace KafkaNet.Common
         {
             if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
 
-            return value.Length.ToBytes()
-                        .Concat(value.ToBytes())
+            var bytes = value.ToBytes();
+
+            return bytes.Length.ToBytes()
+                        .Concat(bytes)
                         .ToArray();
         }
 
@@ -26,8 +28,10 @@ namespace KafkaNet.Common
         {
             if (string.IsNullOrEmpty(value)) return (-1).ToBytes();
 
-            return ((Int16)value.Length).ToBytes()
-                        .Concat(value.ToBytes())
+            var bytes = value.ToBytes();
+
+            return ((Int16)bytes.Length).ToBytes()
+                        .Concat(bytes)
                         .ToArray();
         }
 
