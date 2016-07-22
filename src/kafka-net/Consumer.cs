@@ -267,6 +267,7 @@ namespace KafkaNet
 
             _options.Log.DebugFormat("Consumer: Disposing...");
             _disposeToken.Cancel();
+            _fetchResponseQueue.CompleteAdding();
 
             //wait for all threads to unwind
             foreach (var task in _partitionPollingIndex.Values.Where(task => task != null))
