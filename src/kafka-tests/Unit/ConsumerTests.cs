@@ -46,6 +46,28 @@ namespace kafka_tests.Unit
         }
 
         [Test]
+        public void DisposeShouldInterruptConsumption()
+        {
+            var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
+            routerProxy.BrokerConn0.FetchResponseFunction = () => { return new FetchResponse(); };
+
+            var router = routerProxy.Create();
+
+            var options = CreateOptions(router);
+
+            Task consumeTask;
+            using (var consumer = new Consumer(options))
+            {
+                consumeTask = Task.Run(() => consumer.Consume().FirstOrDefault());
+
+                //wait until the fake broker is running and requesting fetches
+                TaskTest.WaitFor(() => routerProxy.BrokerConn0.FetchRequestCallCount > 10);
+            }
+
+            Assert.True(consumeTask.Wait(TimeSpan.FromSeconds(1)));
+        }
+
+        [Test]
         public void ConsumerWhitelistShouldOnlyConsumeSpecifiedPartition()
         {
             var routerProxy = new BrokerRouterProxy(new MoqMockingKernel());
