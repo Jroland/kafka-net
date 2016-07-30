@@ -126,7 +126,7 @@ namespace KafkaNet
 
             _asyncCollection.AddRange(batch);
 
-            await Task.WhenAll(batch.Select(x => x.Tcs.Task));
+            await Task.WhenAll(batch.Select(x => x.Tcs.Task)).ConfigureAwait(false);
 
             return batch.Select(topicMessage => topicMessage.Tcs.Task.Result)
                                 .Distinct()
