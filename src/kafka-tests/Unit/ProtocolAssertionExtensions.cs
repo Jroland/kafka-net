@@ -13,6 +13,41 @@ namespace kafka_tests.Unit
         private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         /// <summary>
+        /// ProduceRequest => RequiredAcks Timeout [TopicName [Partition MessageSetSize MessageSet]]
+        ///  RequiredAcks => int16   -- This field indicates how many acknowledgements the servers should receive before responding to the request. 
+        ///                             If it is 0 the server will not send any response (this is the only case where the server will not reply to 
+        ///                             a request). If it is 1, the server will wait the data is written to the local log before sending a response. 
+        ///                             If it is -1 the server will block until the message is committed by all in sync replicas before sending a response.
+        ///  Timeout => int32        -- This provides a maximum time in milliseconds the server can await the receipt of the number of acknowledgements 
+        ///                             in RequiredAcks. The timeout is not an exact limit on the request time for a few reasons: (1) it does not include 
+        ///                             network latency, (2) the timer begins at the beginning of the processing of this request so if many requests are 
+        ///                             queued due to server overload that wait time will not be included, (3) we will not terminate a local write so if 
+        ///                             the local write time exceeds this timeout it will not be respected. To get a hard timeout of this type the client 
+        ///                             should use the socket timeout.
+        ///  TopicName => string     -- The topic that data is being published to.
+        ///  Partition => int32      -- The partition that data is being published to.
+        ///  MessageSetSize => int32 -- The size, in bytes, of the message set that follows.
+        /// 
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
+        /// </summary>
+        public static void AssertProduceRequest(this BigEndianBinaryReader reader, int version, ProduceRequest request)
+        {
+            Assert.That(reader.ReadInt16(), Is.EqualTo(request.Acks), "acks");
+            Assert.That(reader.ReadInt32(), Is.EqualTo(request.TimeoutMS), "timeout");
+
+            Assert.That(reader.ReadInt32(), Is.EqualTo(request.Payload.Count), "[topic_data]");
+            foreach (var payload in request.Payload) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.Partition), "Partition");
+
+                var finalPosition = reader.ReadInt32() + reader.Position;
+                reader.AssertMessageSet(version, payload.Messages);
+                Assert.That(reader.Position, Is.EqualTo(finalPosition), "MessageSetSize");
+            }
+        }
+
+        /// <summary>
         /// MessageSet => [Offset MessageSize Message]
         ///  Offset => int64      -- This is the offset used in kafka as the log sequence number. When the producer is sending non compressed messages, 
         ///                          it can set the offsets to anything. When the producer is sending compressed messages, to avoid server side recompression, 
@@ -109,6 +144,9 @@ namespace kafka_tests.Unit
         /// <summary>
         /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
         /// 
+        /// version 0:
+        /// Message => Crc MagicByte Attributes Key Value
+        /// version 1:
         /// Message => Crc MagicByte Attributes Timestamp Key Value
         ///   Crc => int32       -- The CRC is the CRC32 of the remainder of the message bytes. This is used to check the integrity of the message on the broker and consumer.
         ///   MagicByte => int8  -- This is a version id used to allow backwards compatible evolution of the message binary format. The current value is 1.
@@ -116,7 +154,7 @@ namespace kafka_tests.Unit
         ///                         The lowest 3 bits contain the compression codec used for the message.
         ///                         The fourth lowest bit represents the timestamp type. 0 stands for CreateTime and 1 stands for LogAppendTime. The producer should always set this bit to 0. (since 0.10.0)
         ///                         All other bits should be set to 0.
-        ///   Timestamp => int64 -- ONLY version 1! This is the timestamp of the message. The timestamp type is indicated in the attributes. Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
+        ///   Timestamp => int64 -- This is the timestamp of the message. The timestamp type is indicated in the attributes. Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
         ///   Key => bytes       -- The key is an optional message key that was used for partition assignment. The key can be null.
         ///   Value => bytes     -- The value is the actual message contents as an opaque byte array. Kafka supports recursive messages in which case this may itself contain a message set. The message can be null.
         /// </summary>
@@ -146,7 +184,7 @@ namespace kafka_tests.Unit
         /// From http://kafka.apache.org/protocol.html#protocol_messages
         /// 
         /// Response Header => correlation_id 
-        ///  correlation_id => INT32      -- The user-supplied value passed in with the request
+        ///  correlation_id => INT32  -- The user-supplied value passed in with the request
         /// </summary>
         public static void AssertResponseHeader(this BigEndianBinaryReader reader, int correlationId)
         {
@@ -154,19 +192,19 @@ namespace kafka_tests.Unit
         }
 
         /// <summary>
-        /// From http://kafka.apache.org/protocol.html#protocol_common
-        /// 
         /// RequestOrResponse => Size (RequestMessage | ResponseMessage)
-        ///  Size => int32 -- The message_size field gives the size of the subsequent request or response message in bytes. 
-        ///                   The client can read requests by first reading this 4 byte size as an integer N, and then reading 
-        ///                   and parsing the subsequent N bytes of the request.
+        ///  Size => int32    -- The Size field gives the size of the subsequent request or response message in bytes. 
+        ///                      The client can read requests by first reading this 4 byte size as an integer N, and 
+        ///                      then reading and parsing the subsequent N bytes of the request.
+        /// 
+        /// From: https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-CommonRequestandResponseStructure
         /// </summary>
         public static void AssertProtocol(this byte[] bytes, Action<BigEndianBinaryReader> assertions)
         {
             using (var reader = new BigEndianBinaryReader(bytes)) {
-                Assert.That(reader.ReadInt32(), Is.EqualTo(reader.Length - 4), "Size");
+                var finalPosition = reader.ReadInt32() + reader.Position;
                 assertions(reader);
-                Assert.That(reader.HasData, Is.False);
+                Assert.That(reader.Position, Is.EqualTo(finalPosition), "Size");
             }
         }
     }

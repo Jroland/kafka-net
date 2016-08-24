@@ -52,6 +52,11 @@ namespace KafkaNet.Protocol
         public byte[] Value { get; set; }
 
         /// <summary>
+        /// This is the timestamp of the message. The timestamp type is indicated in the attributes. Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
+        /// </summary>
+        public DateTime Timestamp { get; set; }
+
+        /// <summary>
         /// Construct an empty message.
         /// </summary>
         public Message() { }
