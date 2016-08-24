@@ -91,7 +91,7 @@ namespace kafka_tests.Unit
             Assert.That(reader.ReadByte(), Is.EqualTo(message.MagicNumber), "MagicByte");
             Assert.That(reader.ReadByte(), Is.EqualTo(message.Attribute), "Attributes");
             if (version == 2) {
-                Assert.That(reader.ReadInt64(), Is.EqualTo((message.Timestamp - UnixEpoch).TotalMilliseconds), "Timestamp");
+                Assert.That(reader.ReadInt64(), Is.EqualTo((long)(message.Timestamp - UnixEpoch).TotalMilliseconds), "Timestamp");
             }
             Assert.That(reader.ReadBytes(), Is.EqualTo(message.Key), "Key");
             Assert.That(reader.ReadBytes(), Is.EqualTo(message.Value), "Value");

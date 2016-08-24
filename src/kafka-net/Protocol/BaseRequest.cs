@@ -14,7 +14,6 @@ namespace KafkaNet.Protocol
         /// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
         /// </summary>
         protected const int ReplicaId = -1;
-        protected const Int16 ApiVersion = 0;
         private string _clientId = "Kafka-Net";
         private int _correlationId = 1;
 
@@ -30,6 +29,11 @@ namespace KafkaNet.Protocol
         public int CorrelationId { get { return _correlationId; } set { _correlationId = value; } }
 
         /// <summary>
+        /// This is a numeric version number for the api request. It allows the server to properly interpret the request as the protocol evolves. Responses will always be in the format corresponding to the request version.
+        /// </summary>
+        public short ApiVersion { get; set; } = 0;
+
+        /// <summary>
         /// Flag which tells the broker call to expect a response for this request.
         /// </summary>
         public virtual bool ExpectResponse { get { return true; } }
@@ -43,7 +47,7 @@ namespace KafkaNet.Protocol
         {
             return new KafkaMessagePacker()
                  .Pack(((Int16)request.ApiKey))
-                 .Pack(ApiVersion)
+                 .Pack(request.ApiVersion)
                  .Pack(request.CorrelationId)
                  .Pack(request.ClientId, StringPrefixEncoding.Int16);
         }

@@ -40,6 +40,10 @@ namespace KafkaNet.Protocol
         public byte MagicNumber { get; set; }
         /// <summary>
         /// Attribute value outside message body used for added codec/compression info.
+        /// 
+        /// The lowest 3 bits contain the compression codec used for the message.
+        /// The fourth lowest bit represents the timestamp type. 0 stands for CreateTime and 1 stands for LogAppendTime. The producer should always set this bit to 0. (since 0.10.0)
+        /// All other bits should be set to 0.
         /// </summary>
         public byte Attribute { get; set; }
         /// <summary>
@@ -50,7 +54,6 @@ namespace KafkaNet.Protocol
         /// The message body contents.  Can contain compress message set.
         /// </summary>
         public byte[] Value { get; set; }
-
         /// <summary>
         /// This is the timestamp of the message. The timestamp type is indicated in the attributes. Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
         /// </summary>
@@ -77,15 +80,16 @@ namespace KafkaNet.Protocol
         /// Encodes a collection of messages into one byte[].  Encoded in order of list.
         /// </summary>
         /// <param name="messages">The collection of messages to encode together.</param>
+        /// <param name="version">Message version</param>
         /// <returns>Encoded byte[] representing the collection of messages.</returns>
-        public static byte[] EncodeMessageSet(IEnumerable<Message> messages)
+        public static byte[] EncodeMessageSet(IEnumerable<Message> messages, short version = 0)
         {
             using (var stream = new KafkaMessagePacker())
             {
                 foreach (var message in messages)
                 {
                     stream.Pack(InitialMessageOffset)
-                        .Pack(EncodeMessage(message));
+                        .Pack(EncodeMessage(message, version));
                 }
 
                 return stream.PayloadNoLength();
@@ -126,24 +130,36 @@ namespace KafkaNet.Protocol
             }
         }
 
+        private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        private long TimestampMilliseconds
+        {
+            get { return Timestamp > UnixEpoch ? (long)(Timestamp - UnixEpoch).TotalMilliseconds : 0L; }
+            set { Timestamp = UnixEpoch.AddMilliseconds(value); }
+        }
+
         /// <summary>
         /// Encodes a message object to byte[]
         /// </summary>
         /// <param name="message">Message data to encode.</param>
+        /// <param name="version">Message version</param>
         /// <returns>Encoded byte[] representation of the message object.</returns>
         /// <remarks>
         /// Format:
         /// Crc (Int32), MagicByte (Byte), Attribute (Byte), Key (Byte[]), Value (Byte[])
         /// </remarks>
-        public static byte[] EncodeMessage(Message message)
+        public static byte[] EncodeMessage(Message message, short version = 0)
         {
             using(var stream = new KafkaMessagePacker())
             {
-                return stream.Pack(message.MagicNumber)
-                    .Pack(message.Attribute)
-                    .Pack(message.Key)
-                    .Pack(message.Value)
-                    .CrcPayload();
+                stream.Pack(message.MagicNumber)
+                      .Pack(message.Attribute);
+                if (version > 1) {
+                    stream.Pack(message.TimestampMilliseconds);
+                }
+                return stream.Pack(message.Key)
+                      .Pack(message.Value)
+                      .CrcPayload();
             }
         }
 

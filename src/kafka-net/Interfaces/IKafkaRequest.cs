@@ -27,6 +27,10 @@ namespace KafkaNet
         /// </summary>
         ApiKeyRequestType ApiKey { get; }
         /// <summary>
+        /// This is a numeric version number for the api request. It allows the server to properly interpret the request as the protocol evolves. Responses will always be in the format corresponding to the request version.
+        /// </summary>
+        short ApiVersion { get; set; }
+        /// <summary>
         /// Encode this request into the Kafka wire protocol.
         /// </summary>
         /// <returns>Byte[] representing the binary wire protocol of this request.</returns>

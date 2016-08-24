@@ -57,7 +57,7 @@ namespace kafka_tests.Unit
         /// </summary>
         [Test]
         public void ProduceApiRequest(
-            [Values(0)] short version, // currently only supported version
+            [Values(0, 1, 2)] short version,
             [Values(0, 1, 2, -1)] short acks, 
             [Values(0, 1, 1000)] int timeoutMilliseconds, 
             [Values("test", "a really long name, with spaces and punctuation!")] string topic, 
@@ -73,7 +73,8 @@ namespace kafka_tests.Unit
                 ClientId = clientId,
                 CorrelationId = clientId.GetHashCode(),
                 TimeoutMS = timeoutMilliseconds,
-                Payload = new List<Payload>()
+                Payload = new List<Payload>(),
+                ApiVersion = version
             };
 
             for (var t = 0; t < topicsPerRequest; t++) {

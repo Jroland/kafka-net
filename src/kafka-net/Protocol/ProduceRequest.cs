@@ -42,7 +42,7 @@ namespace KafkaNet.Protocol
         }
 
         #region Protocol...
-        private KafkaDataPayload EncodeProduceRequest(ProduceRequest request)
+        private static KafkaDataPayload EncodeProduceRequest(ProduceRequest request)
         {
             int totalCompressedBytes = 0;
             if (request.Payload == null) request.Payload = new List<Payload>();
@@ -72,12 +72,12 @@ namespace KafkaNet.Protocol
                     {
 
                         case MessageCodec.CodecNone:
-                            message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
+                            message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages), request.ApiVersion));
                             break;
                         case MessageCodec.CodecGzip:
-                            var compressedBytes = CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages));
+                            var compressedBytes = CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages), request.ApiVersion);
                             Interlocked.Add(ref totalCompressedBytes, compressedBytes.CompressedAmount);
-                            message.Pack(Message.EncodeMessageSet(new[] { compressedBytes.CompressedMessage }));
+                            message.Pack(Message.EncodeMessageSet(new[] { compressedBytes.CompressedMessage }, request.ApiVersion));
                             break;
                         default:
                             throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
@@ -95,9 +95,9 @@ namespace KafkaNet.Protocol
             }
         }
 
-        private CompressedMessageResult CreateGzipCompressedMessage(IEnumerable<Message> messages)
+        private static CompressedMessageResult CreateGzipCompressedMessage(IEnumerable<Message> messages, short version)
         {
-            var messageSet = Message.EncodeMessageSet(messages);
+            var messageSet = Message.EncodeMessageSet(messages, version);
 
             var gZipBytes = Compression.Zip(messageSet);
 
@@ -114,7 +114,7 @@ namespace KafkaNet.Protocol
             };
         }
 
-        private IEnumerable<ProduceResponse> DecodeProduceResponse(byte[] data)
+        private static IEnumerable<ProduceResponse> DecodeProduceResponse(byte[] data)
         {
             using (var stream = new BigEndianBinaryReader(data))
             {
