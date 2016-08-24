@@ -1,0 +1,173 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using KafkaNet;
+using KafkaNet.Common;
+using KafkaNet.Protocol;
+using NUnit.Framework;
+
+namespace kafka_tests.Unit
+{
+    public static class ProtocolAssertionExtensions
+    {
+        private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        /// <summary>
+        /// MessageSet => [Offset MessageSize Message]
+        ///  Offset => int64      -- This is the offset used in kafka as the log sequence number. When the producer is sending non compressed messages, 
+        ///                          it can set the offsets to anything. When the producer is sending compressed messages, to avoid server side recompression, 
+        ///                          each compressed message should have offset starting from 0 and increasing by one for each inner message in the compressed message. 
+        ///  MessageSize => int32
+        /// 
+        /// NB. MessageSets are not preceded by an int32 like other array elements in the protocol:
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
+        /// </summary>
+        public static void AssertMessageSet(this BigEndianBinaryReader reader, int version, IEnumerable<Message> messages)
+        {
+            foreach (var message in messages) {
+                var offset = reader.ReadInt64();
+                if (message.Attribute != (byte)MessageCodec.CodecNone) {
+                    // TODO: assert offset?
+                }
+                var finalPosition = reader.ReadInt32() + reader.Position;
+                reader.AssertMessage(version, message);
+                Assert.That(reader.Position, Is.EqualTo(finalPosition), "MessageSize");
+            }
+        }
+
+        /// <summary>
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
+        /// 
+        /// Message => Crc MagicByte Attributes Timestamp Key Value
+        ///   Crc => int32       -- The CRC is the CRC32 of the remainder of the message bytes. This is used to check the integrity of the message on the broker and consumer.
+        ///   MagicByte => int8  -- This is a version id used to allow backwards compatible evolution of the message binary format. The current value is 1.
+        ///   Attributes => int8 -- This byte holds metadata attributes about the message.
+        ///                         The lowest 3 bits contain the compression codec used for the message.
+        ///                         The fourth lowest bit represents the timestamp type. 0 stands for CreateTime and 1 stands for LogAppendTime. The producer should always set this bit to 0. (since 0.10.0)
+        ///                         All other bits should be set to 0.
+        ///   Timestamp => int64 -- ONLY version 1! This is the timestamp of the message. The timestamp type is indicated in the attributes. Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
+        ///   Key => bytes       -- The key is an optional message key that was used for partition assignment. The key can be null.
+        ///   Value => bytes     -- The value is the actual message contents as an opaque byte array. Kafka supports recursive messages in which case this may itself contain a message set. The message can be null.
+        /// </summary>
+        public static void AssertMessage(this BigEndianBinaryReader reader, int version, Message message)
+        {
+            var crc = (uint)reader.ReadInt32();
+            var positionAfterCrc = reader.Position;
+            Assert.That(reader.ReadByte(), Is.EqualTo(message.MagicNumber), "MagicByte");
+            Assert.That(reader.ReadByte(), Is.EqualTo(message.Attribute), "Attributes");
+            if (version == 2) {
+                Assert.That(reader.ReadInt64(), Is.EqualTo((message.Timestamp - UnixEpoch).TotalMilliseconds), "Timestamp");
+            }
+            Assert.That(reader.ReadBytes(), Is.EqualTo(message.Key), "Key");
+            Assert.That(reader.ReadBytes(), Is.EqualTo(message.Value), "Value");
+
+            var positionAfterMessage = reader.Position;
+            reader.Position = positionAfterCrc;
+            var crcBytes = reader.ReadBytes((int) (positionAfterMessage - positionAfterCrc));
+            Assert.That(Crc32Provider.Compute(crcBytes), Is.EqualTo(crc));
+            reader.Position = positionAfterMessage;
+        }
+
+        /// <summary>
+        /// From http://kafka.apache.org/protocol.html#protocol_messages
+        /// 
+        /// Request Header => api_key api_version correlation_id client_id 
+        ///  api_key => INT16             -- The id of the request type.
+        ///  api_version => INT16         -- The version of the API.
+        ///  correlation_id => INT32      -- A user-supplied integer value that will be passed back with the response.
+        ///  client_id => NULLABLE_STRING -- A user specified identifier for the client making the request.
+        /// </summary>
+        public static void AssertRequestHeader<T>(this BigEndianBinaryReader reader, short version, IKafkaRequest<T> request)
+        {
+            reader.AssertRequestHeader(request.ApiKey, version, request.CorrelationId, request.ClientId);
+        }
+
+        /// <summary>
+        /// MessageSet => [Offset MessageSize Message]
+        ///  Offset => int64      -- This is the offset used in kafka as the log sequence number. When the producer is sending non compressed messages, 
+        ///                          it can set the offsets to anything. When the producer is sending compressed messages, to avoid server side recompression, 
+        ///                          each compressed message should have offset starting from 0 and increasing by one for each inner message in the compressed message. 
+        ///  MessageSize => int32
+        /// 
+        /// NB. MessageSets are not preceded by an int32 like other array elements in the protocol:
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
+        /// </summary>
+        public static void AssertMessageSet(this BigEndianBinaryReader reader, int version, IEnumerable<Tuple<byte, DateTime, byte[], byte[]>> messageValues)
+        {
+            var messages = messageValues.Select(
+                t =>
+                new Message {
+                    Attribute = t.Item1,
+                    Timestamp = t.Item2,
+                    Key = t.Item3,
+                    Value = t.Item4,
+                    MagicNumber = 1
+                });
+            reader.AssertMessageSet(version, messages);
+        }
+
+        /// <summary>
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
+        /// 
+        /// Message => Crc MagicByte Attributes Timestamp Key Value
+        ///   Crc => int32       -- The CRC is the CRC32 of the remainder of the message bytes. This is used to check the integrity of the message on the broker and consumer.
+        ///   MagicByte => int8  -- This is a version id used to allow backwards compatible evolution of the message binary format. The current value is 1.
+        ///   Attributes => int8 -- This byte holds metadata attributes about the message.
+        ///                         The lowest 3 bits contain the compression codec used for the message.
+        ///                         The fourth lowest bit represents the timestamp type. 0 stands for CreateTime and 1 stands for LogAppendTime. The producer should always set this bit to 0. (since 0.10.0)
+        ///                         All other bits should be set to 0.
+        ///   Timestamp => int64 -- ONLY version 1! This is the timestamp of the message. The timestamp type is indicated in the attributes. Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
+        ///   Key => bytes       -- The key is an optional message key that was used for partition assignment. The key can be null.
+        ///   Value => bytes     -- The value is the actual message contents as an opaque byte array. Kafka supports recursive messages in which case this may itself contain a message set. The message can be null.
+        /// </summary>
+        public static void AssertMessage(this BigEndianBinaryReader reader, int version, byte attributes, DateTime timestamp, byte[] key, byte[] value)
+        {
+            reader.AssertMessage(version, new Message { Attribute = attributes, Timestamp = timestamp, Key = key, Value = value, MagicNumber = 1});
+        }
+
+        /// <summary>
+        /// From http://kafka.apache.org/protocol.html#protocol_messages
+        /// 
+        /// Request Header => api_key api_version correlation_id client_id 
+        ///  api_key => INT16             -- The id of the request type.
+        ///  api_version => INT16         -- The version of the API.
+        ///  correlation_id => INT32      -- A user-supplied integer value that will be passed back with the response.
+        ///  client_id => NULLABLE_STRING -- A user specified identifier for the client making the request.
+        /// </summary>
+        public static void AssertRequestHeader(this BigEndianBinaryReader reader, ApiKeyRequestType apiKey, short version, int correlationId, string clientId)
+        {
+            Assert.That(reader.ReadInt16(), Is.EqualTo((short) apiKey), "api_key");
+            Assert.That(reader.ReadInt16(), Is.EqualTo(version), "api_version");
+            Assert.That(reader.ReadInt32(), Is.EqualTo(correlationId), "correlation_id");
+            Assert.That(reader.ReadString(), Is.EqualTo(clientId), "client_id");
+        }
+
+        /// <summary>
+        /// From http://kafka.apache.org/protocol.html#protocol_messages
+        /// 
+        /// Response Header => correlation_id 
+        ///  correlation_id => INT32      -- The user-supplied value passed in with the request
+        /// </summary>
+        public static void AssertResponseHeader(this BigEndianBinaryReader reader, int correlationId)
+        {
+            Assert.That(reader.ReadInt32(), Is.EqualTo(correlationId));
+        }
+
+        /// <summary>
+        /// From http://kafka.apache.org/protocol.html#protocol_common
+        /// 
+        /// RequestOrResponse => Size (RequestMessage | ResponseMessage)
+        ///  Size => int32 -- The message_size field gives the size of the subsequent request or response message in bytes. 
+        ///                   The client can read requests by first reading this 4 byte size as an integer N, and then reading 
+        ///                   and parsing the subsequent N bytes of the request.
+        /// </summary>
+        public static void AssertProtocol(this byte[] bytes, Action<BigEndianBinaryReader> assertions)
+        {
+            using (var reader = new BigEndianBinaryReader(bytes)) {
+                Assert.That(reader.ReadInt32(), Is.EqualTo(reader.Length - 4), "Size");
+                assertions(reader);
+                Assert.That(reader.HasData, Is.False);
+            }
+        }
+    }
+}
