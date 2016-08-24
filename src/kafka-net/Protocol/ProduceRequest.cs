@@ -72,12 +72,12 @@ namespace KafkaNet.Protocol
                     {
 
                         case MessageCodec.CodecNone:
-                            message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages), request.ApiVersion));
+                            message.Pack(Message.EncodeMessageSet(payloads.SelectMany(x => x.Messages)));
                             break;
                         case MessageCodec.CodecGzip:
-                            var compressedBytes = CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages), request.ApiVersion);
+                            var compressedBytes = CreateGzipCompressedMessage(payloads.SelectMany(x => x.Messages));
                             Interlocked.Add(ref totalCompressedBytes, compressedBytes.CompressedAmount);
-                            message.Pack(Message.EncodeMessageSet(new[] { compressedBytes.CompressedMessage }, request.ApiVersion));
+                            message.Pack(Message.EncodeMessageSet(new[] { compressedBytes.CompressedMessage }));
                             break;
                         default:
                             throw new NotSupportedException(string.Format("Codec type of {0} is not supported.", groupedPayload.Key.Codec));
@@ -95,9 +95,9 @@ namespace KafkaNet.Protocol
             }
         }
 
-        private static CompressedMessageResult CreateGzipCompressedMessage(IEnumerable<Message> messages, short version)
+        private static CompressedMessageResult CreateGzipCompressedMessage(IEnumerable<Message> messages)
         {
-            var messageSet = Message.EncodeMessageSet(messages, version);
+            var messageSet = Message.EncodeMessageSet(messages);
 
             var gZipBytes = Compression.Zip(messageSet);
 
@@ -145,6 +145,10 @@ namespace KafkaNet.Protocol
 
                         yield return response;
                     }
+                }
+
+                if (version >= 2) {
+                    var throttleTime = stream.ReadInt32();
                 }
             }
         }

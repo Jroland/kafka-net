@@ -80,16 +80,15 @@ namespace KafkaNet.Protocol
         /// Encodes a collection of messages into one byte[].  Encoded in order of list.
         /// </summary>
         /// <param name="messages">The collection of messages to encode together.</param>
-        /// <param name="version">Message version</param>
         /// <returns>Encoded byte[] representing the collection of messages.</returns>
-        public static byte[] EncodeMessageSet(IEnumerable<Message> messages, short version = 0)
+        public static byte[] EncodeMessageSet(IEnumerable<Message> messages)
         {
             using (var stream = new KafkaMessagePacker())
             {
                 foreach (var message in messages)
                 {
                     stream.Pack(InitialMessageOffset)
-                        .Pack(EncodeMessage(message, version));
+                        .Pack(EncodeMessage(message));
                 }
 
                 return stream.PayloadNoLength();
@@ -134,19 +133,18 @@ namespace KafkaNet.Protocol
         /// Encodes a message object to byte[]
         /// </summary>
         /// <param name="message">Message data to encode.</param>
-        /// <param name="version">Message version</param>
         /// <returns>Encoded byte[] representation of the message object.</returns>
         /// <remarks>
         /// Format:
         /// Crc (Int32), MagicByte (Byte), Attribute (Byte), Key (Byte[]), Value (Byte[])
         /// </remarks>
-        public static byte[] EncodeMessage(Message message, short version = 0)
+        public static byte[] EncodeMessage(Message message)
         {
             using(var stream = new KafkaMessagePacker())
             {
                 stream.Pack(message.MagicNumber)
                       .Pack(message.Attribute);
-                if (version > 1) {
+                if (message.MagicNumber >= 1) {
                     stream.Pack(message.Timestamp.ToUnixEpochMilliseconds());
                 }
                 return stream.Pack(message.Key)
@@ -175,8 +173,15 @@ namespace KafkaNet.Protocol
                     Meta = new MessageMetadata { Offset = offset },
                     MagicNumber = stream.ReadByte(),
                     Attribute = stream.ReadByte(),
-                    Key = stream.ReadIntPrefixedBytes()
                 };
+
+                if (message.MagicNumber >= 1) {
+                    var timestamp = stream.ReadInt64();
+                    if (timestamp >= 0) {
+                        message.Timestamp = timestamp.FromUnixEpochMilliseconds();
+                    }
+                }
+                message.Key = stream.ReadIntPrefixedBytes();
 
                 var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
                 switch (codec)

@@ -12,6 +12,41 @@ namespace kafka_tests.Unit
     public static class ProtocolAssertionExtensions
     {
         /// <summary>
+        /// FetchResponse => *ThrottleTime [TopicName [Partition ErrorCode HighwaterMarkOffset MessageSetSize MessageSet]]
+        ///  *ThrottleTime is only version 1 (0.9.0) and above
+        ///  ThrottleTime => int32        -- Duration in milliseconds for which the request was throttled due to quota violation. (Zero if the request did not 
+        ///                                  violate any quota.)
+        ///  TopicName => string          -- The topic this response entry corresponds to.
+        ///  Partition => int32           -- The partition this response entry corresponds to.
+        ///  ErrorCode => int16           -- The error from this partition, if any. Errors are given on a per-partition basis because a given partition may 
+        ///                                  be unavailable or maintained on a different host, while others may have successfully accepted the produce request.
+        ///  HighwaterMarkOffset => int64 -- The offset at the end of the log for this partition. This can be used by the client to determine how many messages 
+        ///                                  behind the end of the log they are.
+        ///  MessageSetSize => int32      -- The size in bytes of the message set for this partition
+        /// 
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-FetchResponse
+        /// </summary>
+        public static void AssertFetchResponse(this BigEndianBinaryReader reader, int version, int throttleTime, IEnumerable<FetchResponse> response)
+        {
+            var responses = response.ToList();
+            if (version >= 1) {
+                Assert.That(reader.ReadInt32(), Is.EqualTo(throttleTime), "ThrottleTime");
+            }
+            Assert.That(reader.ReadInt32(), Is.EqualTo(responses.Count), "[TopicName]");
+            foreach (var payload in responses) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
+                Assert.That(reader.ReadInt16(), Is.EqualTo(payload.Error), "Error");
+                Assert.That(reader.ReadInt64(), Is.EqualTo(payload.HighWaterMark), "HighwaterMarkOffset");
+
+                var finalPosition = reader.ReadInt32() + reader.Position;
+                reader.AssertMessageSet(version, payload.Messages);
+                Assert.That(reader.Position, Is.EqualTo(finalPosition), $"MessageSetSize was {finalPosition - 4} but ended in a different spot.");
+            }
+        }
+
+        /// <summary>
         /// FetchRequest => ReplicaId MaxWaitTime MinBytes [TopicName [Partition FetchOffset MaxBytes]]
         ///  ReplicaId => int32   -- The replica id indicates the node id of the replica initiating this request. Normal client consumers should always 
         ///                          specify this as -1 as they have no node id. Other brokers set this to be their own node id. The value -2 is accepted 

@@ -71,7 +71,6 @@ namespace kafka_tests.Unit
             [Values(1, 5)] int totalPartitions, 
             [Values(1, 2, 3)] int messagesPerSet)
         {
-            var randomizer = new Randomizer();
             var clientId = nameof(ProduceApiRequest);
 
             var request = new ProduceRequest {
@@ -84,26 +83,13 @@ namespace kafka_tests.Unit
             };
 
             for (var t = 0; t < topicsPerRequest; t++) {
-                var payload = new Payload {
-                    Topic = topic + t,
-                    Partition = t % totalPartitions,
-                    Codec = MessageCodec.CodecNone,
-                    Messages = new List<Message>()
-                };
-                for (var m = 0; m < messagesPerSet; m++) {
-                    var message = new Message {
-                        MagicNumber = 1,
-                        Timestamp = DateTime.UtcNow,
-                        Key = m > 0 ? new byte[8] : null,
-                        Value = new byte[8*(m + 1)]
-                    };
-                    if (message.Key != null) {
-                        randomizer.NextBytes(message.Key);
-                    }
-                    randomizer.NextBytes(message.Value);
-                    payload.Messages.Add(message);
-                }
-                request.Payload.Add(payload);
+                request.Payload.Add(
+                    new Payload {
+                        Topic = topic + t,
+                        Partition = t % totalPartitions,
+                        Codec = MessageCodec.CodecNone,
+                        Messages = GenerateMessages(messagesPerSet, (byte) (version >= 2 ? 1 : 0))
+                    });
             }
 
             var data = request.Encode();
@@ -135,7 +121,7 @@ namespace kafka_tests.Unit
         /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
         /// </summary>
         [Test]
-        public void InterpretApiResponse(
+        public void ProduceApiResponse(
             [Values(0, 1, 2)] short version,
             [Values(-1, 0, 123456, 10000000)] long timestampMilliseconds, 
             [Values("test", "a really long name, with spaces and punctuation!")] string topic, 
@@ -149,7 +135,7 @@ namespace kafka_tests.Unit
             [Values(0, 1234, 100000)] int throttleTime)
         {
             var randomizer = new Randomizer();
-            var clientId = nameof(InterpretApiResponse);
+            var clientId = nameof(ProduceApiResponse);
             var correlationId = clientId.GetHashCode();
 
             byte[] data = null;
@@ -245,24 +231,94 @@ namespace kafka_tests.Unit
                 });
         }
 
-        public static IEnumerable<ErrorResponseCode> ErrorResponseCodes => new[] {
-            ErrorResponseCode.NoError,
-            ErrorResponseCode.Unknown,
-            ErrorResponseCode.OffsetOutOfRange,
-            ErrorResponseCode.InvalidMessage,
-            ErrorResponseCode.UnknownTopicOrPartition,
-            ErrorResponseCode.InvalidMessageSize,
-            ErrorResponseCode.LeaderNotAvailable,
-            ErrorResponseCode.NotLeaderForPartition,
-            ErrorResponseCode.RequestTimedOut,
-            ErrorResponseCode.BrokerNotAvailable,
-            ErrorResponseCode.ReplicaNotAvailable,
-            ErrorResponseCode.MessageSizeTooLarge,
-            //ErrorResponseCode.StaleControllerEpochCode, 
-            ErrorResponseCode.OffsetMetadataTooLargeCode,
-            ErrorResponseCode.OffsetsLoadInProgressCode,
-            ErrorResponseCode.ConsumerCoordinatorNotAvailableCode,
-            ErrorResponseCode.NotCoordinatorForConsumerCode
-        };
+        /// <summary>
+        /// FetchResponse => *ThrottleTime [TopicName [Partition ErrorCode HighwaterMarkOffset MessageSetSize MessageSet]]
+        ///  *ThrottleTime is only version 1 (0.9.0) and above
+        ///  ThrottleTime => int32        -- Duration in milliseconds for which the request was throttled due to quota violation. (Zero if the request did not 
+        ///                                  violate any quota.)
+        ///  TopicName => string          -- The topic this response entry corresponds to.
+        ///  Partition => int32           -- The partition this response entry corresponds to.
+        ///  ErrorCode => int16           -- The error from this partition, if any. Errors are given on a per-partition basis because a given partition may 
+        ///                                  be unavailable or maintained on a different host, while others may have successfully accepted the produce request.
+        ///  HighwaterMarkOffset => int64 -- The offset at the end of the log for this partition. This can be used by the client to determine how many messages 
+        ///                                  behind the end of the log they are.
+        ///  MessageSetSize => int32      -- The size in bytes of the message set for this partition
+        /// 
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-FetchResponse
+        /// </summary>
+        [Test]
+        public void FetchApiResponse(
+            [Values(0, 1, 2)] short version,
+            [Values(0, 1234)] int throttleTime,
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic, 
+            [Values(1, 10)] int topicsPerRequest, 
+            [Values(1, 5)] int totalPartitions, 
+            [Values(
+                ErrorResponseCode.NoError,
+                ErrorResponseCode.OffsetOutOfRange,
+                ErrorResponseCode.NotLeaderForPartition,
+                ErrorResponseCode.ReplicaNotAvailable,
+                ErrorResponseCode.Unknown
+            )] ErrorResponseCode errorCode, 
+            [Values(2, 3)] int messagesPerSet
+            )
+        {
+            var randomizer = new Randomizer();
+            var clientId = nameof(FetchApiResponse);
+            var correlationId = clientId.GetHashCode();
+
+            byte[] data = null;
+            using (var stream = new MemoryStream()) {
+                var writer = new BigEndianBinaryWriter(stream);
+                writer.WriteResponseHeader(correlationId);
+
+                if (version >= 1) {
+                    writer.Write(throttleTime);
+                }
+                writer.Write(topicsPerRequest);
+                for (var t = 0; t < topicsPerRequest; t++) {
+                    writer.Write(topic + t);
+                    writer.Write(1); // partitionsPerTopic
+                    writer.Write(t % totalPartitions);
+                    writer.Write((short)errorCode);
+                    writer.Write((long)randomizer.Next());
+
+                    var messageSet = Message.EncodeMessageSet(GenerateMessages(messagesPerSet, (byte) (version >= 2 ? 1 : 0)));
+                    writer.Write(messageSet.Length);
+                    writer.Write(messageSet);
+                }
+                data = new byte[stream.Position];
+                Buffer.BlockCopy(stream.GetBuffer(), 0, data, 0, data.Length);
+            }
+
+            var request = new FetchRequest { ApiVersion = version };
+            var responses = request.Decode(data); // doesn't include the size in the decode -- the framework deals with it, I'd assume
+            data.PrefixWithInt32Length().AssertProtocol(
+                reader =>
+                {
+                    reader.AssertResponseHeader(correlationId);
+                    reader.AssertFetchResponse(version, throttleTime, responses);
+                });
+        }
+
+        private List<Message> GenerateMessages(int count, byte version)
+        {
+            var randomizer = new Randomizer();
+            var messages = new List<Message>();
+            for (var m = 0; m < count; m++) {
+                var message = new Message {
+                    MagicNumber = version,
+                    Timestamp = DateTime.UtcNow,
+                    Key = m > 0 ? new byte[8] : null,
+                    Value = new byte[8*(m + 1)]
+                };
+                if (message.Key != null) {
+                    randomizer.NextBytes(message.Key);
+                }
+                randomizer.NextBytes(message.Value);
+                messages.Add(message);
+            }
+            return messages;
+        }
     }
 }
