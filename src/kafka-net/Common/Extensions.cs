@@ -234,5 +234,17 @@ namespace KafkaNet.Common
             
             return new ApplicationException("Unknown exception occured.");
         }
+
+        private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        public static long ToUnixEpochMilliseconds(this DateTime pointInTime)
+        {
+            return pointInTime > UnixEpoch ? (long)(pointInTime - UnixEpoch).TotalMilliseconds : 0L;
+        }
+
+        public static DateTime FromUnixEpochMilliseconds(this long milliseconds)
+        {
+            return UnixEpoch.AddMilliseconds(milliseconds);
+        }
     }
 }

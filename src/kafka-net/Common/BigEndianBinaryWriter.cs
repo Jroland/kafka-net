@@ -101,7 +101,7 @@ namespace KafkaNet.Common
 
         public override void Write(string value)
         {
-            throw new NotSupportedException("Kafka requires specific string length prefix encoding.");
+            Write(value, StringPrefixEncoding.Int16);
         }
 
         public void Write(byte[] value, StringPrefixEncoding encoding)

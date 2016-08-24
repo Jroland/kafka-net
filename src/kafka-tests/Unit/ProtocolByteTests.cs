@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using KafkaNet.Common;
 using KafkaNet.Protocol;
 using NUnit.Framework;
 
@@ -42,18 +44,22 @@ namespace kafka_tests.Unit
     public class ProtocolByteTests
     {
         /// <summary>
-        /// Produce Request (Version: 0,1,2) => acks timeout [topic_data] 
-        ///  acks => INT16                   -- The number of nodes that should replicate the produce before returning. -1 indicates the full ISR.
-        ///  timeout => INT32                -- The time to await a response in ms.
-        ///  topic_data => topic [data] 
-        ///    topic => STRING
-        ///    data => partition record_set 
-        ///      partition => INT32
-        ///      record_set => BYTES
+        /// ProduceRequest => RequiredAcks Timeout [TopicName [Partition MessageSetSize MessageSet]]
+        ///  RequiredAcks => int16   -- This field indicates how many acknowledgements the servers should receive before responding to the request. 
+        ///                             If it is 0 the server will not send any response (this is the only case where the server will not reply to 
+        ///                             a request). If it is 1, the server will wait the data is written to the local log before sending a response. 
+        ///                             If it is -1 the server will block until the message is committed by all in sync replicas before sending a response.
+        ///  Timeout => int32        -- This provides a maximum time in milliseconds the server can await the receipt of the number of acknowledgements 
+        ///                             in RequiredAcks. The timeout is not an exact limit on the request time for a few reasons: (1) it does not include 
+        ///                             network latency, (2) the timer begins at the beginning of the processing of this request so if many requests are 
+        ///                             queued due to server overload that wait time will not be included, (3) we will not terminate a local write so if 
+        ///                             the local write time exceeds this timeout it will not be respected. To get a hard timeout of this type the client 
+        ///                             should use the socket timeout.
+        ///  TopicName => string     -- The topic that data is being published to.
+        ///  Partition => int32      -- The partition that data is being published to.
+        ///  MessageSetSize => int32 -- The size, in bytes, of the message set that follows.
         /// 
-        /// where:
-        /// record_set => MessageSetSize MessageSet
-        ///  MessageSetSize => int32
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
         /// </summary>
         [Test]
         public void ProduceApiRequest(
@@ -104,9 +110,99 @@ namespace kafka_tests.Unit
 
             data.Buffer.AssertProtocol(
                 reader => {
-                    reader.AssertRequestHeader(version, request);
-                    reader.AssertProduceRequest(version, request);
+                    reader.AssertRequestHeader(request);
+                    reader.AssertProduceRequest(request);
                 });
         }
+
+        /// <summary>
+        /// ProduceResponse => [TopicName [Partition ErrorCode Offset *Timestamp]] *ThrottleTime
+        ///  *ThrottleTime is only version 1 (0.9.0) and above
+        ///  *Timestamp is only version 2 (0.10.0) and above
+        ///  TopicName => string   -- The topic this response entry corresponds to.
+        ///  Partition => int32    -- The partition this response entry corresponds to.
+        ///  ErrorCode => int16    -- The error from this partition, if any. Errors are given on a per-partition basis because a given partition may be 
+        ///                           unavailable or maintained on a different host, while others may have successfully accepted the produce request.
+        ///  Offset => int64       -- The offset assigned to the first message in the message set appended to this partition.
+        ///  Timestamp => int64    -- If LogAppendTime is used for the topic, this is the timestamp assigned by the broker to the message set. 
+        ///                           All the messages in the message set have the same timestamp.
+        ///                           If CreateTime is used, this field is always -1. The producer can assume the timestamp of the messages in the 
+        ///                           produce request has been accepted by the broker if there is no error code returned.
+        ///                           Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
+        ///  ThrottleTime => int32 -- Duration in milliseconds for which the request was throttled due to quota violation. 
+        ///                           (Zero if the request did not violate any quota).
+        /// 
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
+        /// </summary>
+        [Test]
+        public void InterpretApiResponse(
+            [Values(0, 1, 2)] short version,
+            [Values(-1, 0, 123456, 10000000)] long timestampMilliseconds, 
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic, 
+            [Values(1, 10)] int topicsPerRequest, 
+            [Values(1, 5)] int totalPartitions, 
+            [Values(
+                ErrorResponseCode.NoError,
+                ErrorResponseCode.InvalidMessage,
+                ErrorResponseCode.NotCoordinatorForConsumerCode
+            )] ErrorResponseCode errorCode,
+            [Values(0, 1234, 100000)] int throttleTime)
+        {
+            var randomizer = new Randomizer();
+            var clientId = nameof(InterpretApiResponse);
+            var correlationId = clientId.GetHashCode();
+
+            byte[] data = null;
+            using (var stream = new MemoryStream()) {
+                var writer = new BigEndianBinaryWriter(stream);
+                writer.WriteResponseHeader(correlationId);
+
+                writer.Write(topicsPerRequest);
+                for (var t = 0; t < topicsPerRequest; t++) {
+                    writer.Write(topic + t);
+                    writer.Write(1); // partitionsPerTopic
+                    writer.Write(t % totalPartitions);
+                    writer.Write((short)errorCode);
+                    writer.Write((long)randomizer.Next());
+                    if (version >= 2) {
+                        writer.Write(timestampMilliseconds);
+                    }
+                }
+                if (version >= 1) {
+                    writer.Write(throttleTime);    
+                }
+                data = new byte[stream.Position];
+                Buffer.BlockCopy(stream.GetBuffer(), 0, data, 0, data.Length);
+            }
+
+            var request = new ProduceRequest { ApiVersion = version };
+            var responses = request.Decode(data); // doesn't include the size in the decode -- the framework deals with it, I'd assume
+            data.PrefixWithInt32Length().AssertProtocol(
+                reader =>
+                {
+                    reader.AssertResponseHeader(correlationId);
+                    reader.AssertProduceResponse(version, throttleTime, responses);
+                });
+        }
+
+        public static IEnumerable<ErrorResponseCode> ErrorResponseCodes => new[] {
+            ErrorResponseCode.NoError,
+            ErrorResponseCode.Unknown,
+            ErrorResponseCode.OffsetOutOfRange,
+            ErrorResponseCode.InvalidMessage,
+            ErrorResponseCode.UnknownTopicOrPartition,
+            ErrorResponseCode.InvalidMessageSize,
+            ErrorResponseCode.LeaderNotAvailable,
+            ErrorResponseCode.NotLeaderForPartition,
+            ErrorResponseCode.RequestTimedOut,
+            ErrorResponseCode.BrokerNotAvailable,
+            ErrorResponseCode.ReplicaNotAvailable,
+            ErrorResponseCode.MessageSizeTooLarge,
+            //ErrorResponseCode.StaleControllerEpochCode, 
+            ErrorResponseCode.OffsetMetadataTooLargeCode,
+            ErrorResponseCode.OffsetsLoadInProgressCode,
+            ErrorResponseCode.ConsumerCoordinatorNotAvailableCode,
+            ErrorResponseCode.NotCoordinatorForConsumerCode
+        };
     }
 }

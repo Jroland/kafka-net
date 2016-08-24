@@ -130,14 +130,6 @@ namespace KafkaNet.Protocol
             }
         }
 
-        private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-
-        private long TimestampMilliseconds
-        {
-            get { return Timestamp > UnixEpoch ? (long)(Timestamp - UnixEpoch).TotalMilliseconds : 0L; }
-            set { Timestamp = UnixEpoch.AddMilliseconds(value); }
-        }
-
         /// <summary>
         /// Encodes a message object to byte[]
         /// </summary>
@@ -155,7 +147,7 @@ namespace KafkaNet.Protocol
                 stream.Pack(message.MagicNumber)
                       .Pack(message.Attribute);
                 if (version > 1) {
-                    stream.Pack(message.TimestampMilliseconds);
+                    stream.Pack(message.Timestamp.ToUnixEpochMilliseconds());
                 }
                 return stream.Pack(message.Key)
                       .Pack(message.Value)
