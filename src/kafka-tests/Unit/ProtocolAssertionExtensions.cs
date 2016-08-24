@@ -11,7 +11,43 @@ namespace kafka_tests.Unit
 {
     public static class ProtocolAssertionExtensions
     {
-        private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        /// <summary>
+        /// FetchRequest => ReplicaId MaxWaitTime MinBytes [TopicName [Partition FetchOffset MaxBytes]]
+        ///  ReplicaId => int32   -- The replica id indicates the node id of the replica initiating this request. Normal client consumers should always 
+        ///                          specify this as -1 as they have no node id. Other brokers set this to be their own node id. The value -2 is accepted 
+        ///                          to allow a non-broker to issue fetch requests as if it were a replica broker for debugging purposes.
+        ///  MaxWaitTime => int32 -- The max wait time is the maximum amount of time in milliseconds to block waiting if insufficient data is available 
+        ///                          at the time the request is issued.
+        ///  MinBytes => int32    -- This is the minimum number of bytes of messages that must be available to give a response. If the client sets this 
+        ///                          to 0 the server will always respond immediately, however if there is no new data since their last request they will 
+        ///                          just get back empty message sets. If this is set to 1, the server will respond as soon as at least one partition has 
+        ///                          at least 1 byte of data or the specified timeout occurs. By setting higher values in combination with the timeout the 
+        ///                          consumer can tune for throughput and trade a little additional latency for reading only large chunks of data (e.g. 
+        ///                          setting MaxWaitTime to 100 ms and setting MinBytes to 64k would allow the server to wait up to 100ms to try to accumulate 
+        ///                          64k of data before responding).
+        ///  TopicName => string  -- The name of the topic.
+        ///  Partition => int32   -- The id of the partition the fetch is for.
+        ///  FetchOffset => int64 -- The offset to begin this fetch from.
+        ///  MaxBytes => int32    -- The maximum bytes to include in the message set for this partition. This helps bound the size of the response.
+        /// 
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-FetchAPI
+        /// </summary>
+        public static void AssertFetchRequest(this BigEndianBinaryReader reader, FetchRequest request)
+        {
+            Assert.That(reader.ReadInt32(), Is.EqualTo(-1), "ReplicaId");
+            Assert.That(reader.ReadInt32(), Is.EqualTo(request.MaxWaitTime), "MaxWaitTime");
+            Assert.That(reader.ReadInt32(), Is.EqualTo(request.MinBytes), "MinBytes");
+
+            Assert.That(reader.ReadInt32(), Is.EqualTo(request.Fetches.Count), "[TopicName]");
+            foreach (var payload in request.Fetches) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
+
+                Assert.That(reader.ReadInt64(), Is.EqualTo(payload.Offset), "FetchOffset");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.MaxBytes), "MaxBytes");
+            }
+        }
 
         /// <summary>
         /// ProduceResponse => [TopicName [Partition ErrorCode Offset *Timestamp]] *ThrottleTime
@@ -48,7 +84,7 @@ namespace kafka_tests.Unit
                         Assert.That(payload.Timestamp, Is.Null, "Timestamp");
                     } else {
                         Assert.That(payload.Timestamp, Is.Not.Null, "Timestamp");
-                        Assert.That(payload.Timestamp.Value, Is.EqualTo(UnixEpoch.AddMilliseconds(timestamp)), "Timestamp");
+                        Assert.That(payload.Timestamp.Value, Is.EqualTo(timestamp.FromUnixEpochMilliseconds()), "Timestamp");
                     }
                 }
             }
@@ -137,7 +173,7 @@ namespace kafka_tests.Unit
             Assert.That(reader.ReadByte(), Is.EqualTo(message.MagicNumber), "MagicByte");
             Assert.That(reader.ReadByte(), Is.EqualTo(message.Attribute), "Attributes");
             if (version == 2) {
-                Assert.That(reader.ReadInt64(), Is.EqualTo((long)(message.Timestamp - UnixEpoch).TotalMilliseconds), "Timestamp");
+                Assert.That(reader.ReadInt64(), Is.EqualTo(message.Timestamp.ToUnixEpochMilliseconds()), "Timestamp");
             }
             Assert.That(reader.ReadBytes(), Is.EqualTo(message.Key), "Key");
             Assert.That(reader.ReadBytes(), Is.EqualTo(message.Value), "Value");
