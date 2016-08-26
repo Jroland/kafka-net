@@ -12,6 +12,63 @@ namespace kafka_tests.Unit
     public static class ProtocolAssertionExtensions
     {
         /// <summary>
+        /// OffsetResponse => [TopicName [PartitionOffsets]]
+        ///  PartitionOffsets => Partition ErrorCode [Offset]
+        ///  TopicName => string  -- The name of the topic.
+        ///  Partition => int32   -- The id of the partition the fetch is for.
+        ///  ErrorCode => int16   -- The error from this partition, if any. Errors are given on a per-partition basis because a given partition may 
+        ///                          be unavailable or maintained on a different host, while others may have successfully accepted the produce request.
+        ///  Offset => int64
+        /// 
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetAPI(AKAListOffset)
+        /// </summary>
+        public static void AssertOffsetResponse(this BigEndianBinaryReader reader, IEnumerable<OffsetResponse> response)
+        {
+            var responses = response.ToList();
+            Assert.That(reader.ReadInt32(), Is.EqualTo(responses.Count), "[TopicName]");
+            foreach (var payload in responses) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
+                Assert.That(reader.ReadInt16(), Is.EqualTo(payload.Error), "ErrorCode");
+
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.Offsets.Count), "[Offset]");
+                foreach (var offset in payload.Offsets) {
+                    Assert.That(reader.ReadInt64(), Is.EqualTo(offset), "Offset");
+                }
+            }
+        }
+
+        /// <summary>
+        /// OffsetRequest => ReplicaId [TopicName [Partition Time MaxNumberOfOffsets]]
+        ///  ReplicaId => int32   -- The replica id indicates the node id of the replica initiating this request. Normal client consumers should always 
+        ///                          specify this as -1 as they have no node id. Other brokers set this to be their own node id. The value -2 is accepted 
+        ///                          to allow a non-broker to issue fetch requests as if it were a replica broker for debugging purposes.
+        ///  TopicName => string  -- The name of the topic.
+        ///  Partition => int32   -- The id of the partition the fetch is for.
+        ///  Time => int64        -- Used to ask for all messages before a certain time (ms). There are two special values. Specify -1 to receive the 
+        ///                          latest offset (i.e. the offset of the next coming message) and -2 to receive the earliest available offset. Note 
+        ///                          that because offsets are pulled in descending order, asking for the earliest offset will always return you a single element.
+        ///  MaxNumberOfOffsets => int32 
+        /// 
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetAPI(AKAListOffset)
+        /// </summary>
+        public static void AssertOffsetRequest(this BigEndianBinaryReader reader, OffsetRequest request)
+        {
+            Assert.That(reader.ReadInt32(), Is.EqualTo(-1), "ReplicaId");
+
+            Assert.That(reader.ReadInt32(), Is.EqualTo(request.Offsets.Count), "[TopicName]");
+            foreach (var payload in request.Offsets) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
+
+                Assert.That(reader.ReadInt64(), Is.EqualTo(payload.Time), "Time");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.MaxOffsets), "MaxNumberOfOffsets");
+            }
+        }
+
+        /// <summary>
         /// FetchResponse => *ThrottleTime [TopicName [Partition ErrorCode HighwaterMarkOffset MessageSetSize MessageSet]]
         ///  *ThrottleTime is only version 1 (0.9.0) and above
         ///  ThrottleTime => int32        -- Duration in milliseconds for which the request was throttled due to quota violation. (Zero if the request did not 

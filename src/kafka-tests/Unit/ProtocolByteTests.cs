@@ -301,6 +301,113 @@ namespace kafka_tests.Unit
                 });
         }
 
+        /// <summary>
+        /// OffsetRequest => ReplicaId [TopicName [Partition Time MaxNumberOfOffsets]]
+        ///  ReplicaId => int32   -- The replica id indicates the node id of the replica initiating this request. Normal client consumers should always 
+        ///                          specify this as -1 as they have no node id. Other brokers set this to be their own node id. The value -2 is accepted 
+        ///                          to allow a non-broker to issue fetch requests as if it were a replica broker for debugging purposes.
+        ///  TopicName => string  -- The name of the topic.
+        ///  Partition => int32   -- The id of the partition the fetch is for.
+        ///  Time => int64        -- Used to ask for all messages before a certain time (ms). There are two special values. Specify -1 to receive the 
+        ///                          latest offset (i.e. the offset of the next coming message) and -2 to receive the earliest available offset. Note 
+        ///                          that because offsets are pulled in descending order, asking for the earliest offset will always return you a single element.
+        ///  MaxNumberOfOffsets => int32 
+        /// 
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetAPI(AKAListOffset)
+        /// </summary>
+        [Test]
+        public void OffsetsApiRequest(
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic, 
+            [Values(1, 10)] int topicsPerRequest, 
+            [Values(1, 5)] int totalPartitions, 
+            [Values(-2, -1, 123456, 10000000)] long time,
+            [Values(1, 10)] int maxOffsets)
+        {
+            var clientId = nameof(OffsetsApiRequest);
+
+            var request = new OffsetRequest {
+                ClientId = clientId,
+                CorrelationId = clientId.GetHashCode(),
+                Offsets = new List<Offset>(),
+                ApiVersion = 0
+            };
+
+            for (var t = 0; t < topicsPerRequest; t++) {
+                var payload = new Offset {
+                    Topic = topic + t,
+                    PartitionId = t % totalPartitions,
+                    Time = time,
+                    MaxOffsets = maxOffsets
+                };
+                request.Offsets.Add(payload);
+            }
+
+            var data = request.Encode();
+
+            data.Buffer.AssertProtocol(
+                reader => {
+                    reader.AssertRequestHeader(request);
+                    reader.AssertOffsetRequest(request);
+                });
+        }
+
+        /// <summary>
+        /// OffsetResponse => [TopicName [PartitionOffsets]]
+        ///  PartitionOffsets => Partition ErrorCode [Offset]
+        ///  TopicName => string  -- The name of the topic.
+        ///  Partition => int32   -- The id of the partition the fetch is for.
+        ///  ErrorCode => int16   -- The error from this partition, if any. Errors are given on a per-partition basis because a given partition may 
+        ///                          be unavailable or maintained on a different host, while others may have successfully accepted the produce request.
+        ///  Offset => int64
+        /// 
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetAPI(AKAListOffset)
+        /// </summary>
+        [Test]
+        public void OffsetsApiResponse(
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic, 
+            [Values(1, 10)] int topicsPerRequest, 
+            [Values(5)] int totalPartitions, 
+            [Values(
+                ErrorResponseCode.UnknownTopicOrPartition,
+                ErrorResponseCode.NotLeaderForPartition,
+                ErrorResponseCode.Unknown
+            )] ErrorResponseCode errorCode, 
+            [Values(1, 5)] int offsetsPerPartition)
+        {
+            var randomizer = new Randomizer();
+            var clientId = nameof(OffsetsApiResponse);
+            var correlationId = clientId.GetHashCode();
+
+            byte[] data = null;
+            using (var stream = new MemoryStream()) {
+                var writer = new BigEndianBinaryWriter(stream);
+                writer.WriteResponseHeader(correlationId);
+
+                writer.Write(topicsPerRequest);
+                for (var t = 0; t < topicsPerRequest; t++) {
+                    writer.Write(topic + t);
+                    writer.Write(1); // partitionsPerTopic
+                    writer.Write(t % totalPartitions);
+                    writer.Write((short)errorCode);
+                    writer.Write(offsetsPerPartition);
+                    for (var o = 0; o < offsetsPerPartition; o++) {
+                        writer.Write((long)randomizer.Next());
+                    }
+                }
+                data = new byte[stream.Position];
+                Buffer.BlockCopy(stream.GetBuffer(), 0, data, 0, data.Length);
+            }
+
+            var request = new OffsetRequest { ApiVersion = 0 };
+            var responses = request.Decode(data); // doesn't include the size in the decode -- the framework deals with it, I'd assume
+            data.PrefixWithInt32Length().AssertProtocol(
+                reader =>
+                {
+                    reader.AssertResponseHeader(correlationId);
+                    reader.AssertOffsetResponse(responses);
+                });
+        }
+
         private List<Message> GenerateMessages(int count, byte version)
         {
             var randomizer = new Randomizer();
