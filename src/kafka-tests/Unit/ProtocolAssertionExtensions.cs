@@ -12,6 +12,29 @@ namespace kafka_tests.Unit
     public static class ProtocolAssertionExtensions
     {
         /// <summary>
+        /// OffsetCommitResponse => [TopicName [Partition ErrorCode]]]
+        ///  TopicName => string -- The name of the topic.
+        ///  Partition => int32  -- The id of the partition.
+        ///  ErrorCode => int16  -- The error code for the partition, if any.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        public static void AssertOffsetCommitResponse(this BigEndianBinaryReader reader, IEnumerable<OffsetCommitResponse> response)
+        {
+            var responses = response.GroupBy(r => r.Topic).ToList();
+            Assert.That(reader.ReadInt32(), Is.EqualTo(responses.Count), "[TopicName]");
+            foreach (var payload in responses) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Key), "TopicName");
+                var partitions = payload.ToList();
+                Assert.That(reader.ReadInt32(), Is.EqualTo(partitions.Count), "[Partition]");
+                foreach (var partition in partitions) {
+                    Assert.That(reader.ReadInt32(), Is.EqualTo(partition.PartitionId), "Partition");
+                    Assert.That(reader.ReadInt16(), Is.EqualTo((short)partition.Error), "ErrorCode");
+                }
+            }
+        }
+
+        /// <summary>
         /// OffsetCommitRequest => ConsumerGroup *ConsumerGroupGenerationId *MemberId *RetentionTime [TopicName [Partition Offset *TimeStamp Metadata]]
         /// *ConsumerGroupGenerationId, MemberId is only version 1 (0.8.2) and above
         /// *TimeStamp is only version 1 (0.8.2)

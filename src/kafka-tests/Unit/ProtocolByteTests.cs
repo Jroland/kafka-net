@@ -594,6 +594,63 @@ namespace kafka_tests.Unit
                      });
         }
 
+        /// <summary>
+        /// OffsetCommitResponse => [TopicName [Partition ErrorCode]]]
+        ///  TopicName => string -- The name of the topic.
+        ///  Partition => int32  -- The id of the partition.
+        ///  ErrorCode => int16  -- The error code for the partition, if any.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        [Test]
+        public void OffsetCommitApiResponse(
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic,
+            [Values(1, 10)] int topicsPerRequest,
+            [Values(1, 5)] int partitionsPerTopic,
+            [Values(
+                 ErrorResponseCode.NoError,
+                 ErrorResponseCode.OffsetMetadataTooLargeCode,
+                 ErrorResponseCode.OffsetsLoadInProgressCode,
+                 ErrorResponseCode.NotCoordinatorForConsumerCode,
+                 ErrorResponseCode.IllegalGeneration,
+                 ErrorResponseCode.UnknownMemberId,
+                 ErrorResponseCode.RebalanceInProgress,
+                 ErrorResponseCode.InvalidCommitOffsetSize,
+                 ErrorResponseCode.TopicAuthorizationFailed,
+                 ErrorResponseCode.GroupAuthorizationFailed
+             )] ErrorResponseCode errorCode)
+        {
+            var clientId = nameof(OffsetCommitApiResponse);
+            var correlationId = clientId.GetHashCode();
+
+            byte[] data = null;
+            using (var stream = new MemoryStream()) {
+                var writer = new BigEndianBinaryWriter(stream);
+                writer.WriteResponseHeader(correlationId);
+
+                writer.Write(topicsPerRequest);
+                for (var t = 0; t < topicsPerRequest; t++) {
+                    writer.Write(topic + t);
+                    writer.Write(partitionsPerTopic);
+                    for (var p = 0; p < partitionsPerTopic; p++) {
+                        writer.Write(p);
+                        writer.Write((short) errorCode);
+                    }
+                }
+                data = new byte[stream.Position];
+                Buffer.BlockCopy(stream.GetBuffer(), 0, data, 0, data.Length);
+            }
+
+            var request = new OffsetCommitRequest {ApiVersion = 0};
+            var responses = request.Decode(data); 
+                // doesn't include the size in the decode -- the framework deals with it, I'd assume
+            data.PrefixWithInt32Length().AssertProtocol(
+                     reader => {
+                         reader.AssertResponseHeader(correlationId);
+                         reader.AssertOffsetCommitResponse(responses);
+                     });
+        }
+
         private List<Message> GenerateMessages(int count, byte version)
         {
             var randomizer = new Randomizer();
