@@ -12,6 +12,68 @@ namespace kafka_tests.Unit
     public static class ProtocolAssertionExtensions
     {
         /// <summary>
+        /// MetadataResponse => [Broker][TopicMetadata]
+        ///  Broker => NodeId Host Port  (any number of brokers may be returned)
+        ///                              -- The node id, hostname, and port information for a kafka broker
+        ///   NodeId => int32
+        ///   Host => string
+        ///   Port => int32
+        ///  TopicMetadata => TopicErrorCode TopicName [PartitionMetadata]
+        ///   TopicErrorCode => int16
+        ///  PartitionMetadata => PartitionErrorCode PartitionId Leader Replicas Isr
+        ///   PartitionErrorCode => int16
+        ///   PartitionId => int32
+        ///   Leader => int32             -- The node id for the kafka broker currently acting as leader for this partition.
+        ///                                  If no leader exists because we are in the middle of a leader election this id will be -1.
+        ///   Replicas => [int32]         -- The set of alive nodes that currently acts as slaves for the leader for this partition.
+        ///   Isr => [int32]              -- The set subset of the replicas that are "caught up" to the leader
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataAPI
+        /// </summary>
+        public static void AssertMetadataResponse(this BigEndianBinaryReader reader, MetadataResponse response)
+        {
+            Assert.That(reader.ReadInt32(), Is.EqualTo(response.Brokers.Count), "[Broker]");
+            foreach (var payload in response.Brokers) {
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.BrokerId), "NodeId");
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Host), "Host");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.Port), "Port");
+            }
+            Assert.That(reader.ReadInt32(), Is.EqualTo(response.Topics.Count), "[TopicMetadata]");
+            foreach (var payload in response.Topics) {
+                Assert.That(reader.ReadInt16(), Is.EqualTo((short)payload.ErrorCode), "TopicErrorCode");
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Name), "TopicName");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.Partitions.Count), "[PartitionMetadata]");
+                foreach (var partition in payload.Partitions) {
+                    Assert.That(reader.ReadInt16(), Is.EqualTo((short) partition.ErrorCode), "PartitionErrorCode");
+                    Assert.That(reader.ReadInt32(), Is.EqualTo(partition.PartitionId), "PartitionId");
+                    Assert.That(reader.ReadInt32(), Is.EqualTo(partition.LeaderId), "Leader");
+                    Assert.That(reader.ReadInt32(), Is.EqualTo(partition.Replicas.Count), "[Replicas]");
+                    foreach (var replica in partition.Replicas) {
+                        Assert.That(reader.ReadInt32(), Is.EqualTo(replica), "Replicas");
+                    }
+                    Assert.That(reader.ReadInt32(), Is.EqualTo(partition.Isrs.Count), "[Isr]");
+                    foreach (var isr in partition.Isrs) {
+                        Assert.That(reader.ReadInt32(), Is.EqualTo(isr), "Isr");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// TopicMetadataRequest => [TopicName]
+        ///  TopicName => string  -- The topics to produce metadata for. If empty the request will yield metadata for all topics.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataAPI
+        /// </summary>
+        public static void AssertMetadataRequest(this BigEndianBinaryReader reader, MetadataRequest request)
+        {
+            Assert.That(reader.ReadInt32(), Is.EqualTo(request.Topics.Count), "[TopicName]");
+            foreach (var payload in request.Topics) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload), "TopicName");
+            }
+        }
+
+        /// <summary>
         /// OffsetResponse => [TopicName [PartitionOffsets]]
         ///  PartitionOffsets => Partition ErrorCode [Offset]
         ///  TopicName => string  -- The name of the topic.

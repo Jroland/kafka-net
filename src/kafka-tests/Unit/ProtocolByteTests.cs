@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using KafkaNet.Common;
 using KafkaNet.Protocol;
 using NUnit.Framework;
@@ -406,6 +407,124 @@ namespace kafka_tests.Unit
                     reader.AssertResponseHeader(correlationId);
                     reader.AssertOffsetResponse(responses);
                 });
+        }
+
+        /// <summary>
+        /// TopicMetadataRequest => [TopicName]
+        ///  TopicName => string  -- The topics to produce metadata for. If empty the request will yield metadata for all topics.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataAPI
+        /// </summary>
+        [Test]
+        public void MetadataApiRequest(
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic,
+            [Values(0, 1, 10)] int topicsPerRequest)
+        {
+            var clientId = nameof(MetadataApiRequest);
+
+            var request = new MetadataRequest {
+                ClientId = clientId,
+                CorrelationId = clientId.GetHashCode(),
+                Topics = new List<string>(),
+                ApiVersion = 0
+            };
+
+            for (var t = 0; t < topicsPerRequest; t++) {
+                request.Topics.Add(topic + t);
+            }
+
+            var data = request.Encode();
+
+            data.Buffer.AssertProtocol(
+                     reader => {
+                         reader.AssertRequestHeader(request);
+                         reader.AssertMetadataRequest(request);
+                     });
+        }
+
+        /// <summary>
+        /// MetadataResponse => [Broker][TopicMetadata]
+        ///  Broker => NodeId Host Port  (any number of brokers may be returned)
+        ///                              -- The node id, hostname, and port information for a kafka broker
+        ///   NodeId => int32
+        ///   Host => string
+        ///   Port => int32
+        ///  TopicMetadata => TopicErrorCode TopicName [PartitionMetadata]
+        ///   TopicErrorCode => int16
+        ///  PartitionMetadata => PartitionErrorCode PartitionId Leader Replicas Isr
+        ///   PartitionErrorCode => int16
+        ///   PartitionId => int32
+        ///   Leader => int32             -- The node id for the kafka broker currently acting as leader for this partition.
+        ///                                  If no leader exists because we are in the middle of a leader election this id will be -1.
+        ///   Replicas => [int32]         -- The set of alive nodes that currently acts as slaves for the leader for this partition.
+        ///   Isr => [int32]              -- The set subset of the replicas that are "caught up" to the leader
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataAPI
+        /// </summary>
+        [Test]
+        public void MetadataApiResponse(
+            [Values(1, 5)] int brokersPerRequest,
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic,
+            [Values(1, 10)] int topicsPerRequest,
+            [Values(1, 5)] int partitionsPerTopic,
+            [Values(
+                 ErrorResponseCode.NoError,
+                 ErrorResponseCode.UnknownTopicOrPartition,
+                 ErrorResponseCode.LeaderNotAvailable,
+                 ErrorResponseCode.InvalidTopic,
+                 ErrorResponseCode.TopicAuthorizationFailed
+             )] ErrorResponseCode errorCode)
+        {
+            var randomizer = new Randomizer();
+            var clientId = nameof(MetadataApiResponse);
+            var correlationId = clientId.GetHashCode();
+
+            byte[] data = null;
+            using (var stream = new MemoryStream()) {
+                var writer = new BigEndianBinaryWriter(stream);
+                writer.WriteResponseHeader(correlationId);
+
+                writer.Write(brokersPerRequest);
+                for (var b = 0; b < brokersPerRequest; b++) {
+                    writer.Write(b);
+                    writer.Write("http://broker-" + b);
+                    writer.Write(9092 + b);
+                }
+
+                writer.Write(topicsPerRequest);
+                for (var t = 0; t < topicsPerRequest; t++) {
+                    writer.Write((short) errorCode);
+                    writer.Write(topic + t);
+                    writer.Write(partitionsPerTopic);
+                    for (var p = 0; p < partitionsPerTopic; p++) {
+                        writer.Write((short) errorCode);
+                        writer.Write(p);
+                        var leader = randomizer.Next(0, brokersPerRequest - 1);
+                        writer.Write(leader);
+                        var replicas = randomizer.Next(0, brokersPerRequest - 1);
+                        writer.Write(replicas);
+                        for (var r = 0; r < replicas; r++) {
+                            writer.Write(r);
+                        }
+                        var isr = randomizer.Next(0, replicas);
+                        writer.Write(isr);
+                        for (var i = 0; i < isr; i++) {
+                            writer.Write(i);
+                        }
+                    }
+                }
+                data = new byte[stream.Position];
+                Buffer.BlockCopy(stream.GetBuffer(), 0, data, 0, data.Length);
+            }
+
+            var request = new MetadataRequest {ApiVersion = 0};
+            var responses = request.Decode(data).Single(); // note that this is a bit weird
+                // doesn't include the size in the decode -- the framework deals with it, I'd assume
+            data.PrefixWithInt32Length().AssertProtocol(
+                     reader => {
+                         reader.AssertResponseHeader(correlationId);
+                         reader.AssertMetadataResponse(responses);
+                     });
         }
 
         private List<Message> GenerateMessages(int count, byte version)
