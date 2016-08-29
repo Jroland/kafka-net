@@ -12,6 +12,54 @@ namespace kafka_tests.Unit
     public static class ProtocolAssertionExtensions
     {
         /// <summary>
+        /// OffsetFetchResponse => [TopicName [Partition Offset Metadata ErrorCode]]
+        ///  TopicName => string -- The name of the topic.
+        ///  Partition => int32  -- The id of the partition.
+        ///  Offset => int64     -- The offset, or -1 if none exists.
+        ///  Metadata => string  -- The metadata associated with the topic and partition.
+        ///  ErrorCode => int16  -- The error code for the partition, if any.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        public static void AssertOffsetFetchResponse(this BigEndianBinaryReader reader, IEnumerable<OffsetFetchResponse> response)
+        {
+            var responses = response.GroupBy(r => r.Topic).ToList();
+            Assert.That(reader.ReadInt32(), Is.EqualTo(responses.Count), "[TopicName]");
+            foreach (var payload in responses) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Key), "TopicName");
+                var partitions = payload.ToList();
+                Assert.That(reader.ReadInt32(), Is.EqualTo(partitions.Count), "[Partition]");
+                foreach (var partition in partitions) {
+                    Assert.That(reader.ReadInt32(), Is.EqualTo(partition.PartitionId), "Partition");
+                    Assert.That(reader.ReadInt64(), Is.EqualTo(partition.Offset), "Offset");
+                    Assert.That(reader.ReadString(), Is.EqualTo(partition.MetaData), "Metadata");
+                    Assert.That(reader.ReadInt16(), Is.EqualTo((short)partition.Error), "ErrorCode");
+                }
+            }
+        }
+
+
+        /// <summary>
+        /// OffsetFetchRequest => ConsumerGroup [TopicName [Partition]]
+        ///  ConsumerGroup => string -- The consumer group id.
+        ///  TopicName => string     -- The topic to commit.
+        ///  Partition => int32      -- The partition id.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        public static void AssertOffsetFetchRequest(this BigEndianBinaryReader reader, OffsetFetchRequest request)
+        {
+            Assert.That(reader.ReadString(), Is.EqualTo(request.ConsumerGroup), "ConsumerGroup");
+
+            Assert.That(reader.ReadInt32(), Is.EqualTo(request.Topics.Count), "[TopicName]");
+            foreach (var payload in request.Topics) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
+            }
+        }
+
+        /// <summary>
         /// OffsetCommitResponse => [TopicName [Partition ErrorCode]]]
         ///  TopicName => string -- The name of the topic.
         ///  Partition => int32  -- The id of the partition.

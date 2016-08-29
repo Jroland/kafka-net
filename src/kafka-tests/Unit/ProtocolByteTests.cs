@@ -651,6 +651,110 @@ namespace kafka_tests.Unit
                      });
         }
 
+        /// <summary>
+        /// OffsetFetchRequest => ConsumerGroup [TopicName [Partition]]
+        ///  ConsumerGroup => string -- The consumer group id.
+        ///  TopicName => string     -- The topic to commit.
+        ///  Partition => int32      -- The partition id.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        [Test]
+        public void OffsetFetchApiRequest(
+            [Values("group1", "group2")] string groupId,
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic,
+            [Values(1, 10)] int topicsPerRequest,
+            [Values(5)] int maxPartitions)
+        {
+            var clientId = nameof(OffsetFetchApiRequest);
+
+            var request = new OffsetFetchRequest {
+                ClientId = clientId,
+                CorrelationId = clientId.GetHashCode(),
+                ConsumerGroup = groupId,
+                Topics = new List<OffsetFetch>(),
+                ApiVersion = 0
+            };
+
+            for (var t = 0; t < topicsPerRequest; t++) {
+                var payload = new OffsetFetch {
+                    Topic = topic + t,
+                    PartitionId = t % maxPartitions
+                };
+                request.Topics.Add(payload);
+            }
+
+            var data = request.Encode();
+
+            data.Buffer.AssertProtocol(
+                     reader =>
+                     {
+                         reader.AssertRequestHeader(request);
+                         reader.AssertOffsetFetchRequest(request);
+                     });
+        }
+
+        /// <summary>
+        /// OffsetFetchResponse => [TopicName [Partition Offset Metadata ErrorCode]]
+        ///  TopicName => string -- The name of the topic.
+        ///  Partition => int32  -- The id of the partition.
+        ///  Offset => int64     -- The offset, or -1 if none exists.
+        ///  Metadata => string  -- The metadata associated with the topic and partition.
+        ///  ErrorCode => int16  -- The error code for the partition, if any.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        [Test]
+        public void OffsetFetchApiResponse(
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic,
+            [Values(1, 10)] int topicsPerRequest,
+            [Values(1, 5)] int partitionsPerTopic,
+            [Values(
+                 ErrorResponseCode.NoError,
+                 ErrorResponseCode.UnknownTopicOrPartition,
+                 ErrorResponseCode.OffsetsLoadInProgressCode,
+                 ErrorResponseCode.NotCoordinatorForConsumerCode,
+                 ErrorResponseCode.IllegalGeneration,
+                 ErrorResponseCode.UnknownMemberId,
+                 ErrorResponseCode.TopicAuthorizationFailed,
+                 ErrorResponseCode.GroupAuthorizationFailed
+             )] ErrorResponseCode errorCode)
+        {
+            var clientId = nameof(OffsetFetchApiResponse);
+            var correlationId = clientId.GetHashCode();
+            var randomizer = new Randomizer();
+
+            byte[] data = null;
+            using (var stream = new MemoryStream()) {
+                var writer = new BigEndianBinaryWriter(stream);
+                writer.WriteResponseHeader(correlationId);
+
+                writer.Write(topicsPerRequest);
+                for (var t = 0; t < topicsPerRequest; t++) {
+                    writer.Write(topic + t);
+                    writer.Write(partitionsPerTopic);
+                    for (var p = 0; p < partitionsPerTopic; p++) {
+                        writer.Write(p);
+                        var offset = (long)randomizer.Next(int.MinValue, int.MaxValue);
+                        writer.Write(offset);
+                        writer.Write(offset >= 0 ? topic : string.Empty);
+                        writer.Write((short) errorCode);
+                    }
+                }
+                data = new byte[stream.Position];
+                Buffer.BlockCopy(stream.GetBuffer(), 0, data, 0, data.Length);
+            }
+
+            var request = new OffsetFetchRequest {ApiVersion = 0};
+            var responses = request.Decode(data); 
+                // doesn't include the size in the decode -- the framework deals with it, I'd assume
+            data.PrefixWithInt32Length().AssertProtocol(
+                     reader => {
+                         reader.AssertResponseHeader(correlationId);
+                         reader.AssertOffsetFetchResponse(responses);
+                     });
+        }
+
         private List<Message> GenerateMessages(int count, byte version)
         {
             var randomizer = new Randomizer();
