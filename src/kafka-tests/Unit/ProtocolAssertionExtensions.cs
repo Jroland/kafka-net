@@ -12,6 +12,52 @@ namespace kafka_tests.Unit
     public static class ProtocolAssertionExtensions
     {
         /// <summary>
+        /// OffsetCommitRequest => ConsumerGroup *ConsumerGroupGenerationId *MemberId *RetentionTime [TopicName [Partition Offset *TimeStamp Metadata]]
+        /// *ConsumerGroupGenerationId, MemberId is only version 1 (0.8.2) and above
+        /// *TimeStamp is only version 1 (0.8.2)
+        /// *RetentionTime is only version 2 (0.9.0) and above
+        ///  ConsumerGroupId => string          -- The consumer group id.
+        ///  ConsumerGroupGenerationId => int32 -- The generation of the consumer group.
+        ///  MemberId => string                 -- The consumer id assigned by the group coordinator.
+        ///  RetentionTime => int64             -- Time period in ms to retain the offset.
+        ///  TopicName => string                -- The topic to commit.
+        ///  Partition => int32                 -- The partition id.
+        ///  Offset => int64                    -- message offset to be committed.
+        ///  Timestamp => int64                 -- Commit timestamp.
+        ///  Metadata => string                 -- Any associated metadata the client wants to keep
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        public static void AssertOffsetCommitRequest(this BigEndianBinaryReader reader, OffsetCommitRequest request)
+        {
+            Assert.That(reader.ReadString(), Is.EqualTo(request.ConsumerGroup), "ConsumerGroup");
+
+            if (request.ApiVersion >= 1) {
+                Assert.That(reader.ReadInt32(), Is.EqualTo(request.GenerationId), "ConsumerGroupGenerationId");
+                Assert.That(reader.ReadString(), Is.EqualTo(request.MemberId), "MemberId");                
+            }
+            if (request.ApiVersion >= 2) {
+                var expectedRetention = request.OffsetRetention.HasValue
+                                            ? (long) request.OffsetRetention.Value.TotalMilliseconds
+                                            : -1L;
+                Assert.That(reader.ReadInt64(), Is.EqualTo(expectedRetention), "RetentionTime");
+            }
+
+            Assert.That(reader.ReadInt32(), Is.EqualTo(request.OffsetCommits.Count), "[TopicName]");
+            foreach (var payload in request.OffsetCommits) {
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
+                Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
+                Assert.That(reader.ReadInt64(), Is.EqualTo(payload.Offset), "Offset");
+
+                if (request.ApiVersion == 1) {
+                    Assert.That(reader.ReadInt64(), Is.EqualTo(payload.TimeStamp), "TimeStamp");
+                }
+                Assert.That(reader.ReadString(), Is.EqualTo(payload.Metadata), "Metadata");
+            }
+        }
+
+        /// <summary>
         /// MetadataResponse => [Broker][TopicMetadata]
         ///  Broker => NodeId Host Port  (any number of brokers may be returned)
         ///                              -- The node id, hostname, and port information for a kafka broker

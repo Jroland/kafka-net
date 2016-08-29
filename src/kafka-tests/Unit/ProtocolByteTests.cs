@@ -411,7 +411,7 @@ namespace kafka_tests.Unit
 
         /// <summary>
         /// TopicMetadataRequest => [TopicName]
-        ///  TopicName => string  -- The topics to produce metadata for. If empty the request will yield metadata for all topics.
+        ///  TopicName => string  -- The topics to produce metadata for. If no topics are specified fetch metadata for all topics.
         ///
         /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataAPI
         /// </summary>
@@ -445,19 +445,20 @@ namespace kafka_tests.Unit
         /// <summary>
         /// MetadataResponse => [Broker][TopicMetadata]
         ///  Broker => NodeId Host Port  (any number of brokers may be returned)
-        ///                              -- The node id, hostname, and port information for a kafka broker
-        ///   NodeId => int32
-        ///   Host => string
-        ///   Port => int32
+        ///                               -- The node id, hostname, and port information for a kafka broker
+        ///   NodeId => int32             -- The broker id.
+        ///   Host => string              -- The hostname of the broker.
+        ///   Port => int32               -- The port on which the broker accepts requests.
         ///  TopicMetadata => TopicErrorCode TopicName [PartitionMetadata]
-        ///   TopicErrorCode => int16
+        ///   TopicErrorCode => int16     -- The error code for the given topic.
+        ///   TopicName => string         -- The name of the topic.
         ///  PartitionMetadata => PartitionErrorCode PartitionId Leader Replicas Isr
-        ///   PartitionErrorCode => int16
-        ///   PartitionId => int32
-        ///   Leader => int32             -- The node id for the kafka broker currently acting as leader for this partition.
+        ///   PartitionErrorCode => int16 -- The error code for the partition, if any.
+        ///   PartitionId => int32        -- The id of the partition.
+        ///   Leader => int32             -- The id of the broker acting as leader for this partition.
         ///                                  If no leader exists because we are in the middle of a leader election this id will be -1.
-        ///   Replicas => [int32]         -- The set of alive nodes that currently acts as slaves for the leader for this partition.
-        ///   Isr => [int32]              -- The set subset of the replicas that are "caught up" to the leader
+        ///   Replicas => [int32]         -- The set of all nodes that host this partition.
+        ///   Isr => [int32]              -- The set of nodes that are in sync with the leader for this partition.
         ///
         /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-MetadataAPI
         /// </summary>
@@ -487,7 +488,7 @@ namespace kafka_tests.Unit
                 writer.Write(brokersPerRequest);
                 for (var b = 0; b < brokersPerRequest; b++) {
                     writer.Write(b);
-                    writer.Write("http://broker-" + b);
+                    writer.Write("broker-" + b);
                     writer.Write(9092 + b);
                 }
 
@@ -524,6 +525,72 @@ namespace kafka_tests.Unit
                      reader => {
                          reader.AssertResponseHeader(correlationId);
                          reader.AssertMetadataResponse(responses);
+                     });
+        }
+
+        /// <summary>
+        /// OffsetCommitRequest => ConsumerGroup *ConsumerGroupGenerationId *MemberId *RetentionTime [TopicName [Partition Offset *TimeStamp Metadata]]
+        /// *ConsumerGroupGenerationId, MemberId is only version 1 (0.8.2) and above
+        /// *TimeStamp is only version 1 (0.8.2)
+        /// *RetentionTime is only version 2 (0.9.0) and above
+        ///  ConsumerGroupId => string          -- The consumer group id.
+        ///  ConsumerGroupGenerationId => int32 -- The generation of the consumer group.
+        ///  MemberId => string                 -- The consumer id assigned by the group coordinator.
+        ///  RetentionTime => int64             -- Time period in ms to retain the offset.
+        ///  TopicName => string                -- The topic to commit.
+        ///  Partition => int32                 -- The partition id.
+        ///  Offset => int64                    -- message offset to be committed.
+        ///  Timestamp => int64                 -- Commit timestamp.
+        ///  Metadata => string                 -- Any associated metadata the client wants to keep
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        [Test]
+        public void OffsetCommitApiRequest(
+            [Values(0, 1, 2)] short version,
+            [Values("group1", "group2")] string groupId,
+            [Values(0, 1, 2)] int generation,
+            [Values(-1, 1024, 20000)] int retentionTime,
+            [Values("test", "a really long name, with spaces and punctuation!")] string topic,
+            [Values(1, 10)] int topicsPerRequest,
+            [Values(5)] int maxPartitions,
+            [Values(1, 10)] int maxOffsets,
+            [Values(null, "something useful for the client")] string metadata)
+        {
+            var clientId = nameof(OffsetCommitApiRequest);
+            var randomizer = new Randomizer();
+
+            var request = new OffsetCommitRequest {
+                ClientId = clientId,
+                CorrelationId = clientId.GetHashCode(),
+                ConsumerGroup = groupId,
+                OffsetCommits = new List<OffsetCommit>(),
+                ApiVersion = version,
+                GenerationId = generation,
+                MemberId = "member" + generation
+            };
+
+            if (retentionTime >= 0) {
+                request.OffsetRetention = TimeSpan.FromMilliseconds(retentionTime);
+            }
+            for (var t = 0; t < topicsPerRequest; t++) {
+                var payload = new OffsetCommit {
+                    Topic = topic + t,
+                    PartitionId = t % maxPartitions,
+                    Offset = randomizer.Next(0, int.MaxValue),
+                    Metadata = metadata
+                };
+                payload.TimeStamp = retentionTime;
+                request.OffsetCommits.Add(payload);
+            }
+
+            var data = request.Encode();
+
+            data.Buffer.AssertProtocol(
+                     reader =>
+                     {
+                         reader.AssertRequestHeader(request);
+                         reader.AssertOffsetCommitRequest(request);
                      });
         }
 
