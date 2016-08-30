@@ -755,6 +755,79 @@ namespace kafka_tests.Unit
                      });
         }
 
+        /// <summary>
+        /// GroupCoordinatorRequest => GroupId
+        ///  GroupId => string -- The consumer group id.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        [Test]
+        public void GroupCoordinatorApiRequest([Values("group1", "group2")] string groupId)
+        {
+            var clientId = nameof(GroupCoordinatorApiRequest);
+
+            var request = new ConsumerMetadataRequest {
+                ClientId = clientId,
+                CorrelationId = clientId.GetHashCode(),
+                ConsumerGroup = groupId,
+                ApiVersion = 0
+            };
+
+            var data = request.Encode();
+
+            data.Buffer.AssertProtocol(
+                     reader =>
+                     {
+                         reader.AssertRequestHeader(request);
+                         reader.AssertGroupCoordinatorRequest(request);
+                     });
+        }
+
+        /// <summary>
+        /// GroupCoordinatorResponse => ErrorCode CoordinatorId CoordinatorHost CoordinatorPort
+        ///  ErrorCode => int16        -- The error code.
+        ///  CoordinatorId => int32    -- The broker id.
+        ///  CoordinatorHost => string -- The hostname of the broker.
+        ///  CoordinatorPort => int32  -- The port on which the broker accepts requests.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        [Test]
+        public void GroupCoordinatorApiResponse(
+            [Values(
+                 ErrorResponseCode.NoError,
+                 ErrorResponseCode.ConsumerCoordinatorNotAvailableCode,
+                 ErrorResponseCode.GroupAuthorizationFailed
+             )] ErrorResponseCode errorCode,
+            [Values(0, 1)] int coordinatorId
+            )
+        {
+            var clientId = nameof(GroupCoordinatorApiResponse);
+            var correlationId = clientId.GetHashCode();
+
+            byte[] data = null;
+            using (var stream = new MemoryStream()) {
+                var writer = new BigEndianBinaryWriter(stream);
+                writer.WriteResponseHeader(correlationId);
+                writer.Write((short)errorCode);
+                writer.Write(coordinatorId);
+                writer.Write("broker-" + coordinatorId);
+                writer.Write(9092 + coordinatorId);
+
+                data = new byte[stream.Position];
+                Buffer.BlockCopy(stream.GetBuffer(), 0, data, 0, data.Length);
+            }
+
+            var request = new ConsumerMetadataRequest {ApiVersion = 0};
+            var responses = request.Decode(data).Single(); 
+                // doesn't include the size in the decode -- the framework deals with it, I'd assume
+            data.PrefixWithInt32Length().AssertProtocol(
+                     reader => {
+                         reader.AssertResponseHeader(correlationId);
+                         reader.AssertGroupCoordinatorResponse(responses);
+                     });
+        }
+
         private List<Message> GenerateMessages(int count, byte version)
         {
             var randomizer = new Randomizer();

@@ -12,6 +12,34 @@ namespace kafka_tests.Unit
     public static class ProtocolAssertionExtensions
     {
         /// <summary>
+        /// GroupCoordinatorResponse => ErrorCode CoordinatorId CoordinatorHost CoordinatorPort
+        ///  ErrorCode => int16        -- The error code.
+        ///  CoordinatorId => int32    -- The broker id.
+        ///  CoordinatorHost => string -- The hostname of the broker.
+        ///  CoordinatorPort => int32  -- The port on which the broker accepts requests.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        public static void AssertGroupCoordinatorResponse(this BigEndianBinaryReader reader, ConsumerMetadataResponse response)
+        {
+            Assert.That(reader.ReadInt16(), Is.EqualTo(response.Error), "ErrorCode");
+            Assert.That(reader.ReadInt32(), Is.EqualTo(response.CoordinatorId), "CoordinatorId");
+            Assert.That(reader.ReadString(), Is.EqualTo(response.CoordinatorHost), "CoordinatorHost");
+            Assert.That(reader.ReadInt32(), Is.EqualTo(response.CoordinatorPort), "CoordinatorPort");
+        }
+
+        /// <summary>
+        /// GroupCoordinatorRequest => GroupId
+        ///  GroupId => string -- The consumer group id.
+        ///
+        /// From https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-OffsetCommit/FetchAPI
+        /// </summary>
+        public static void AssertGroupCoordinatorRequest(this BigEndianBinaryReader reader, ConsumerMetadataRequest request)
+        {
+            Assert.That(reader.ReadString(), Is.EqualTo(request.ConsumerGroup), "ConsumerGroup");
+        }
+
+        /// <summary>
         /// OffsetFetchResponse => [TopicName [Partition Offset Metadata ErrorCode]]
         ///  TopicName => string -- The name of the topic.
         ///  Partition => int32  -- The id of the partition.
@@ -37,7 +65,6 @@ namespace kafka_tests.Unit
                 }
             }
         }
-
 
         /// <summary>
         /// OffsetFetchRequest => ConsumerGroup [TopicName [Partition]]
