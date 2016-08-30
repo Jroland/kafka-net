@@ -37,7 +37,7 @@ namespace KafkaNet.Protocol
 
         public IEnumerable<FetchResponse> Decode(byte[] payload)
         {
-            return DecodeFetchResponse(payload);
+            return DecodeFetchResponse(ApiVersion, payload);
         }
 
         private KafkaDataPayload EncodeFetchRequest(FetchRequest request)
@@ -78,11 +78,15 @@ namespace KafkaNet.Protocol
             }
         }
 
-        private IEnumerable<FetchResponse> DecodeFetchResponse(byte[] data)
+        private IEnumerable<FetchResponse> DecodeFetchResponse(int version, byte[] data)
         {
             using (var stream = new BigEndianBinaryReader(data))
             {
                 var correlationId = stream.ReadInt32();
+
+                if (version >= 1) {
+                    var throttleTime = stream.ReadInt32();
+                }
 
                 var topicCount = stream.ReadInt32();
                 for (int i = 0; i < topicCount; i++)

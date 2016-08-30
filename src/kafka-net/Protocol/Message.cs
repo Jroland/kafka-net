@@ -40,6 +40,10 @@ namespace KafkaNet.Protocol
         public byte MagicNumber { get; set; }
         /// <summary>
         /// Attribute value outside message body used for added codec/compression info.
+        /// 
+        /// The lowest 3 bits contain the compression codec used for the message.
+        /// The fourth lowest bit represents the timestamp type. 0 stands for CreateTime and 1 stands for LogAppendTime. The producer should always set this bit to 0. (since 0.10.0)
+        /// All other bits should be set to 0.
         /// </summary>
         public byte Attribute { get; set; }
         /// <summary>
@@ -50,6 +54,10 @@ namespace KafkaNet.Protocol
         /// The message body contents.  Can contain compress message set.
         /// </summary>
         public byte[] Value { get; set; }
+        /// <summary>
+        /// This is the timestamp of the message. The timestamp type is indicated in the attributes. Unit is milliseconds since beginning of the epoch (midnight Jan 1, 1970 (UTC)).
+        /// </summary>
+        public DateTime Timestamp { get; set; }
 
         /// <summary>
         /// Construct an empty message.
@@ -134,11 +142,14 @@ namespace KafkaNet.Protocol
         {
             using(var stream = new KafkaMessagePacker())
             {
-                return stream.Pack(message.MagicNumber)
-                    .Pack(message.Attribute)
-                    .Pack(message.Key)
-                    .Pack(message.Value)
-                    .CrcPayload();
+                stream.Pack(message.MagicNumber)
+                      .Pack(message.Attribute);
+                if (message.MagicNumber >= 1) {
+                    stream.Pack(message.Timestamp.ToUnixEpochMilliseconds());
+                }
+                return stream.Pack(message.Key)
+                      .Pack(message.Value)
+                      .CrcPayload();
             }
         }
 
@@ -162,8 +173,15 @@ namespace KafkaNet.Protocol
                     Meta = new MessageMetadata { Offset = offset },
                     MagicNumber = stream.ReadByte(),
                     Attribute = stream.ReadByte(),
-                    Key = stream.ReadIntPrefixedBytes()
                 };
+
+                if (message.MagicNumber >= 1) {
+                    var timestamp = stream.ReadInt64();
+                    if (timestamp >= 0) {
+                        message.Timestamp = timestamp.FromUnixEpochMilliseconds();
+                    }
+                }
+                message.Key = stream.ReadIntPrefixedBytes();
 
                 var codec = (MessageCodec)(ProtocolConstants.AttributeCodeMask & message.Attribute);
                 switch (codec)

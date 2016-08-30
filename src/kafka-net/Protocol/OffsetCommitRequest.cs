@@ -12,7 +12,10 @@ namespace KafkaNet.Protocol
     public class OffsetCommitRequest : BaseRequest, IKafkaRequest<OffsetCommitResponse>
     {
         public ApiKeyRequestType ApiKey { get { return ApiKeyRequestType.OffsetCommit; } }
+        public int GenerationId { get; set; }
+        public string MemberId { get; set; }
         public string ConsumerGroup { get; set; }
+        public TimeSpan? OffsetRetention { get; set; }
         public List<OffsetCommit> OffsetCommits { get; set; }
 
         public KafkaDataPayload Encode()
@@ -31,6 +34,18 @@ namespace KafkaNet.Protocol
 
             using (var message = EncodeHeader(request).Pack(request.ConsumerGroup, StringPrefixEncoding.Int16))
             {
+                if (request.ApiVersion >= 1) {
+                    message.Pack(request.GenerationId)
+                            .Pack(request.MemberId, StringPrefixEncoding.Int16);
+                }
+                if (request.ApiVersion >= 2) {
+                    if (request.OffsetRetention.HasValue) {
+                        message.Pack((long) request.OffsetRetention.Value.TotalMilliseconds);
+                    } else {
+                        message.Pack(-1L);
+                    }
+                }
+
                 var topicGroups = request.OffsetCommits.GroupBy(x => x.Topic).ToList();
                 message.Pack(topicGroups.Count);
 
@@ -45,9 +60,11 @@ namespace KafkaNet.Protocol
                         foreach (var commit in partition)
                         {
                             message.Pack(partition.Key)
-                            .Pack(commit.Offset)
-                            .Pack(commit.TimeStamp)
-                            .Pack(commit.Metadata, StringPrefixEncoding.Int16);
+                            .Pack(commit.Offset);
+                            if (ApiVersion == 1) {
+                                message.Pack(commit.TimeStamp);
+                            }
+                            message.Pack(commit.Metadata, StringPrefixEncoding.Int16);
                         }
                     }
                 }
