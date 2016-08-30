@@ -16,6 +16,7 @@ namespace KafkaNet.Protocol
         protected const int ReplicaId = -1;
         private string _clientId = "Kafka-Net";
         private int _correlationId = 1;
+        private short _apiVersion = 0;
 
         /// <summary>
         /// Descriptive name of the source of the messages sent to kafka
@@ -31,7 +32,7 @@ namespace KafkaNet.Protocol
         /// <summary>
         /// This is a numeric version number for the api request. It allows the server to properly interpret the request as the protocol evolves. Responses will always be in the format corresponding to the request version.
         /// </summary>
-        public short ApiVersion { get; set; } = 0;
+        public short ApiVersion { get { return _apiVersion; } set { _apiVersion = value; } }
 
         /// <summary>
         /// Flag which tells the broker call to expect a response for this request.
