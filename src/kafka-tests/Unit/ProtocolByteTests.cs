@@ -72,7 +72,7 @@ namespace kafka_tests.Unit
             [Values(1, 5)] int totalPartitions, 
             [Values(1, 2, 3)] int messagesPerSet)
         {
-            var clientId = nameof(ProduceApiRequest);
+            var clientId = "ProduceApiRequest";
 
             var request = new ProduceRequest {
                 Acks = acks,
@@ -136,7 +136,7 @@ namespace kafka_tests.Unit
             [Values(0, 1234, 100000)] int throttleTime)
         {
             var randomizer = new Randomizer();
-            var clientId = nameof(ProduceApiResponse);
+            var clientId = "ProduceApiResponse";
             var correlationId = clientId.GetHashCode();
 
             byte[] data = null;
@@ -204,7 +204,7 @@ namespace kafka_tests.Unit
             [Values(64000, 25600000)] int maxBytes)
         {
             var randomizer = new Randomizer();
-            var clientId = nameof(FetchApiRequest);
+            var clientId = "FetchApiRequest";
 
             var request = new FetchRequest {
                 ClientId = clientId,
@@ -265,7 +265,7 @@ namespace kafka_tests.Unit
             )
         {
             var randomizer = new Randomizer();
-            var clientId = nameof(FetchApiResponse);
+            var clientId = "FetchApiResponse";
             var correlationId = clientId.GetHashCode();
 
             byte[] data = null;
@@ -324,7 +324,7 @@ namespace kafka_tests.Unit
             [Values(-2, -1, 123456, 10000000)] long time,
             [Values(1, 10)] int maxOffsets)
         {
-            var clientId = nameof(OffsetsApiRequest);
+            var clientId = "OffsetsApiRequest";
 
             var request = new OffsetRequest {
                 ClientId = clientId,
@@ -376,7 +376,7 @@ namespace kafka_tests.Unit
             [Values(1, 5)] int offsetsPerPartition)
         {
             var randomizer = new Randomizer();
-            var clientId = nameof(OffsetsApiResponse);
+            var clientId = "OffsetsApiResponse";
             var correlationId = clientId.GetHashCode();
 
             byte[] data = null;
@@ -420,7 +420,7 @@ namespace kafka_tests.Unit
             [Values("test", "a really long name, with spaces and punctuation!")] string topic,
             [Values(0, 1, 10)] int topicsPerRequest)
         {
-            var clientId = nameof(MetadataApiRequest);
+            var clientId = "MetadataApiRequest";
 
             var request = new MetadataRequest {
                 ClientId = clientId,
@@ -477,7 +477,7 @@ namespace kafka_tests.Unit
              )] ErrorResponseCode errorCode)
         {
             var randomizer = new Randomizer();
-            var clientId = nameof(MetadataApiResponse);
+            var clientId = "MetadataApiResponse";
             var correlationId = clientId.GetHashCode();
 
             byte[] data = null;
@@ -557,7 +557,7 @@ namespace kafka_tests.Unit
             [Values(1, 10)] int maxOffsets,
             [Values(null, "something useful for the client")] string metadata)
         {
-            var clientId = nameof(OffsetCommitApiRequest);
+            var clientId = "OffsetCommitApiRequest";
             var randomizer = new Randomizer();
 
             var request = new OffsetCommitRequest {
@@ -620,7 +620,7 @@ namespace kafka_tests.Unit
                  ErrorResponseCode.GroupAuthorizationFailed
              )] ErrorResponseCode errorCode)
         {
-            var clientId = nameof(OffsetCommitApiResponse);
+            var clientId = "OffsetCommitApiResponse";
             var correlationId = clientId.GetHashCode();
 
             byte[] data = null;
@@ -666,7 +666,7 @@ namespace kafka_tests.Unit
             [Values(1, 10)] int topicsPerRequest,
             [Values(5)] int maxPartitions)
         {
-            var clientId = nameof(OffsetFetchApiRequest);
+            var clientId = "OffsetFetchApiRequest";
 
             var request = new OffsetFetchRequest {
                 ClientId = clientId,
@@ -720,7 +720,7 @@ namespace kafka_tests.Unit
                  ErrorResponseCode.GroupAuthorizationFailed
              )] ErrorResponseCode errorCode)
         {
-            var clientId = nameof(OffsetFetchApiResponse);
+            var clientId = "OffsetFetchApiResponse";
             var correlationId = clientId.GetHashCode();
             var randomizer = new Randomizer();
 
@@ -764,7 +764,7 @@ namespace kafka_tests.Unit
         [Test]
         public void GroupCoordinatorApiRequest([Values("group1", "group2")] string groupId)
         {
-            var clientId = nameof(GroupCoordinatorApiRequest);
+            var clientId = "GroupCoordinatorApiRequest";
 
             var request = new ConsumerMetadataRequest {
                 ClientId = clientId,
@@ -802,7 +802,7 @@ namespace kafka_tests.Unit
             [Values(0, 1)] int coordinatorId
             )
         {
-            var clientId = nameof(GroupCoordinatorApiResponse);
+            var clientId = "GroupCoordinatorApiResponse";
             var correlationId = clientId.GetHashCode();
 
             byte[] data = null;
