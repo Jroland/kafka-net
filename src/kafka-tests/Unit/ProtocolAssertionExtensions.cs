@@ -24,7 +24,7 @@ namespace kafka_tests.Unit
         {
             Assert.That(reader.ReadInt16(), Is.EqualTo(response.Error), "ErrorCode");
             Assert.That(reader.ReadInt32(), Is.EqualTo(response.CoordinatorId), "CoordinatorId");
-            Assert.That(reader.ReadString(), Is.EqualTo(response.CoordinatorHost), "CoordinatorHost");
+            Assert.That(reader.ReadInt16String(), Is.EqualTo(response.CoordinatorHost), "CoordinatorHost");
             Assert.That(reader.ReadInt32(), Is.EqualTo(response.CoordinatorPort), "CoordinatorPort");
         }
 
@@ -36,7 +36,7 @@ namespace kafka_tests.Unit
         /// </summary>
         public static void AssertGroupCoordinatorRequest(this BigEndianBinaryReader reader, ConsumerMetadataRequest request)
         {
-            Assert.That(reader.ReadString(), Is.EqualTo(request.ConsumerGroup), "ConsumerGroup");
+            Assert.That(reader.ReadInt16String(), Is.EqualTo(request.ConsumerGroup), "ConsumerGroup");
         }
 
         /// <summary>
@@ -54,13 +54,13 @@ namespace kafka_tests.Unit
             var responses = response.GroupBy(r => r.Topic).ToList();
             Assert.That(reader.ReadInt32(), Is.EqualTo(responses.Count), "[TopicName]");
             foreach (var payload in responses) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Key), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Key), "TopicName");
                 var partitions = payload.ToList();
                 Assert.That(reader.ReadInt32(), Is.EqualTo(partitions.Count), "[Partition]");
                 foreach (var partition in partitions) {
                     Assert.That(reader.ReadInt32(), Is.EqualTo(partition.PartitionId), "Partition");
                     Assert.That(reader.ReadInt64(), Is.EqualTo(partition.Offset), "Offset");
-                    Assert.That(reader.ReadString(), Is.EqualTo(partition.MetaData), "Metadata");
+                    Assert.That(reader.ReadInt16String(), Is.EqualTo(partition.MetaData), "Metadata");
                     Assert.That(reader.ReadInt16(), Is.EqualTo((short)partition.Error), "ErrorCode");
                 }
             }
@@ -76,11 +76,11 @@ namespace kafka_tests.Unit
         /// </summary>
         public static void AssertOffsetFetchRequest(this BigEndianBinaryReader reader, OffsetFetchRequest request)
         {
-            Assert.That(reader.ReadString(), Is.EqualTo(request.ConsumerGroup), "ConsumerGroup");
+            Assert.That(reader.ReadInt16String(), Is.EqualTo(request.ConsumerGroup), "ConsumerGroup");
 
             Assert.That(reader.ReadInt32(), Is.EqualTo(request.Topics.Count), "[TopicName]");
             foreach (var payload in request.Topics) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Topic), "TopicName");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
             }
@@ -99,7 +99,7 @@ namespace kafka_tests.Unit
             var responses = response.GroupBy(r => r.Topic).ToList();
             Assert.That(reader.ReadInt32(), Is.EqualTo(responses.Count), "[TopicName]");
             foreach (var payload in responses) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Key), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Key), "TopicName");
                 var partitions = payload.ToList();
                 Assert.That(reader.ReadInt32(), Is.EqualTo(partitions.Count), "[Partition]");
                 foreach (var partition in partitions) {
@@ -128,11 +128,11 @@ namespace kafka_tests.Unit
         /// </summary>
         public static void AssertOffsetCommitRequest(this BigEndianBinaryReader reader, OffsetCommitRequest request)
         {
-            Assert.That(reader.ReadString(), Is.EqualTo(request.ConsumerGroup), "ConsumerGroup");
+            Assert.That(reader.ReadInt16String(), Is.EqualTo(request.ConsumerGroup), "ConsumerGroup");
 
             if (request.ApiVersion >= 1) {
                 Assert.That(reader.ReadInt32(), Is.EqualTo(request.GenerationId), "ConsumerGroupGenerationId");
-                Assert.That(reader.ReadString(), Is.EqualTo(request.MemberId), "MemberId");                
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(request.MemberId), "MemberId");                
             }
             if (request.ApiVersion >= 2) {
                 var expectedRetention = request.OffsetRetention.HasValue
@@ -143,7 +143,7 @@ namespace kafka_tests.Unit
 
             Assert.That(reader.ReadInt32(), Is.EqualTo(request.OffsetCommits.Count), "[TopicName]");
             foreach (var payload in request.OffsetCommits) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Topic), "TopicName");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
                 Assert.That(reader.ReadInt64(), Is.EqualTo(payload.Offset), "Offset");
@@ -151,7 +151,7 @@ namespace kafka_tests.Unit
                 if (request.ApiVersion == 1) {
                     Assert.That(reader.ReadInt64(), Is.EqualTo(payload.TimeStamp), "TimeStamp");
                 }
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Metadata), "Metadata");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Metadata), "Metadata");
             }
         }
 
@@ -179,13 +179,13 @@ namespace kafka_tests.Unit
             Assert.That(reader.ReadInt32(), Is.EqualTo(response.Brokers.Count), "[Broker]");
             foreach (var payload in response.Brokers) {
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.BrokerId), "NodeId");
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Host), "Host");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Host), "Host");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.Port), "Port");
             }
             Assert.That(reader.ReadInt32(), Is.EqualTo(response.Topics.Count), "[TopicMetadata]");
             foreach (var payload in response.Topics) {
                 Assert.That(reader.ReadInt16(), Is.EqualTo((short)payload.ErrorCode), "TopicErrorCode");
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Name), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Name), "TopicName");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.Partitions.Count), "[PartitionMetadata]");
                 foreach (var partition in payload.Partitions) {
                     Assert.That(reader.ReadInt16(), Is.EqualTo((short) partition.ErrorCode), "PartitionErrorCode");
@@ -213,7 +213,7 @@ namespace kafka_tests.Unit
         {
             Assert.That(reader.ReadInt32(), Is.EqualTo(request.Topics.Count), "[TopicName]");
             foreach (var payload in request.Topics) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload), "TopicName");
             }
         }
 
@@ -233,7 +233,7 @@ namespace kafka_tests.Unit
             var responses = response.ToList();
             Assert.That(reader.ReadInt32(), Is.EqualTo(responses.Count), "[TopicName]");
             foreach (var payload in responses) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Topic), "TopicName");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
                 Assert.That(reader.ReadInt16(), Is.EqualTo(payload.Error), "ErrorCode");
@@ -265,7 +265,7 @@ namespace kafka_tests.Unit
 
             Assert.That(reader.ReadInt32(), Is.EqualTo(request.Offsets.Count), "[TopicName]");
             foreach (var payload in request.Offsets) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Topic), "TopicName");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
 
@@ -297,7 +297,7 @@ namespace kafka_tests.Unit
             }
             Assert.That(reader.ReadInt32(), Is.EqualTo(responses.Count), "[TopicName]");
             foreach (var payload in responses) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Topic), "TopicName");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
                 Assert.That(reader.ReadInt16(), Is.EqualTo(payload.Error), "Error");
@@ -339,7 +339,7 @@ namespace kafka_tests.Unit
 
             Assert.That(reader.ReadInt32(), Is.EqualTo(request.Fetches.Count), "[TopicName]");
             foreach (var payload in request.Fetches) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Topic), "TopicName");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
 
@@ -372,7 +372,7 @@ namespace kafka_tests.Unit
             var responses = response.ToList();
             Assert.That(reader.ReadInt32(), Is.EqualTo(responses.Count), "[TopicName]");
             foreach (var payload in responses) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Topic), "TopicName");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.PartitionId), "Partition");
                 Assert.That(reader.ReadInt16(), Is.EqualTo(payload.Error), "Error");
@@ -417,7 +417,7 @@ namespace kafka_tests.Unit
 
             Assert.That(reader.ReadInt32(), Is.EqualTo(request.Payload.Count), "[topic_data]");
             foreach (var payload in request.Payload) {
-                Assert.That(reader.ReadString(), Is.EqualTo(payload.Topic), "TopicName");
+                Assert.That(reader.ReadInt16String(), Is.EqualTo(payload.Topic), "TopicName");
                 Assert.That(reader.ReadInt32(), Is.EqualTo(1), "[Partition]"); // this is a mismatch between the protocol and the object model
                 Assert.That(reader.ReadInt32(), Is.EqualTo(payload.Partition), "Partition");
 
@@ -560,7 +560,7 @@ namespace kafka_tests.Unit
             Assert.That(reader.ReadInt16(), Is.EqualTo((short) apiKey), "api_key");
             Assert.That(reader.ReadInt16(), Is.EqualTo(version), "api_version");
             Assert.That(reader.ReadInt32(), Is.EqualTo(correlationId), "correlation_id");
-            Assert.That(reader.ReadString(), Is.EqualTo(clientId), "client_id");
+            Assert.That(reader.ReadInt16String(), Is.EqualTo(clientId), "client_id");
         }
 
         /// <summary>

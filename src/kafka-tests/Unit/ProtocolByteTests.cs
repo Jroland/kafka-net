@@ -146,7 +146,7 @@ namespace kafka_tests.Unit
 
                 writer.Write(topicsPerRequest);
                 for (var t = 0; t < topicsPerRequest; t++) {
-                    writer.Write(topic + t);
+                    writer.Write(topic + t, StringPrefixEncoding.Int16);
                     writer.Write(1); // partitionsPerTopic
                     writer.Write(t % totalPartitions);
                     writer.Write((short)errorCode);
@@ -278,7 +278,7 @@ namespace kafka_tests.Unit
                 }
                 writer.Write(topicsPerRequest);
                 for (var t = 0; t < topicsPerRequest; t++) {
-                    writer.Write(topic + t);
+                    writer.Write(topic + t, StringPrefixEncoding.Int16);
                     writer.Write(1); // partitionsPerTopic
                     writer.Write(t % totalPartitions);
                     writer.Write((short)errorCode);
@@ -386,7 +386,7 @@ namespace kafka_tests.Unit
 
                 writer.Write(topicsPerRequest);
                 for (var t = 0; t < topicsPerRequest; t++) {
-                    writer.Write(topic + t);
+                    writer.Write(topic + t, StringPrefixEncoding.Int16);
                     writer.Write(1); // partitionsPerTopic
                     writer.Write(t % totalPartitions);
                     writer.Write((short)errorCode);
@@ -488,14 +488,14 @@ namespace kafka_tests.Unit
                 writer.Write(brokersPerRequest);
                 for (var b = 0; b < brokersPerRequest; b++) {
                     writer.Write(b);
-                    writer.Write("broker-" + b);
+                    writer.Write("broker-" + b, StringPrefixEncoding.Int16);
                     writer.Write(9092 + b);
                 }
 
                 writer.Write(topicsPerRequest);
                 for (var t = 0; t < topicsPerRequest; t++) {
                     writer.Write((short) errorCode);
-                    writer.Write(topic + t);
+                    writer.Write(topic + t, StringPrefixEncoding.Int16);
                     writer.Write(partitionsPerTopic);
                     for (var p = 0; p < partitionsPerTopic; p++) {
                         writer.Write((short) errorCode);
@@ -630,7 +630,7 @@ namespace kafka_tests.Unit
 
                 writer.Write(topicsPerRequest);
                 for (var t = 0; t < topicsPerRequest; t++) {
-                    writer.Write(topic + t);
+                    writer.Write(topic + t, StringPrefixEncoding.Int16);
                     writer.Write(partitionsPerTopic);
                     for (var p = 0; p < partitionsPerTopic; p++) {
                         writer.Write(p);
@@ -731,13 +731,13 @@ namespace kafka_tests.Unit
 
                 writer.Write(topicsPerRequest);
                 for (var t = 0; t < topicsPerRequest; t++) {
-                    writer.Write(topic + t);
+                    writer.Write(topic + t, StringPrefixEncoding.Int16);
                     writer.Write(partitionsPerTopic);
                     for (var p = 0; p < partitionsPerTopic; p++) {
                         writer.Write(p);
                         var offset = (long)randomizer.Next(int.MinValue, int.MaxValue);
                         writer.Write(offset);
-                        writer.Write(offset >= 0 ? topic : string.Empty);
+                        writer.Write(offset >= 0 ? topic : string.Empty, StringPrefixEncoding.Int16);
                         writer.Write((short) errorCode);
                     }
                 }
@@ -811,7 +811,7 @@ namespace kafka_tests.Unit
                 writer.WriteResponseHeader(correlationId);
                 writer.Write((short)errorCode);
                 writer.Write(coordinatorId);
-                writer.Write("broker-" + coordinatorId);
+                writer.Write("broker-" + coordinatorId, StringPrefixEncoding.Int16);
                 writer.Write(9092 + coordinatorId);
 
                 data = new byte[stream.Position];
