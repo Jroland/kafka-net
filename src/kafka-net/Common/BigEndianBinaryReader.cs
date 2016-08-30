@@ -104,11 +104,6 @@ namespace KafkaNet.Common
             return EndianAwareRead(8, BitConverter.ToUInt64);
         }
 
-        public override string ReadString()
-        {
-            return ReadInt16String();
-        }
-
         public byte[] ReadBytes()
         {
             return ReadIntPrefixedBytes();
