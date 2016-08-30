@@ -305,7 +305,8 @@ namespace kafka_tests.Unit
 
                 var finalPosition = reader.ReadInt32() + reader.Position;
                 reader.AssertMessageSet(version, payload.Messages);
-                Assert.That(reader.Position, Is.EqualTo(finalPosition), $"MessageSetSize was {finalPosition - 4} but ended in a different spot.");
+                Assert.That(reader.Position, Is.EqualTo(finalPosition),
+                            string.Format("MessageSetSize was {0} but ended in a different spot.", finalPosition - 4));
             }
         }
 
@@ -422,7 +423,8 @@ namespace kafka_tests.Unit
 
                 var finalPosition = reader.ReadInt32() + reader.Position;
                 reader.AssertMessageSet(request.ApiVersion, payload.Messages);
-                Assert.That(reader.Position, Is.EqualTo(finalPosition), $"MessageSetSize was {finalPosition - 4} but ended in a different spot.");
+                Assert.That(reader.Position, Is.EqualTo(finalPosition),
+                            string.Format("MessageSetSize was {0} but ended in a different spot.", finalPosition - 4));
             }
         }
 
@@ -445,7 +447,8 @@ namespace kafka_tests.Unit
                 }
                 var finalPosition = reader.ReadInt32() + reader.Position;
                 reader.AssertMessage(version, message);
-                Assert.That(reader.Position, Is.EqualTo(finalPosition), $"MessageSize was {finalPosition - 4} but ended in a different spot.");
+                Assert.That(reader.Position, Is.EqualTo(finalPosition),
+                            string.Format("MessageSize was {0} but ended in a different spot.", finalPosition - 4));
             }
         }
 
@@ -584,7 +587,8 @@ namespace kafka_tests.Unit
             using (var reader = new BigEndianBinaryReader(bytes)) {
                 var finalPosition = reader.ReadInt32() + reader.Position;
                 assertions(reader);
-                Assert.That(finalPosition, Is.EqualTo(reader.Position), $"Size was {finalPosition - 4} but ended in a different spot.");
+                Assert.That(finalPosition, Is.EqualTo(reader.Position),
+                            string.Format("Size was {0} but ended in a different spot.", finalPosition - 4));
             }
         }
 
