@@ -65,12 +65,12 @@ namespace kafka_tests.Unit
         [Test]
         public void ProduceApiRequest(
             [Values(0, 1, 2)] short version,
-            [Values(0, 1, 2, -1)] short acks, 
-            [Values(0, 1, 1000)] int timeoutMilliseconds, 
+            [Values(0, 2, -1)] short acks, 
+            [Values(0, 1000)] int timeoutMilliseconds, 
             [Values("test", "a really long name, with spaces and punctuation!")] string topic, 
             [Values(1, 10)] int topicsPerRequest, 
             [Values(1, 5)] int totalPartitions, 
-            [Values(1, 2, 3)] int messagesPerSet)
+            [Values(3)] int messagesPerSet)
         {
             var clientId = "ProduceApiRequest";
 
@@ -124,16 +124,15 @@ namespace kafka_tests.Unit
         [Test]
         public void ProduceApiResponse(
             [Values(0, 1, 2)] short version,
-            [Values(-1, 0, 123456, 10000000)] long timestampMilliseconds, 
+            [Values(-1, 0, 10000000)] long timestampMilliseconds, 
             [Values("test", "a really long name, with spaces and punctuation!")] string topic, 
             [Values(1, 10)] int topicsPerRequest, 
             [Values(1, 5)] int totalPartitions, 
             [Values(
                 ErrorResponseCode.NoError,
-                ErrorResponseCode.InvalidMessage,
-                ErrorResponseCode.NotCoordinatorForConsumerCode
+                ErrorResponseCode.InvalidMessage
             )] ErrorResponseCode errorCode,
-            [Values(0, 1234, 100000)] int throttleTime)
+            [Values(0, 100000)] int throttleTime)
         {
             var randomizer = new Randomizer();
             var clientId = "ProduceApiResponse";
@@ -196,12 +195,12 @@ namespace kafka_tests.Unit
         [Test]
         public void FetchApiRequest(
             [Values(0, 1, 2)] short version,
-            [Values(0, 10, 100)] int timeoutMilliseconds, 
+            [Values(0, 100)] int timeoutMilliseconds, 
             [Values(0, 64000)] int minBytes, 
             [Values("test", "a really long name, with spaces and punctuation!")] string topic, 
             [Values(1, 10)] int topicsPerRequest, 
             [Values(1, 5)] int totalPartitions, 
-            [Values(64000, 25600000)] int maxBytes)
+            [Values(25600000)] int maxBytes)
         {
             var randomizer = new Randomizer();
             var clientId = "FetchApiRequest";
@@ -256,12 +255,9 @@ namespace kafka_tests.Unit
             [Values(1, 5)] int totalPartitions, 
             [Values(
                 ErrorResponseCode.NoError,
-                ErrorResponseCode.OffsetOutOfRange,
-                ErrorResponseCode.NotLeaderForPartition,
-                ErrorResponseCode.ReplicaNotAvailable,
-                ErrorResponseCode.Unknown
+                ErrorResponseCode.OffsetOutOfRange
             )] ErrorResponseCode errorCode, 
-            [Values(2, 3)] int messagesPerSet
+            [Values(3)] int messagesPerSet
             )
         {
             var randomizer = new Randomizer();
@@ -470,10 +466,7 @@ namespace kafka_tests.Unit
             [Values(1, 5)] int partitionsPerTopic,
             [Values(
                  ErrorResponseCode.NoError,
-                 ErrorResponseCode.UnknownTopicOrPartition,
-                 ErrorResponseCode.LeaderNotAvailable,
-                 ErrorResponseCode.InvalidTopic,
-                 ErrorResponseCode.TopicAuthorizationFailed
+                 ErrorResponseCode.UnknownTopicOrPartition
              )] ErrorResponseCode errorCode)
         {
             var randomizer = new Randomizer();
@@ -549,12 +542,12 @@ namespace kafka_tests.Unit
         public void OffsetCommitApiRequest(
             [Values(0, 1, 2)] short version,
             [Values("group1", "group2")] string groupId,
-            [Values(0, 1, 2)] int generation,
-            [Values(-1, 1024, 20000)] int retentionTime,
+            [Values(0, 5)] int generation,
+            [Values(-1, 20000)] int retentionTime,
             [Values("test", "a really long name, with spaces and punctuation!")] string topic,
             [Values(1, 10)] int topicsPerRequest,
             [Values(5)] int maxPartitions,
-            [Values(1, 10)] int maxOffsets,
+            [Values(10)] int maxOffsets,
             [Values(null, "something useful for the client")] string metadata)
         {
             var clientId = "OffsetCommitApiRequest";
@@ -609,15 +602,7 @@ namespace kafka_tests.Unit
             [Values(1, 5)] int partitionsPerTopic,
             [Values(
                  ErrorResponseCode.NoError,
-                 ErrorResponseCode.OffsetMetadataTooLargeCode,
-                 ErrorResponseCode.OffsetsLoadInProgressCode,
-                 ErrorResponseCode.NotCoordinatorForConsumerCode,
-                 ErrorResponseCode.IllegalGeneration,
-                 ErrorResponseCode.UnknownMemberId,
-                 ErrorResponseCode.RebalanceInProgress,
-                 ErrorResponseCode.InvalidCommitOffsetSize,
-                 ErrorResponseCode.TopicAuthorizationFailed,
-                 ErrorResponseCode.GroupAuthorizationFailed
+                 ErrorResponseCode.OffsetMetadataTooLargeCode
              )] ErrorResponseCode errorCode)
         {
             var clientId = "OffsetCommitApiResponse";
