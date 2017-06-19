@@ -55,9 +55,8 @@ namespace kafka_tests.Unit
         [TestCase((UInt32)0, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((UInt32)1, new Byte[] { 0x00, 0x00, 0x00, 0x01 })]
         [TestCase((UInt32)123456789, new Byte[] { 0x07, 0x5B, 0xCD, 0x15 })]
-        [TestCase(UInt32.MinValue, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase(UInt32.MaxValue, new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF })]
-        public void UInt32Tests(UInt32 expectedValue, Byte[] givenBytes)
+        public void UInt32FromBytesTests(UInt32 expectedValue, Byte[] givenBytes)
         {
             // arrange
             var binaryReader = new BigEndianBinaryReader(givenBytes);
@@ -142,9 +141,9 @@ namespace kafka_tests.Unit
         }
 
         [Theory]
-        [TestCase(new Char[] { '0', '0', '0', '0' }, new Byte[] { 0x30, 0x30, 0x30, 0x30 })]
-        [TestCase(new Char[] { '€', '€', '€', '€' }, new Byte[] { 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC })]
-        public void CharArrayTests(Char[] expectedValue, Byte[] givenBytes)
+        [TestCase(1, new Char[] { '0', '0', '0', '0' }, new Byte[] { 0x30, 0x30, 0x30, 0x30 })]
+        [TestCase(2, new Char[] { '€', '€', '€', '€' }, new Byte[] { 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC })]
+        public void CharArrayFromBytesTests(int testCase, Char[] expectedValue, Byte[] givenBytes)
         {
             // arrange
             var binaryReader = new BigEndianBinaryReader(givenBytes);

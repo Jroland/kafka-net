@@ -17,10 +17,12 @@ namespace KafkaNet
     {
         private const int MaxDisposeWaitSeconds = 30;
         private const int DefaultAckTimeoutMS = 1000;
+        private const int DefaultMessageTimeoutMS = DefaultAckTimeoutMS + 1000;
         private const int MaximumAsyncRequests = 20;
         private const int MaximumMessageBuffer = 1000;
         private const int DefaultBatchDelayMS = 100;
         private const int DefaultBatchSize = 100;
+        public const short ErrorOnTimeout = -1;
 
         private readonly CancellationTokenSource _stopToken = new CancellationTokenSource();
         private readonly int _maximumAsyncRequests;
@@ -109,13 +111,14 @@ namespace KafkaNet
         /// <param name="codec">The codec to apply to the message collection.  Defaults to none.</param>
         /// <returns>List of ProduceResponses from each partition sent to or empty list if acks = 0.</returns>
         public async Task<List<ProduceResponse>> SendMessageAsync(string topic, IEnumerable<Message> messages, Int16 acks = 1,
-            TimeSpan? timeout = null, MessageCodec codec = MessageCodec.CodecNone)
+            TimeSpan? timeout = null, MessageCodec codec = MessageCodec.CodecNone, TimeSpan? messageTimeout = null)
         {
             if (_stopToken.IsCancellationRequested)
                 throw new ObjectDisposedException("Cannot send new documents as producer is disposing.");
             if (timeout == null) timeout = TimeSpan.FromMilliseconds(DefaultAckTimeoutMS);
+            if (messageTimeout == null) messageTimeout = TimeSpan.FromMilliseconds(DefaultMessageTimeoutMS);
 
-            var batch = messages.Select(message => new TopicMessage
+            var batch = messages.Select(message => new TopicMessage(messageTimeout.Value)
             {
                 Acks = acks,
                 Codec = codec,
@@ -126,7 +129,7 @@ namespace KafkaNet
 
             _asyncCollection.AddRange(batch);
 
-            await Task.WhenAll(batch.Select(x => x.Tcs.Task));
+            await Task.WhenAll(batch.Select(x => x.Tcs.Task)).ConfigureAwait(false);
 
             return batch.Select(topicMessage => topicMessage.Tcs.Task.Result)
                                 .Distinct()
@@ -332,9 +335,17 @@ namespace KafkaNet
         public string Topic { get; set; }
         public Message Message { get; set; }
 
-        public TopicMessage()
+        public TopicMessage(TimeSpan messageTimeout)
         {
             Tcs = new TaskCompletionSource<ProduceResponse>();
+            Tcs.TimeoutAfter(
+                (int)messageTimeout.TotalMilliseconds, 
+                null, 
+                new ProduceResponse()
+                {
+                    Topic = Topic,
+                    Error = Producer.ErrorOnTimeout
+                });
         }
     }
 
