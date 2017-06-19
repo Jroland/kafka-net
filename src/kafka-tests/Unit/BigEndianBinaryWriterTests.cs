@@ -79,9 +79,8 @@ namespace kafka_tests.Unit
         [TestCase((UInt32)0, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase((UInt32)1, new Byte[] { 0x00, 0x00, 0x00, 0x01 })]
         [TestCase((UInt32)123456789, new Byte[] { 0x07, 0x5B, 0xCD, 0x15 })]
-        [TestCase(UInt32.MinValue, new Byte[] { 0x00, 0x00, 0x00, 0x00 })]
         [TestCase(UInt32.MaxValue, new Byte[] { 0xFF, 0xFF, 0xFF, 0xFF })]
-        public void UInt32Tests(UInt32 number, Byte[] expectedBytes)
+        public void UInt32ToBytesTests(UInt32 number, Byte[] expectedBytes)
         {
             // arrange
             var memoryStream = new MemoryStream();
@@ -197,9 +196,9 @@ namespace kafka_tests.Unit
         }
 
         [Theory]
-        [TestCase(new Char[] { '0', '0', '0', '0' }, new Byte[] { 0x30, 0x30, 0x30, 0x30 })]
-        [TestCase(new Char[] { '€', '€', '€', '€' }, new Byte[] { 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC })]
-        public void CharArrayTests(Char[] value, Byte[] expectedBytes)
+        [TestCase(1, new Char[] { '0', '0', '0', '0' }, new Byte[] { 0x30, 0x30, 0x30, 0x30 })]
+        [TestCase(2, new Char[] { '€', '€', '€', '€' }, new Byte[] { 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC, 0xE2, 0x82, 0xAC })]
+        public void CharArrayToBytesTests(int testCase, Char[] value, Byte[] expectedBytes)
         {
             // arrange
             var memoryStream = new MemoryStream();
@@ -214,9 +213,9 @@ namespace kafka_tests.Unit
         }
 
         [Theory]
-        [TestCase(new Char[] { '0', '1', '2', '3' }, 1, 2, new Byte[] { 0x31, 0x32 })]
-        [TestCase(new Char[] { '€', '2', '€', '€' }, 1, 2, new Byte[] { 0x32, 0xE2, 0x82, 0xAC })]
-        public void CharSubArrayTests(Char[] value, Int32 index, Int32 count, Byte[] expectedBytes)
+        [TestCase(1, new Char[] { '0', '1', '2', '3' }, 1, 2, new Byte[] { 0x31, 0x32 })]
+        [TestCase(2, new Char[] { '€', '2', '€', '€' }, 1, 2, new Byte[] { 0x32, 0xE2, 0x82, 0xAC })]
+        public void CharSubArrayTests(int testCase, Char[] value, Int32 index, Int32 count, Byte[] expectedBytes)
         {
             // arrange
             var memoryStream = new MemoryStream();

@@ -73,5 +73,26 @@ namespace kafka_tests.Integration
                 Assert.That(result.Count, Is.EqualTo(2));
             }
         }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [MaxTime(5000)]
+        public async Task UnreachableHost_Timeout_Test(short acks)
+        {
+            using (var router = new BrokerRouter(new KafkaOptions(new Uri("http://localhost:1234"))))
+            using (var producer = new Producer(router))
+            {
+                var result = await producer.SendMessageAsync(
+                    IntegrationConfig.IntegrationTopic, 
+                    new[] { new Message("1") },
+                    acks,
+                    TimeSpan.FromMilliseconds(200)
+                ).ConfigureAwait(false);
+
+                Assert.That(result.Count, Is.EqualTo(1));
+                Assert.That(result[0].Error, Is.EqualTo(Producer.ErrorOnTimeout));
+            }
+        }
+
     }
 }

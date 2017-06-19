@@ -265,9 +265,9 @@ namespace KafkaNet.Common
             {
                 // We've already timed out.
                 if (exceptionOnTimeout != null)
-                    tcs.SetException(exceptionOnTimeout);
+                    tcs.TrySetException(exceptionOnTimeout);
                 else
-                    tcs.SetResult(resultOnTimeout);
+                    tcs.TrySetResult(resultOnTimeout);
                 return tcs.Task;
             }
 
