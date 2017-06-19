@@ -86,7 +86,7 @@ namespace kafka_tests.Integration
                     IntegrationConfig.IntegrationTopic, 
                     new[] { new Message("1") },
                     acks,
-                    TimeSpan.FromMilliseconds(200)
+                    messageTimeout: TimeSpan.FromMilliseconds(200)
                 ).ConfigureAwait(false);
 
                 Assert.That(result.Count, Is.EqualTo(1));
