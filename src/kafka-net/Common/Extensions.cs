@@ -251,7 +251,7 @@ namespace KafkaNet.Common
             T resultOnTimeout = default(T)
         )
         {
-            if (tcs == null) throw new ArgumentNullException(nameof(tcs));
+            if (tcs == null) throw new ArgumentNullException("tcs");
             // Short-circuit #1: infinite timeout or task already completed
             if (tcs.Task.IsCompleted || (millisecondsTimeout == Timeout.Infinite))
             {
