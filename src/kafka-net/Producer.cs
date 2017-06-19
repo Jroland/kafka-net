@@ -333,7 +333,7 @@ namespace KafkaNet
         public string Topic { get; set; }
         public Message Message { get; set; }
 
-        public Lazy<Task<ProduceResponse>> Task { get; }
+        public Lazy<Task<ProduceResponse>> Task { get; private set; }
 
         public TopicMessage()
         {
