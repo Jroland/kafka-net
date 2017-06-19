@@ -21,6 +21,7 @@ namespace KafkaNet
         private const int MaximumMessageBuffer = 1000;
         private const int DefaultBatchDelayMS = 100;
         private const int DefaultBatchSize = 100;
+        public const short ErrorOnTimeout = -1;
 
         private readonly CancellationTokenSource _stopToken = new CancellationTokenSource();
         private readonly int _maximumAsyncRequests;
@@ -126,9 +127,9 @@ namespace KafkaNet
 
             _asyncCollection.AddRange(batch);
 
-            await Task.WhenAll(batch.Select(x => x.Tcs.Task));
+            await Task.WhenAll(batch.Select(x => x.Task.Value));
 
-            return batch.Select(topicMessage => topicMessage.Tcs.Task.Result)
+            return batch.Select(topicMessage => topicMessage.Task.Value.Result)
                                 .Distinct()
                                 .ToList();
         }
@@ -332,9 +333,21 @@ namespace KafkaNet
         public string Topic { get; set; }
         public Message Message { get; set; }
 
+        public Lazy<Task<ProduceResponse>> Task { get; }
+
         public TopicMessage()
         {
             Tcs = new TaskCompletionSource<ProduceResponse>();
+            Task = new Lazy<Task<ProduceResponse>>(() => {
+                return Tcs.TimeoutAfter(
+                    (int)Timeout.TotalMilliseconds, 
+                    null, 
+                    new ProduceResponse()
+                    {
+                        Topic = Topic,
+                        Error = Producer.ErrorOnTimeout
+                    });
+            }, LazyThreadSafetyMode.ExecutionAndPublication);
         }
     }
 

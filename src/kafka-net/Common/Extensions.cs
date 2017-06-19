@@ -234,5 +234,95 @@ namespace KafkaNet.Common
             
             return new ApplicationException("Unknown exception occured.");
         }
+
+        /// <summary>
+        /// https://blogs.msdn.microsoft.com/pfxteam/2011/11/10/crafting-a-task-timeoutafter-method/
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="tcs"></param>
+        /// <param name="millisecondsTimeout"></param>
+        /// <param name="exceptionOnTimeout">exception to be set on timeout</param>
+        /// <param name="resultOnTimeout">result to be set on timeout (in case exceptionOnTimeout is null)</param>
+        /// <returns></returns>
+        public static Task<T> TimeoutAfter<T>(
+            this TaskCompletionSource<T> tcs, 
+            int millisecondsTimeout,
+            Exception exceptionOnTimeout = null,
+            T resultOnTimeout = default(T)
+        )
+        {
+            if (tcs == null) throw new ArgumentNullException(nameof(tcs));
+            // Short-circuit #1: infinite timeout or task already completed
+            if (tcs.Task.IsCompleted || (millisecondsTimeout == Timeout.Infinite))
+            {
+                // Either the task has already completed or timeout will never occur.
+                // No proxy necessary.
+                return tcs.Task;
+            }
+
+            // Short-circuit #2: zero timeout
+            if (millisecondsTimeout == 0)
+            {
+                // We've already timed out.
+                if (exceptionOnTimeout != null)
+                    tcs.SetException(exceptionOnTimeout);
+                else
+                    tcs.SetResult(resultOnTimeout);
+                return tcs.Task;
+            }
+
+            // Set up a timer to complete after the specified timeout period
+            Timer timer = new Timer(state =>
+            {
+                // Recover your state information
+                var myTcs = (TaskCompletionSource<T>)state;
+
+                // Fault our proxy with a TimeoutException
+                if (exceptionOnTimeout != null)
+                    myTcs.TrySetException(exceptionOnTimeout);
+                else
+                    myTcs.TrySetResult(resultOnTimeout);
+            }, tcs, millisecondsTimeout, Timeout.Infinite);
+
+            // Wire up the logic for what happens when source task completes
+            tcs.Task.ContinueWith((antecedent, state) =>
+            {
+                // Recover our state data
+                var tuple =
+                    (Tuple<Timer, TaskCompletionSource<T>>)state;
+
+                // Cancel the Timer
+                tuple.Item1.Dispose();
+
+                // Marshal results to proxy
+                MarshalTaskResults(antecedent, tuple.Item2);
+            },
+            Tuple.Create(timer, tcs),
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+
+            return tcs.Task;
+        }
+
+        internal static void MarshalTaskResults<TResult>(
+            Task source, TaskCompletionSource<TResult> proxy)
+        {
+            switch (source.Status)
+            {
+                case TaskStatus.Faulted:
+                    proxy.TrySetException(source.Exception);
+                    break;
+                case TaskStatus.Canceled:
+                    proxy.TrySetCanceled();
+                    break;
+                case TaskStatus.RanToCompletion:
+                    Task<TResult> castedSource = source as Task<TResult>;
+                    proxy.TrySetResult(
+                        castedSource == null ? default(TResult) : // source is a Task
+                            castedSource.Result); // source is a Task<TResult>
+                    break;
+            }
+        }
     }
 }
